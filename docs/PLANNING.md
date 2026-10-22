@@ -1,10 +1,12 @@
-# Read-only state-aware plan
+# Read-only Podman planning
 
-`orisema plan examples/nginx.yaml` now queries local Podman (`podman ps -a --format json`) and classifies each requested service:
+`orisema plan examples/nginx.yaml` reads `podman ps -a --format json` and inspects existing matching containers using `podman inspect --type container`.
 
-- `CREATE`: the expected container name does not exist.
-- `REVIEW`: the name already exists; no automatic replacement is allowed.
+- `CREATE`: expected container name does not exist.
+- `REVIEW`: existing container lacks matching Orisema ownership labels, or inspection fails. No adoption.
+- `DRIFT`: owned container has a different configured image reference or published port bindings.
+- `NOOP`: ownership labels, configured image reference and declared TCP port bindings match.
 
-**Important:** A matching name, image tag or running state is not proof of equivalence. This planner does not inspect port bindings, labels, digests, health, volumes or security options. `REVIEW` does not mean `NOOP` or that the container is managed by Orisema.
+**NOOP is intentionally limited:** it does not verify image digest, image freshness, running state, health, volumes, restart policy, security settings, firewall, or other runtime settings. It is not a declaration of full equivalence or production readiness. `plan` never changes containers.
 
-The existing `deploy` command remains create-only and refuses any existing name. It does not automatically execute this plan. No rollback or multi-service atomicity is implemented.
+`deploy` remains create-only and refuses existing names; it does not execute this plan or automatically reconcile drift. No rollback or atomic multi-service deployment is available.

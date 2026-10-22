@@ -162,8 +162,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stdout, "    finished: %s\n", item.State.FinishedAt)
 			}
 			health := "not configured or unavailable"
-			if item.State.Healthcheck != nil { health = item.State.Healthcheck.Status }
-			if item.State.Health != nil { health = item.State.Health.Status }
+			if item.State.Healthcheck != nil && item.State.Healthcheck.Status != "" { health = item.State.Healthcheck.Status }
+			if item.State.Health != nil && item.State.Health.Status != "" { health = item.State.Health.Status }
 			fmt.Fprintf(stdout, "    health: %s\n", health)
 		}
 

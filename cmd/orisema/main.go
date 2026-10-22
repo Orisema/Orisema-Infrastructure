@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
 )
 
@@ -29,14 +30,16 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "validate":
 		fmt.Fprintf(stdout, "valid: %s (%d services)\n", m.Name, len(m.Services))
 	case "plan":
-		fmt.Fprintf(stdout, "Proposed deployment for %q (no host inspected; no changes made):\n", m.Name)
-		for _, s := range m.Services {
-			fmt.Fprintf(stdout, "  - service %q: image %q\n", s.Name, s.Image)
-			for _, p := range s.Ports {
-				fmt.Fprintf(stdout, "      port: %d -> %d/tcp\n", p.Host, p.Container)
-			}
+		containers, err := (runtime.Client{}).List(context.Background())
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
 		}
-		fmt.Fprintln(stdout, "Note: this is a manifest preview, not a host state diff or executable deployment plan.")
+		fmt.Fprintf(stdout, "Read-only Podman plan for %q:\n", m.Name)
+		for _, step := range planner.Build(m, containers) {
+			fmt.Fprintf(stdout, "  [%s] %s: %s (%s)\n", step.Action, step.Name, step.Image, step.Reason)
+		}
+		fmt.Fprintln(stdout, "REVIEW means existing name, NOT verified equivalence. No changes made.")
 	case "deploy":
 		containers, err := (runtime.Client{}).List(context.Background())
 		if err != nil { fmt.Fprintf(stderr, "error: %v\n", err); return 1 }

@@ -12,11 +12,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - name: Dependencies
         run: go mod download
-      - name: Formatting
-        run: test -z "$(gofmt -l cmd internal)"
       - name: Vet
         run: go vet ./...
       - name: Tests

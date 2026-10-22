@@ -28,3 +28,25 @@ The `plan` command **only prints the requested services**. It does not connect t
 - Only service names, images and TCP port mappings are represented.
 - No support yet for secrets, storage, networking, security contexts or runtime operations.
 - Do not use this prototype to deploy production applications.
+
+## Experimental deployment (create-only)
+
+**Use only on a disposable test host.** Run `validate` and inspect the manifest first.
+
+```sh
+go run ./cmd/orisema deploy examples/nginx.yaml
+# Type DEPLOY when prompted.
+go run ./cmd/orisema status examples/nginx.yaml
+curl -I http://127.0.0.1:8080/
+```
+
+Deployment uses `podman run --detach` with a managed label and `no-new-privileges`. It refuses an existing exact container name and never uses `--replace`. Published ports bind on all host interfaces by default, so verify the firewall and avoid production servers.
+
+**Known limitations:** No rollback, no idempotent updates, no volume support, no health verification, no preflight check for port conflicts, no image digest enforcement, no transaction across multiple services. A failure may leave a created container behind. Podman itself detects conflicts when creating containers. Do not use this command for sensitive workloads.
+
+To clean up the test manually after confirming its identity:
+
+```sh
+podman stop orisema-hello-orisema-web
+podman rm orisema-hello-orisema-web
+```

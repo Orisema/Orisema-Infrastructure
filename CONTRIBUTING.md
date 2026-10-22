@@ -10,4 +10,4 @@ Nesta fase, priorizamos revisão de documentação, discussões sobre escopo, te
 4. Prefira mudanças pequenas, documentadas e reproduzíveis.
 5. Trate os demais colaboradores com respeito.
 
-**Atenção:** a licença de código ainda será definida. Evite enviar contribuições substanciais de código até a publicação do arquivo `LICENSE` e das regras de contribuição correspondentes.
+Ao enviar uma contribuição para inclusão no projeto, você concorda que ela seja disponibilizada sob a [Apache License 2.0](LICENSE), conforme a seção 5 da licença, salvo declaração explícita em contrário. Envie apenas conteúdo que você tem direito de licenciar e preserve avisos de atribuição de terceiros.

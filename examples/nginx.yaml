@@ -1,0 +1,9 @@
+# Example only. No containers are started by validate or plan.
+apiVersion: orisema.dev/v1alpha1
+name: hello-orisema
+services:
+  - name: web
+    image: docker.io/library/nginx:1.27
+    ports:
+      - host: 8080
+        container: 80

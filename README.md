@@ -25,6 +25,6 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 
 ## Licença
 
-**Pendente de decisão.** Este repositório público ainda não possui uma licença de código. Antes de aceitar contribuições de código, escolheremos e publicaremos uma licença reconhecida como open source.
+Distribuído sob a [Apache License 2.0](LICENSE). Contribuições devem respeitar a licença e os direitos de terceiros.
 
 A Orisema é independente da Mix Fiscal e não incorpora materiais internos ou proprietários de terceiros.

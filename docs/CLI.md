@@ -1,6 +1,6 @@
 # CLI prototype (v0.1.0-dev)
 
-This is a **proof of concept**, not a deployment engine. `status` reads local Podman state; `validate` and `plan` work offline.
+This is an **experimental laboratory CLI**, not production-ready. `validate` works offline; `plan`, `status` and lifecycle commands query local Podman.
 
 ## Requirements
 
@@ -20,16 +20,16 @@ The `validate` command checks the manifest structure, service identifiers, image
 
 The `status` command reads local Podman containers without changing them (see [PODMAN.md](PODMAN.md)).
 
-The `plan` command **only prints the requested services**. It does not connect to Podman, inspect the host, create containers, reserve ports or compare current state. Do not interpret this output as a safe-to-apply plan.
+The `plan` command inspects Podman and compares selected declared fields only. It does not reserve ports or provide full configuration equivalence; see [PLANNING.md](PLANNING.md).
 
 ## Scope and limits
 
 - YAML schema: `orisema.dev/v1alpha1`; subject to breaking changes.
 - Only service names, images and TCP port mappings are represented.
-- No support yet for secrets, storage, networking, security contexts or runtime operations.
+- No support yet for secrets, persistent storage, custom networks, or full security context management.
 - Do not use this prototype to deploy production applications.
 
-## Experimental deployment (create-only)
+## Experimental deployment
 
 **Use only on a disposable test host.** Run `validate` and inspect the manifest first.
 
@@ -40,9 +40,9 @@ go run ./cmd/orisema status examples/nginx.yaml
 curl -I http://127.0.0.1:8080/
 ```
 
-Deployment uses `podman run --detach` with a managed label and `no-new-privileges`. It refuses an existing exact container name and never uses `--replace`. Published ports bind on all host interfaces by default, so verify the firewall and avoid production servers.
+Deployment uses `podman run --detach` with a managed label and `no-new-privileges`. It skips matching owned containers, blocks DRIFT/REVIEW and never uses `--replace`. Published ports bind on all host interfaces by default, so verify the firewall and avoid production servers.
 
-**Known limitations:** No rollback, no idempotent updates, no volume support, no health verification, no preflight check for port conflicts, no image digest enforcement, no transaction across multiple services. A failure may leave a created container behind. Podman itself detects conflicts when creating containers. Do not use this command for sensitive workloads.
+**Known limitations:** No rollback, no automatic updates, no volume support, no health verification, no preflight check for port conflicts, no image digest enforcement, no transaction across multiple services. A failure may leave a created container behind. Podman itself detects conflicts when creating containers. Do not use this command for sensitive workloads.
 
 To clean up the test manually after confirming its identity:
 
@@ -72,3 +72,16 @@ go run ./cmd/orisema start examples/nginx.yaml web
 ```
 
 `logs` returns only the last 100 lines and does not follow. `start` and `stop` require interactive confirmation, inspect ownership before issuing Podman commands, and never remove containers. They do not check desired image/ports, application health, or service dependencies. **Do not run stop on critical workloads.** The earlier `deploy` command still treats a stopped matching container as `NOOP` and will not automatically restart it.
+
+## Detailed status and integration smoke test
+
+`status` now attempts `podman inspect` for existing containers and displays running state, exit code, restart count, start/finish timestamps, ownership and health if available. Health without an explicit healthcheck is reported as unavailable, **not healthy**. Some Podman versions may expose different health fields.
+
+The opt-in integration test only reads an existing test container; it does not create, start, stop or remove anything:
+
+```sh
+ORISEMA_TEST_CONTAINER=orisema-hello-orisema-web go test -v ./internal/runtime
+go run ./cmd/orisema status examples/nginx.yaml
+```
+
+This integration test is skipped in CI unless `ORISEMA_TEST_CONTAINER` is set.

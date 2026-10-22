@@ -4,17 +4,18 @@
 package main
 
 import (
-	"errors"
-	"fmt"
+		"fmt"
 	"io"
 	"os"
+	"context"
+	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
 )
 
 func run(args []string, stdout, stderr io.Writer) int {
-	if len(args) != 2 || (args[0] != "validate" && args[0] != "plan") {
-		fmt.Fprintln(stderr, "Usage: orisema <validate|plan> <manifest.yaml>")
+	if len(args) != 2 || (args[0] != "validate" && args[0] != "plan" && args[0] != "status") {
+		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status> <manifest.yaml>")
 		return 2
 	}
 	m, err := manifest.Load(args[1])
@@ -34,8 +35,21 @@ func run(args []string, stdout, stderr io.Writer) int {
 			}
 		}
 		fmt.Fprintln(stdout, "Note: this is a manifest preview, not a host state diff or executable deployment plan.")
-	default:
-		panic(errors.New("unreachable command"))
+	case "status":
+		containers, err := (runtime.Client{}).List(context.Background())
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Podman status for %q (read-only):\n", m.Name)
+		for _, svc := range m.Services {
+			name := "orisema-" + m.Name + "-" + svc.Name
+			if found, ok := runtime.Find(containers, name); ok {
+				fmt.Fprintf(stdout, "  %s: %s (image: %s)\n", name, found.State, found.Image)
+			} else {
+				fmt.Fprintf(stdout, "  %s: not found\n", name)
+			}
+		}
 	}
 	return 0
 }

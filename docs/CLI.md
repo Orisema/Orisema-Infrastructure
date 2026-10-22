@@ -58,3 +58,17 @@ After the first deployment, rerunning `go run ./cmd/orisema deploy examples/ngin
 If any service is `DRIFT` or `REVIEW`, deployment is blocked for the entire manifest before creating any containers. `CREATE` services still require typing `DEPLOY`. A second check for name collisions happens immediately before each creation.
 
 **Limits:** This is idempotent only for the fields currently compared (ownership labels, image reference, TCP port bindings). `NOOP` does not imply that the container is running or healthy, that the image digest matches, or that security options and other settings are equivalent. A multi-service deployment can partially complete if a later create fails. No rollback, automatic reconciliation or destructive update exists.
+
+## Experimental service lifecycle
+
+Commands require the service to be declared in the provided manifest and the existing container to have matching Orisema ownership labels (`dev.orisema.managed`, `dev.orisema.app`, `dev.orisema.service`).
+
+```sh
+go run ./cmd/orisema logs examples/nginx.yaml web
+go run ./cmd/orisema stop examples/nginx.yaml web
+# Type STOP to confirm
+go run ./cmd/orisema start examples/nginx.yaml web
+# Type START to confirm
+```
+
+`logs` returns only the last 100 lines and does not follow. `start` and `stop` require interactive confirmation, inspect ownership before issuing Podman commands, and never remove containers. They do not check desired image/ports, application health, or service dependencies. **Do not run stop on critical workloads.** The earlier `deploy` command still treats a stopped matching container as `NOOP` and will not automatically restart it.

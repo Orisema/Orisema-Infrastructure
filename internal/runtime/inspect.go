@@ -17,6 +17,16 @@ type Binding struct {
 }
 type Inspection struct {
  Name string `json:"Name"`
+ State struct {
+  Status string `json:"Status"`
+  Running bool `json:"Running"`
+  ExitCode int `json:"ExitCode"`
+  StartedAt string `json:"StartedAt"`
+  FinishedAt string `json:"FinishedAt"`
+  Healthcheck *struct { Status string `json:"Status"` } `json:"Healthcheck"`
+  Health *struct { Status string `json:"Status"` } `json:"Health"`
+ } `json:"State"`
+ RestartCount int `json:"RestartCount"`
  Config struct {
   Image string `json:"Image"`
   Labels map[string]string `json:"Labels"`

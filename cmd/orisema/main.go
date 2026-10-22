@@ -17,14 +17,51 @@ import (
 )
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) != 2 || (args[0] != "validate" && args[0] != "plan" && args[0] != "status" && args[0] != "deploy") {
-		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status|deploy> <manifest.yaml>")
+	if len(args) < 2 {
+		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service>")
+		return 2
+	}
+	operation := args[0]
+	needsService := operation == "logs" || operation == "start" || operation == "stop"
+	if (needsService && len(args) != 3) || (!needsService && (len(args) != 2 || (operation != "validate" && operation != "plan" && operation != "status" && operation != "deploy"))) {
+		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service>")
 		return 2
 	}
 	m, err := manifest.Load(args[1])
 	if err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
+	}
+	if needsService {
+		service := args[2]
+		found := false
+		for _, svc := range m.Services {
+			if svc.Name == service { found = true; break }
+		}
+		if !found {
+			fmt.Fprintf(stderr, "error: service %q not declared in manifest\n", service)
+			return 1
+		}
+		client := runtime.Client{}
+		if operation == "logs" {
+			out, err := client.Logs(context.Background(), m.Name, service)
+			if err != nil { fmt.Fprintf(stderr, "error: %v\n", err); return 1 }
+			_, _ = stdout.Write(out)
+			return 0
+		}
+		fmt.Fprintf(stdout, "Operation: %s orisema-%s-%s\n", operation, m.Name, service)
+		fmt.Fprintf(stdout, "Type %s to confirm: ", strings.ToUpper(operation))
+		answer, err := bufio.NewReader(stdin).ReadString('\n')
+		if err != nil || strings.TrimSpace(answer) != strings.ToUpper(operation) {
+			fmt.Fprintln(stderr, "cancelled")
+			return 1
+		}
+		if err := client.Control(context.Background(), m.Name, service, operation); err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "%s completed for %s\n", operation, service)
+		return 0
 	}
 	switch args[0] {
 	case "validate":

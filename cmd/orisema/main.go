@@ -36,10 +36,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 		fmt.Fprintf(stdout, "Read-only Podman plan for %q:\n", m.Name)
-		for _, step := range planner.Build(m, containers) {
+		for _, step := range planner.BuildInspected(context.Background(), m, containers, runtime.Client{}) {
 			fmt.Fprintf(stdout, "  [%s] %s: %s (%s)\n", step.Action, step.Name, step.Image, step.Reason)
 		}
-		fmt.Fprintln(stdout, "REVIEW means existing name, NOT verified equivalence. No changes made.")
+		fmt.Fprintln(stdout, "NOOP checks only ownership labels, configured image reference and ports; health and other settings not verified. No changes made.")
 	case "deploy":
 		containers, err := (runtime.Client{}).List(context.Background())
 		if err != nil { fmt.Fprintf(stderr, "error: %v\n", err); return 1 }

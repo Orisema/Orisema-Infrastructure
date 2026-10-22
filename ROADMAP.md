@@ -5,7 +5,7 @@ Etapas propostas, sem datas prometidas.
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.
 - [x] Publicar manifesto e documentação inicial.
-- [ ] Escolher licença open source.
+- [x] Escolher licença open source (Apache-2.0).
 - [ ] Definir mantenedores e decisões arquiteturais.
 
 ## Fase 1 — MVP

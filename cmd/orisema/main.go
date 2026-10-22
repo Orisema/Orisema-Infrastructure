@@ -132,7 +132,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "created %s: %s\n", step.Name, id)
 		}
 	case "status":
-		containers, err := (runtime.Client{}).List(context.Background())
+		client := runtime.Client{}
+		containers, err := client.List(context.Background())
 		if err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
@@ -140,12 +141,32 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "Podman status for %q (read-only):\n", m.Name)
 		for _, svc := range m.Services {
 			name := "orisema-" + m.Name + "-" + svc.Name
-			if found, ok := runtime.Find(containers, name); ok {
-				fmt.Fprintf(stdout, "  %s: %s (image: %s)\n", name, found.State, found.Image)
-			} else {
+			found, ok := runtime.Find(containers, name)
+			if !ok {
 				fmt.Fprintf(stdout, "  %s: not found\n", name)
+				continue
 			}
+			item, err := client.Inspect(context.Background(), name)
+			if err != nil {
+				fmt.Fprintf(stdout, "  %s: %s (image: %s; inspect error: %v)\n", name, found.State, found.Image, err)
+				continue
+			}
+			ownership := "unverified"
+			if runtime.Owned(item, m.Name, svc.Name) { ownership = "verified" }
+			fmt.Fprintf(stdout, "  %s: %s (image: %s; ownership: %s)\n", name, item.State.Status, item.Config.Image, ownership)
+			fmt.Fprintf(stdout, "    running: %t; exit code: %d; restarts: %d\n", item.State.Running, item.State.ExitCode, item.RestartCount)
+			if item.State.Running && item.State.StartedAt != "" {
+				fmt.Fprintf(stdout, "    started: %s\n", item.State.StartedAt)
+			}
+			if !item.State.Running && item.State.FinishedAt != "" {
+				fmt.Fprintf(stdout, "    finished: %s\n", item.State.FinishedAt)
+			}
+			health := "not configured or unavailable"
+			if item.State.Healthcheck != nil { health = item.State.Healthcheck.Status }
+			if item.State.Health != nil { health = item.State.Health.Status }
+			fmt.Fprintf(stdout, "    health: %s\n", health)
 		}
+
 	}
 	return 0
 }

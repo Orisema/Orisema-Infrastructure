@@ -41,30 +41,58 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintln(stdout, "NOOP checks only ownership labels, configured image reference and ports; health and other settings not verified. No changes made.")
 	case "deploy":
-		containers, err := (runtime.Client{}).List(context.Background())
-		if err != nil { fmt.Fprintf(stderr, "error: %v\n", err); return 1 }
-		for _, svc := range m.Services {
-			name := "orisema-" + m.Name + "-" + svc.Name
-			if _, found := runtime.Find(containers, name); found {
-				fmt.Fprintf(stderr, "error: %s already exists; no changes made\n", name)
-				return 1
+		client := runtime.Client{}
+		containers, err := client.List(context.Background())
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		steps := planner.BuildInspected(context.Background(), m, containers, client)
+		creates := 0
+		blocked := false
+		fmt.Fprintf(stdout, "Conservative deployment plan for %q:\n", m.Name)
+		for _, step := range steps {
+			fmt.Fprintf(stdout, "  [%s] %s (%s)\n", step.Action, step.Name, step.Reason)
+			switch step.Action {
+			case planner.Create:
+				creates++
+			case planner.Noop:
+				// No action: matching declared fields only.
+			default:
+				blocked = true
 			}
 		}
-		fmt.Fprintf(stdout, "Create-only Podman deployment for %q:\n", m.Name)
-		for _, svc := range m.Services {
-			fmt.Fprintf(stdout, "  create orisema-%s-%s using %s\n", m.Name, svc.Name, svc.Image)
-			for _, p := range svc.Ports { fmt.Fprintf(stdout, "    publish 0.0.0.0:%d -> %d/tcp\n", p.Host, p.Container) }
+		if blocked {
+			fmt.Fprintln(stderr, "deployment blocked: DRIFT or REVIEW requires manual investigation; no changes made")
+			return 1
 		}
-		fmt.Fprintln(stdout, "Images may be downloaded. No existing containers will be replaced. This does NOT configure firewalls, health checks, persistence, or rollback.")
+		if creates == 0 {
+			fmt.Fprintln(stdout, "No containers to create. No changes made. Note: runtime health and undeclared settings are not verified.")
+			return 0
+		}
+		fmt.Fprintln(stdout, "Only CREATE services will be started. Existing containers will not be changed.")
+		fmt.Fprintln(stdout, "Images may be downloaded; published ports bind to all interfaces. No rollback or health verification.")
 		fmt.Fprint(stdout, "Type DEPLOY to continue: ")
 		reader := bufio.NewReader(stdin)
 		answer, err := reader.ReadString('\n')
-		if err != nil && strings.TrimSpace(answer) != "DEPLOY" { fmt.Fprintln(stderr, "cancelled"); return 1 }
-		if strings.TrimSpace(answer) != "DEPLOY" { fmt.Fprintln(stderr, "cancelled"); return 1 }
-		for _, svc := range m.Services {
-			id, err := (runtime.Client{}).Deploy(context.Background(), m.Name, svc)
-			if err != nil { fmt.Fprintf(stderr, "deployment stopped: %v\nPreviously created services, if any, were not rolled back.\n", err); return 1 }
-			fmt.Fprintf(stdout, "created orisema-%s-%s: %s\n", m.Name, svc.Name, id)
+		if err != nil && strings.TrimSpace(answer) != "DEPLOY" {
+			fmt.Fprintln(stderr, "cancelled")
+			return 1
+		}
+		if strings.TrimSpace(answer) != "DEPLOY" {
+			fmt.Fprintln(stderr, "cancelled")
+			return 1
+		}
+		for i, step := range steps {
+			if step.Action != planner.Create {
+				continue
+			}
+			id, err := client.Deploy(context.Background(), m.Name, m.Services[i])
+			if err != nil {
+				fmt.Fprintf(stderr, "deployment stopped: %v\nPreviously created services, if any, were not rolled back.\n", err)
+				return 1
+			}
+			fmt.Fprintf(stdout, "created %s: %s\n", step.Name, id)
 		}
 	case "status":
 		containers, err := (runtime.Client{}).List(context.Background())

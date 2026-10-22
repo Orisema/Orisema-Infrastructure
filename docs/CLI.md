@@ -50,3 +50,11 @@ To clean up the test manually after confirming its identity:
 podman stop orisema-hello-orisema-web
 podman rm orisema-hello-orisema-web
 ```
+
+## Conservative repeated deployment (experimental)
+
+After the first deployment, rerunning `go run ./cmd/orisema deploy examples/nginx.yaml` should classify the existing owned container as `NOOP` and exit without a confirmation prompt or modifications, **provided its configured image reference and published ports match**.
+
+If any service is `DRIFT` or `REVIEW`, deployment is blocked for the entire manifest before creating any containers. `CREATE` services still require typing `DEPLOY`. A second check for name collisions happens immediately before each creation.
+
+**Limits:** This is idempotent only for the fields currently compared (ownership labels, image reference, TCP port bindings). `NOOP` does not imply that the container is running or healthy, that the image digest matches, or that security options and other settings are equivalent. A multi-service deployment can partially complete if a later create fails. No rollback, automatic reconciliation or destructive update exists.

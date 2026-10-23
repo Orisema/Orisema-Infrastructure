@@ -85,3 +85,31 @@ go run ./cmd/orisema status examples/nginx.yaml
 ```
 
 This integration test is skipped in CI unless `ORISEMA_TEST_CONTAINER` is set.
+
+## Declarative healthchecks (experimental)
+
+An optional `healthcheck` section is supported for each service:
+
+```yaml
+healthcheck:
+  command: "nginx -t"
+  interval: 30s
+  timeout: 5s
+  retries: 3
+```
+
+The command runs **inside the container** using Podman's shell healthcheck; ensure the image contains the required executable. Durations use Go duration syntax and must be at least one second. `retries` must be 1–100. The healthcheck definition is passed at creation time. For an existing container, a different or missing healthcheck results in `DRIFT`, and deployment stops without replacing it.
+
+The separate `examples/nginx-health.yaml` app uses port 8081 and does not modify the existing `hello-orisema` container:
+
+```sh
+go run ./cmd/orisema validate examples/nginx-health.yaml
+go run ./cmd/orisema plan examples/nginx-health.yaml
+go run ./cmd/orisema deploy examples/nginx-health.yaml
+# Type DEPLOY to create it.
+sleep 35
+go run ./cmd/orisema status examples/nginx-health.yaml
+podman healthcheck run orisema-health-lab-web
+```
+
+The sample `nginx -t` check verifies Nginx configuration, **not HTTP reachability**. Health status may be `starting` or `unknown` before the first probe. Do not assume healthcheck support or inspect output are identical across all Podman versions. Existing containers are never silently updated.

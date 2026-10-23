@@ -36,6 +36,12 @@ func (c Client) Deploy(ctx context.Context, app string, s manifest.Service) (str
   "--label", "dev.orisema.service="+s.Name,
   "--security-opt", "no-new-privileges",
  }
+ if h := s.Healthcheck; h != nil {
+  args = append(args, "--health-cmd", h.Command,
+   "--health-interval", h.Interval,
+   "--health-timeout", h.Timeout,
+   "--health-retries", strconv.Itoa(h.Retries))
+ }
  for _, p := range s.Ports {
   args = append(args, "--publish", strconv.Itoa(p.Host)+":"+strconv.Itoa(p.Container)+"/tcp")
  }

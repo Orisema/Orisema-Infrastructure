@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -24,6 +25,16 @@ type Service struct {
 	Name  string `yaml:"name"`
 	Image string `yaml:"image"`
 	Ports []Port `yaml:"ports,omitempty"`
+	Healthcheck *Healthcheck `yaml:"healthcheck,omitempty"`
+}
+
+// Healthcheck uses a shell command executed inside the container.
+// Duration fields use Go duration syntax, such as 30s or 1m.
+type Healthcheck struct {
+ Command string `yaml:"command"`
+ Interval string `yaml:"interval"`
+ Timeout string `yaml:"timeout"`
+ Retries int `yaml:"retries"`
 }
 
 type Port struct {
@@ -80,6 +91,25 @@ func (m *Manifest) Validate() error {
 		seen[s.Name] = true
 		if strings.TrimSpace(s.Image) == "" || strings.ContainsAny(s.Image, " \t\n\r") {
 			return fmt.Errorf("service %q: image must be a nonempty reference without whitespace", s.Name)
+		}
+		if h := s.Healthcheck; h != nil {
+			if strings.TrimSpace(h.Command) == "" {
+				return fmt.Errorf("service %q: healthcheck command is required", s.Name)
+			}
+			if strings.ContainsAny(h.Command, "\x00\n\r") {
+				return fmt.Errorf("service %q: healthcheck command must be a single line without NUL", s.Name)
+			}
+			interval, err := time.ParseDuration(h.Interval)
+			if err != nil || interval < time.Second {
+				return fmt.Errorf("service %q: healthcheck interval must be at least 1s", s.Name)
+			}
+			timeout, err := time.ParseDuration(h.Timeout)
+			if err != nil || timeout < time.Second {
+				return fmt.Errorf("service %q: healthcheck timeout must be at least 1s", s.Name)
+			}
+			if h.Retries < 1 || h.Retries > 100 {
+				return fmt.Errorf("service %q: healthcheck retries must be between 1 and 100", s.Name)
+			}
 		}
 		for _, p := range s.Ports {
 			if p.Host < 1 || p.Host > 65535 || p.Container < 1 || p.Container > 65535 {

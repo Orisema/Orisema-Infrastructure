@@ -30,6 +30,12 @@ type Inspection struct {
  Config struct {
   Image string `json:"Image"`
   Labels map[string]string `json:"Labels"`
+  Healthcheck *struct {
+   Test []string `json:"Test"`
+   Interval int64 `json:"Interval"`
+   Timeout int64 `json:"Timeout"`
+   Retries int `json:"Retries"`
+  } `json:"Healthcheck"`
  } `json:"Config"`
  HostConfig struct {
   PortBindings map[string][]Binding `json:"PortBindings"`

@@ -8,6 +8,7 @@ import (
  "fmt"
  "strconv"
  "strings"
+ "time"
 
  "github.com/Orisema/Orisema-Infrastructure/internal/manifest"
  "github.com/Orisema/Orisema-Infrastructure/internal/runtime"
@@ -56,10 +57,26 @@ func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
     }
    }
   }
+  if h := svc.Healthcheck; h != nil {
+   actualHealth := inspected.Config.Healthcheck
+   if actualHealth == nil {
+    reasons = append(reasons, "healthcheck missing")
+   } else {
+    interval, _ := time.ParseDuration(h.Interval)
+    timeout, _ := time.ParseDuration(h.Timeout)
+    test := actualHealth.Test
+    commandMatches := len(test)==2 && (test[0]=="CMD-SHELL" || test[0]=="CMD") && test[1]==h.Command
+    if !commandMatches || actualHealth.Interval!=int64(interval) || actualHealth.Timeout!=int64(timeout) || actualHealth.Retries!=h.Retries {
+     reasons = append(reasons, "healthcheck configuration differs")
+    }
+   }
+  } else if inspected.Config.Healthcheck != nil {
+   reasons = append(reasons, "unexpected healthcheck configured")
+  }
   if len(reasons)>0 {
    steps=append(steps,Step{Name:name,Image:svc.Image,Action:Drift,Reason:strings.Join(reasons,", ")})
   } else {
-   steps=append(steps,Step{Name:name,Image:svc.Image,Action:Noop,Reason:"managed image reference and port bindings match; runtime health and other settings not verified"})
+   steps=append(steps,Step{Name:name,Image:svc.Image,Action:Noop,Reason:"managed image reference, ports and healthcheck configuration match; live health and other settings not verified"})
   }
  }
  return steps

@@ -48,3 +48,20 @@ func TestLoadRejectsMultipleDocuments(t *testing.T) {
 		t.Fatal("expected multiple document error")
 	}
 }
+
+func TestHealthcheckValidation(t *testing.T) {
+ base := Manifest{APIVersion:"orisema.dev/v1alpha1", Name:"demo", Services:[]Service{{Name:"web", Image:"nginx:1.27"}}}
+ cases := []struct { name string; h Healthcheck; valid bool }{
+  {"valid", Healthcheck{Command:"nginx -t",Interval:"30s",Timeout:"5s",Retries:3},true},
+  {"missing command", Healthcheck{Interval:"30s",Timeout:"5s",Retries:3},false},
+  {"short interval", Healthcheck{Command:"nginx -t",Interval:"500ms",Timeout:"5s",Retries:3},false},
+  {"invalid timeout", Healthcheck{Command:"nginx -t",Interval:"30s",Timeout:"oops",Retries:3},false},
+  {"zero retries", Healthcheck{Command:"nginx -t",Interval:"30s",Timeout:"5s"},false},
+ }
+ for _, tc := range cases { t.Run(tc.name,func(t *testing.T){
+  m:=base
+  m.Services=[]Service{{Name:"web",Image:"nginx:1.27",Healthcheck:&tc.h}}
+  err:=m.Validate()
+  if (err==nil)!=tc.valid {t.Fatalf("valid=%t err=%v",tc.valid,err)}
+ })}
+}

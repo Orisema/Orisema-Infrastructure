@@ -1,0 +1,14 @@
+# Separate lab app: does not change hello-orisema on port 8080.
+apiVersion: orisema.dev/v1alpha1
+name: health-lab
+services:
+  - name: web
+    image: docker.io/library/nginx:1.27
+    ports:
+      - host: 8081
+        container: 80
+    healthcheck:
+      command: "nginx -t"
+      interval: 30s
+      timeout: 5s
+      retries: 3

@@ -21,6 +21,18 @@ type Runtime interface {
 	Inspect(context.Context, string) (runtime.Inspection, error)
 }
 
+// Action is a typed operational recommendation. It never authorizes or
+// performs the corresponding operation.
+type Action string
+
+const (
+	ActionNone           Action = "NONE"
+	ActionInvestigate    Action = "INVESTIGATE"
+	ActionStart          Action = "START"
+	ActionRedeployReview Action = "REDEPLOY_REVIEW"
+	ActionRetryRuntime   Action = "RETRY_RUNTIME"
+)
+
 // Report keeps desired configuration, observed execution, application health,
 // detected failure and recommended operator action as independent dimensions.
 type Report struct {
@@ -30,6 +42,7 @@ type Report struct {
 	Health         string
 	Failure        string
 	Recommendation string
+	Action         Action
 }
 
 // Build performs a read-only diagnostic. A list failure produces an explicit
@@ -46,6 +59,7 @@ func Build(ctx context.Context, m *manifest.Manifest, client Runtime) ([]Report,
 				Health:         "unavailable",
 				Failure:        fmt.Sprintf("runtime query failed: %v", err),
 				Recommendation: "verify Podman access and retry diagnosis",
+				Action:         ActionRetryRuntime,
 			})
 		}
 		return reports, err
@@ -63,6 +77,7 @@ func Build(ctx context.Context, m *manifest.Manifest, client Runtime) ([]Report,
 				Health:         "unavailable",
 				Failure:        "container does not exist",
 				Recommendation: "review the plan and deploy with explicit approval",
+				Action:         ActionRedeployReview,
 			})
 			continue
 		}
@@ -76,6 +91,7 @@ func Build(ctx context.Context, m *manifest.Manifest, client Runtime) ([]Report,
 				Health:         "unavailable",
 				Failure:        fmt.Sprintf("container inspection failed: %v", inspectErr),
 				Recommendation: "inspect the container manually; do not modify it automatically",
+				Action:         ActionRetryRuntime,
 			})
 			continue
 		}
@@ -88,7 +104,7 @@ func Build(ctx context.Context, m *manifest.Manifest, client Runtime) ([]Report,
 			Health:        item.HealthStatus(),
 			Failure:       "none detected",
 		}
-		report.Failure, report.Recommendation = assess(step, item, report.Health)
+		report.Failure, report.Recommendation, report.Action = assess(step, item, report.Health)
 		reports = append(reports, report)
 	}
 	return reports, nil
@@ -127,29 +143,29 @@ func executionStatus(item runtime.Inspection) string {
 	return item.State.Status
 }
 
-func assess(step planner.Step, item runtime.Inspection, health string) (string, string) {
+func assess(step planner.Step, item runtime.Inspection, health string) (string, string, Action) {
 	if step.Action == planner.Review {
-		return "ownership or configuration could not be verified", "review ownership and configuration manually"
+		return "ownership or configuration could not be verified", "review ownership and configuration manually", ActionInvestigate
 	}
 	if step.Action == planner.Drift {
-		return "declared configuration drift", "review drift; Orisema will not replace the container automatically"
+		return "declared configuration drift", "review drift; Orisema will not replace the container automatically", ActionRedeployReview
 	}
 	if !item.State.Running || item.State.Status != "running" {
-		return "container is not running", "investigate the exit, then use start only with explicit approval"
+		return "container is not running", "investigate the exit, then use start only with explicit approval", ActionStart
 	}
 	if item.RestartCount >= repeatedRestartThreshold {
-		return fmt.Sprintf("repeated restarts observed (%d total)", item.RestartCount), "investigate logs and restart history; no automatic restart is recommended"
+		return fmt.Sprintf("repeated restarts observed (%d total)", item.RestartCount), "investigate logs and restart history; no automatic restart is recommended", ActionInvestigate
 	}
 	switch health {
 	case "healthy":
-		return "none detected", "none"
+		return "none detected", "none", ActionNone
 	case "unhealthy":
-		return "application healthcheck is unhealthy", "investigate healthcheck output and application logs"
+		return "application healthcheck is unhealthy", "investigate healthcheck output and application logs", ActionInvestigate
 	case "not configured":
-		return "healthcheck is not configured", "consider declaring an application healthcheck"
+		return "healthcheck is not configured", "consider declaring an application healthcheck", ActionInvestigate
 	case "starting":
-		return "healthcheck has not completed", "wait for the healthcheck and run diagnosis again"
+		return "healthcheck has not completed", "wait for the healthcheck and run diagnosis again", ActionNone
 	default:
-		return "application health is unavailable", "inspect runtime health data manually"
+		return "application health is unavailable", "inspect runtime health data manually", ActionInvestigate
 	}
 }

@@ -38,36 +38,37 @@ func TestBuildOperationalConditions(t *testing.T) {
 		wantHealth  string
 		wantFailure string
 		wantAction  string
+		wantTyped   Action
 	}{
 		{
 			name:       "missing",
 			client:     fakeRuntime{},
 			wantConfig: "absent", wantRun: "not found", wantHealth: "unavailable",
-			wantFailure: "does not exist", wantAction: "deploy with explicit approval",
+			wantFailure: "does not exist", wantAction: "deploy with explicit approval", wantTyped: ActionRedeployReview,
 		},
 		{
 			name:       "running healthy",
 			client:     managedRuntime(inspection("running", true, "healthy", 0)),
 			wantConfig: "matches declared fields", wantRun: "running", wantHealth: "healthy",
-			wantFailure: "none detected", wantAction: "none",
+			wantFailure: "none detected", wantAction: "none", wantTyped: ActionNone,
 		},
 		{
 			name:       "running unhealthy",
 			client:     managedRuntime(inspection("running", true, "unhealthy", 0)),
 			wantConfig: "matches declared fields", wantRun: "running", wantHealth: "unhealthy",
-			wantFailure: "healthcheck is unhealthy", wantAction: "investigate healthcheck",
+			wantFailure: "healthcheck is unhealthy", wantAction: "investigate healthcheck", wantTyped: ActionInvestigate,
 		},
 		{
 			name:       "stopped ignores stale health",
 			client:     managedRuntime(inspection("exited", false, "healthy", 0)),
 			wantConfig: "matches declared fields", wantRun: "exited", wantHealth: "unavailable (container not running)",
-			wantFailure: "not running", wantAction: "explicit approval",
+			wantFailure: "not running", wantAction: "explicit approval", wantTyped: ActionStart,
 		},
 		{
 			name:       "repeated restarts",
 			client:     managedRuntime(inspection("running", true, "healthy", 3)),
 			wantConfig: "matches declared fields", wantRun: "running", wantHealth: "healthy",
-			wantFailure: "repeated restarts observed (3 total)", wantAction: "no automatic restart",
+			wantFailure: "repeated restarts observed (3 total)", wantAction: "no automatic restart", wantTyped: ActionInvestigate,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -79,6 +80,9 @@ func TestBuildOperationalConditions(t *testing.T) {
 				t.Fatalf("got %d reports, want 1", len(reports))
 			}
 			got := reports[0]
+			if got.Action != tc.wantTyped {
+				t.Errorf("action = %q, want %q", got.Action, tc.wantTyped)
+			}
 			for label, values := range map[string][2]string{
 				"configuration":  {got.Configuration, tc.wantConfig},
 				"execution":      {got.Execution, tc.wantRun},
@@ -97,14 +101,14 @@ func TestBuildOperationalConditions(t *testing.T) {
 func TestBuildReportsRuntimeAndInspectionFailures(t *testing.T) {
 	runtimeFailure := fakeRuntime{listErr: errors.New("socket unavailable")}
 	reports, err := Build(context.Background(), testManifest(), runtimeFailure)
-	if err == nil || !strings.Contains(reports[0].Failure, "socket unavailable") {
+	if err == nil || !strings.Contains(reports[0].Failure, "socket unavailable") || reports[0].Action != ActionRetryRuntime {
 		t.Fatalf("expected explicit runtime failure, reports=%+v err=%v", reports, err)
 	}
 
 	inspectionFailure := managedRuntime(runtime.Inspection{})
 	inspectionFailure.inspectErr = errors.New("permission denied")
 	reports, err = Build(context.Background(), testManifest(), inspectionFailure)
-	if err != nil || !strings.Contains(reports[0].Failure, "permission denied") || reports[0].Execution != "running (from container list)" {
+	if err != nil || !strings.Contains(reports[0].Failure, "permission denied") || reports[0].Execution != "running (from container list)" || reports[0].Action != ActionRetryRuntime {
 		t.Fatalf("expected conservative inspection failure, reports=%+v err=%v", reports, err)
 	}
 }

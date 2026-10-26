@@ -15,6 +15,7 @@ go run ./cmd/orisema validate examples/nginx.yaml
 go run ./cmd/orisema plan examples/nginx.yaml
 go run ./cmd/orisema status examples/nginx.yaml
 go run ./cmd/orisema diagnose examples/nginx.yaml
+go run ./cmd/orisema recover plan examples/nginx.yaml
 ```
 
 The `validate` command checks the manifest structure, service identifiers, images and port ranges.
@@ -24,6 +25,10 @@ The `status` command reads local Podman containers without changing them (see [P
 The `diagnose` command is also read-only and presents desired configuration,
 observed execution, application health, detected failure and recommended action
 as separate fields. It does not restart, replace or otherwise modify a container.
+
+The `recover plan` command converts that diagnosis into typed operator guidance
+with preconditions, risk and confirmation requirements. It is read-only; a
+`recover apply` command does not exist.
 
 The `plan` command inspects Podman and compares selected declared fields only. It does not reserve ports or provide full configuration equivalence; see [PLANNING.md](PLANNING.md).
 
@@ -165,3 +170,6 @@ a stopped or unhealthy diagnosis.
 
 See [OPERATIONAL-DIAGNOSTICS.md](OPERATIONAL-DIAGNOSTICS.md) for the data model,
 limitations and an Ubuntu Server rootless validation checklist.
+
+See [RECOVERY-PLANNING.md](RECOVERY-PLANNING.md) for typed actions and the
+guardrails required before any recovery execution can be designed.

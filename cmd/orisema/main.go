@@ -14,18 +14,22 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
+	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
 )
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "recover" {
+		return runRecoveryPlan(args, stdout, stderr)
+	}
 	if len(args) < 2 {
-		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service>")
+		printUsage(stderr)
 		return 2
 	}
 	operation := args[0]
 	needsService := operation == "logs" || operation == "start" || operation == "stop"
 	if (needsService && len(args) != 3) || (!needsService && (len(args) != 2 || (operation != "validate" && operation != "plan" && operation != "status" && operation != "diagnose" && operation != "deploy"))) {
-		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service>")
+		printUsage(stderr)
 		return 2
 	}
 	m, err := manifest.Load(args[1])
@@ -188,6 +192,40 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 
+	}
+	return 0
+}
+
+func printUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover plan <manifest.yaml>")
+}
+
+func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 3 || args[1] != "plan" {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	reports, diagnoseErr := diagnostic.Build(context.Background(), m, runtime.Client{})
+	fmt.Fprintf(stdout, "Recovery plan for %q (read-only):\n", m.Name)
+	for _, step := range recovery.Build(reports) {
+		fmt.Fprintf(stdout, "  [%s] %s\n", step.Action, step.Name)
+		fmt.Fprintf(stdout, "    reason: %s\n", step.Reason)
+		fmt.Fprintf(stdout, "    risk: %s\n", step.Risk)
+		fmt.Fprintf(stdout, "    confirmation required: %t\n", step.RequiresConfirmation)
+		fmt.Fprintln(stdout, "    preconditions:")
+		for _, condition := range step.Preconditions {
+			fmt.Fprintf(stdout, "      - %s\n", condition)
+		}
+	}
+	fmt.Fprintln(stdout, "No changes made. Recovery execution is not implemented.")
+	if diagnoseErr != nil {
+		fmt.Fprintln(stderr, "recovery plan incomplete: Podman could not be queried")
+		return 1
 	}
 	return 0
 }

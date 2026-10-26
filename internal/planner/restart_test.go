@@ -25,7 +25,8 @@ func TestRestartPolicyComparison(t *testing.T) {
 		{"different policy", &manifest.Restart{Policy: "on-failure", MaxRetries: 3}, "no", 0, Drift},
 		{"different retry limit", &manifest.Restart{Policy: "on-failure", MaxRetries: 3}, "on-failure", 5, Drift},
 		{"unexpected always", nil, "always", 0, Drift},
-		{"empty inspection is not equivalence", nil, "", 0, Drift},
+		{"rootful empty default", nil, "", 0, Noop},
+		{"empty default with retries is invalid", nil, "", 1, Drift},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := &manifest.Manifest{Name: "restart-lab", Services: []manifest.Service{{Name: "web", Image: "nginx:stable", Restart: tc.declared}}}

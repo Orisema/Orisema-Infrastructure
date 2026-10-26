@@ -43,6 +43,11 @@ Podman 4.9.3 does not expose `--restart` through `podman update`. Orisema does
 not depend on runtime update support: a mismatch remains `DRIFT` and requires
 manual review rather than an in-place mutation.
 
+Podman 4.9.3 inspection has returned the default disabled policy as both
+`{"Name":"no","MaximumRetryCount":0}` in rootless mode and an empty `Name`
+with zero retries in rootful mode. Orisema normalizes only these disabled forms;
+active policies and retry counts remain strict comparisons.
+
 References:
 
 - [Podman run restart policy](https://docs.podman.io/en/latest/markdown/podman-run.1.html#restartpolicy)

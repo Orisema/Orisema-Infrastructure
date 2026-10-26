@@ -87,7 +87,13 @@ func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 			expectedRestartRetries = r.MaxRetries
 		}
 		actualRestart := inspected.HostConfig.RestartPolicy
-		if actualRestart.Name != expectedRestartName || actualRestart.MaximumRetryCount != expectedRestartRetries {
+		actualRestartName := actualRestart.Name
+		// Podman 4.9.3 has been observed to report the default policy as either
+		// an empty name (rootful) or "no" (rootless). Both mean no restart.
+		if actualRestartName == "" {
+			actualRestartName = "no"
+		}
+		if actualRestartName != expectedRestartName || actualRestart.MaximumRetryCount != expectedRestartRetries {
 			reasons = append(reasons, "restart policy differs")
 		}
 		if len(reasons) > 0 {

@@ -53,6 +53,13 @@ func (c Client) Deploy(ctx context.Context, app string, s manifest.Service) (str
 			"--health-timeout", h.Timeout,
 			"--health-retries", strconv.Itoa(h.Retries))
 	}
+	if r := s.Restart; r != nil {
+		policy := r.Policy
+		if r.Policy == "on-failure" {
+			policy += ":" + strconv.Itoa(r.MaxRetries)
+		}
+		args = append(args, "--restart", policy)
+	}
 	for _, p := range s.Ports {
 		args = append(args, "--publish", strconv.Itoa(p.Host)+":"+strconv.Itoa(p.Container)+"/tcp")
 	}

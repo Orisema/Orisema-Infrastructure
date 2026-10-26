@@ -62,7 +62,7 @@ After the first deployment, rerunning `go run ./cmd/orisema deploy examples/ngin
 
 If any service is `DRIFT` or `REVIEW`, deployment is blocked for the entire manifest before creating any containers. `CREATE` services still require typing `DEPLOY`. A second check for name collisions happens immediately before each creation.
 
-**Limits:** This is idempotent only for the fields currently compared (ownership labels, image reference, TCP port bindings, declared healthcheck command and timing/retries). `NOOP` does not imply that the container is running or healthy, that the image digest matches, or that security options and other settings are equivalent. A multi-service deployment can partially complete if a later create fails. No rollback, automatic reconciliation or destructive update exists.
+**Limits:** This is idempotent only for the fields currently compared (ownership labels, image reference, TCP port bindings, declared healthcheck command and timing/retries, and restart policy). `NOOP` does not imply that the container is running or healthy, that the image digest matches, or that security options and other settings are equivalent. A multi-service deployment can partially complete if a later create fails. No rollback, automatic reconciliation or destructive update exists.
 
 ## Experimental service lifecycle
 
@@ -132,6 +132,14 @@ healthcheck settings are not compared; `NOOP` remains limited.
 
 See [the healthcheck validation checklist](HEALTHCHECK-VALIDATION.md) for the
 remaining real-Podman checks and the next incremental runtime work.
+
+## Declarative restart policy (experimental)
+
+Services may declare `restart.policy: on-failure` with a required finite
+`maxRetries`, or explicitly use `policy: no`. This policy responds only to a
+non-zero process exit; it does not respond to an application becoming
+`unhealthy`. See [RESTART-POLICIES.md](RESTART-POLICIES.md) for the supported
+contract, runtime differences and rootless validation steps.
 
 ## Operational diagnosis (experimental)
 

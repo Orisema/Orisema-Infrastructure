@@ -39,6 +39,10 @@ type Inspection struct {
  } `json:"Config"`
  HostConfig struct {
   PortBindings map[string][]Binding `json:"PortBindings"`
+  RestartPolicy struct {
+   Name string `json:"Name"`
+   MaximumRetryCount int `json:"MaximumRetryCount"`
+  } `json:"RestartPolicy"`
  } `json:"HostConfig"`
 }
 

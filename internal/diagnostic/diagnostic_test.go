@@ -138,6 +138,7 @@ func testManifest() *manifest.Manifest {
 
 func managedRuntime(item runtime.Inspection) fakeRuntime {
 	item.Config.Image = "nginx:stable"
+	item.HostConfig.RestartPolicy.Name = "no"
 	item.Config.Labels = map[string]string{
 		"dev.orisema.managed": "true",
 		"dev.orisema.app":     "demo",

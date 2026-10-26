@@ -19,3 +19,63 @@ jobs:
         run: go vet ./...
       - name: Tests
         run: go test ./...
+  podman-healthcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+          sudo podman version
+      - name: Build and check with Go 1.23
+        run: |
+          go version
+          go vet ./...
+          go test ./...
+          mkdir -p work
+          go build -o work/orisema ./cmd/orisema
+          go test -c -o work/planner.test ./internal/planner
+      - name: Deploy isolated healthcheck and verify real inspect
+        run: |
+          set -euo pipefail
+          work/orisema validate examples/nginx-health.yaml
+          sudo work/orisema plan examples/nginx-health.yaml | tee work/plan-before.txt
+          grep -q CREATE work/plan-before.txt
+          printf 'DEPLOY\n' | sudo work/orisema deploy examples/nginx-health.yaml
+          sudo work/orisema status examples/nginx-health.yaml
+          sudo podman healthcheck run orisema-health-lab-web
+          sudo podman inspect orisema-health-lab-web > work/inspect-after-probe.json
+          sudo work/orisema plan examples/nginx-health.yaml | tee work/plan-after.txt
+          grep -q NOOP work/plan-after.txt
+          sudo env ORISEMA_TEST_HEALTH_MANIFEST="$PWD/examples/nginx-health.yaml" work/planner.test -test.v -test.run TestPodmanHealthcheckIntegrationReadOnly
+      - name: Verify scheduled probes
+        run: |
+          set -euo pipefail
+          sleep 40
+          sudo podman inspect orisema-health-lab-web > work/inspect-scheduled.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          def logs(path):
+              state = json.loads(Path(path).read_text())[0]['State']
+              health = state.get('Healthcheck') or state.get('Health') or {}
+              return health.get('Log') or []
+          before = logs('work/inspect-after-probe.json')
+          after = logs('work/inspect-scheduled.json')
+          assert before, 'manual probe produced no health log'
+          assert after and after[-1]['Start'] != before[-1]['Start'], 'no subsequent scheduled probe observed'
+          assert after[-1]['ExitCode'] == 0, after[-1]
+          print('Observed successful scheduled probe:', after[-1]['Start'])
+          PY
+      - name: Save laboratory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: podman-healthcheck-evidence
+          path: work/

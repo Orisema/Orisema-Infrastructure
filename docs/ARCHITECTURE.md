@@ -27,6 +27,19 @@ Estado, verificações e logs
 - **Provider:** integração com Podman e futuros runtimes.
 - **State:** registro das operações sem segredos.
 
+## Separação de responsabilidades atual
+
+- **Planner:** compara somente os campos declarativos suportados e produz
+  `CREATE`, `NOOP`, `DRIFT` ou `REVIEW`.
+- **Diagnostic:** combina o resultado declarativo com execução e saúde
+  observadas para recomendar uma ação somente informativa.
+- **Runtime:** lista e inspeciona contêineres e executa operações explicitamente
+  solicitadas pela CLI.
+
+Saúde não altera o plano declarativo. Diagnóstico não executa recuperação. Essa
+separação permite que um contêiner parado, mas equivalente nos campos
+declarativos, continue `NOOP` enquanto o diagnóstico informa a falha operacional.
+
 ## Fora do escopo inicial
 
 Orquestração multi-node, painel web e gestão central de identidade.

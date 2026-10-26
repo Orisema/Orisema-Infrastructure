@@ -14,11 +14,16 @@ go test ./...
 go run ./cmd/orisema validate examples/nginx.yaml
 go run ./cmd/orisema plan examples/nginx.yaml
 go run ./cmd/orisema status examples/nginx.yaml
+go run ./cmd/orisema diagnose examples/nginx.yaml
 ```
 
 The `validate` command checks the manifest structure, service identifiers, images and port ranges.
 
 The `status` command reads local Podman containers without changing them (see [PODMAN.md](PODMAN.md)).
+
+The `diagnose` command is also read-only and presents desired configuration,
+observed execution, application health, detected failure and recommended action
+as separate fields. It does not restart, replace or otherwise modify a container.
 
 The `plan` command inspects Podman and compares selected declared fields only. It does not reserve ports or provide full configuration equivalence; see [PLANNING.md](PLANNING.md).
 
@@ -127,3 +132,28 @@ healthcheck settings are not compared; `NOOP` remains limited.
 
 See [the healthcheck validation checklist](HEALTHCHECK-VALIDATION.md) for the
 remaining real-Podman checks and the next incremental runtime work.
+
+## Operational diagnosis (experimental)
+
+Use `diagnose` when an operator needs a recommendation without changing the
+declarative plan:
+
+```sh
+go run ./cmd/orisema diagnose examples/nginx-health.yaml
+```
+
+The command distinguishes missing, stopped, healthy, unhealthy and unobservable
+containers. Three or more cumulative restarts are reported as repeated restarts
+and prompt investigation, but this is not proof of a restart loop: Podman's
+current cumulative `RestartCount` does not provide a time window. A missing
+healthcheck produces a recommendation to consider declaring one. Inspection or
+runtime failures remain explicit and never imply equivalence or container
+absence.
+
+Recommendations are informational. No automatic restart, replacement,
+recovery, rollback or health-based planning is implemented. In particular,
+`NOOP` continues to describe selected declared fields only and can coexist with
+a stopped or unhealthy diagnosis.
+
+See [OPERATIONAL-DIAGNOSTICS.md](OPERATIONAL-DIAGNOSTICS.md) for the data model,
+limitations and an Ubuntu Server rootless validation checklist.

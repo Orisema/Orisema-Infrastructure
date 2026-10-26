@@ -75,7 +75,7 @@ go run ./cmd/orisema start examples/nginx.yaml web
 
 ## Detailed status and integration smoke test
 
-`status` now attempts `podman inspect` for existing containers and displays running state, exit code, restart count, start/finish timestamps, ownership and health if available. Health without an explicit healthcheck is reported as unavailable, **not healthy**. Some Podman versions may expose different health fields.
+`status` now attempts `podman inspect` for existing containers and displays running state, exit code, restart count, start/finish timestamps, ownership and health if available. Health without a configured healthcheck (including `["NONE"]`) is reported as `not configured`. A configured check without a recognized observation is `unavailable`. Both `State.Healthcheck` and `State.Health` are supported; conflicting nonempty values are reported as unavailable. Stopped or paused containers never display a stale `healthy` observation. Health remains the last probe result, not proof of HTTP availability.
 
 The opt-in integration test only reads an existing test container; it does not create, start, stop or remove anything:
 

@@ -50,6 +50,8 @@ jobs:
           printf 'DEPLOY\n' | sudo work/orisema deploy examples/nginx-health.yaml
           sudo work/orisema status examples/nginx-health.yaml
           sudo podman healthcheck run orisema-health-lab-web
+          sudo work/orisema status examples/nginx-health.yaml | tee work/status-after-probe.txt
+          grep -q "health: healthy" work/status-after-probe.txt
           sudo podman inspect orisema-health-lab-web > work/inspect-after-probe.json
           sudo work/orisema plan examples/nginx-health.yaml | tee work/plan-after.txt
           grep -q NOOP work/plan-after.txt
@@ -72,10 +74,28 @@ jobs:
           assert after and after[-1]['Start'] != before[-1]['Start'], 'no subsequent scheduled probe observed'
           assert after[-1]['ExitCode'] == 0, after[-1]
           print('Observed successful scheduled probe:', after[-1]['Start'])
+          item = json.loads(Path('work/inspect-scheduled.json').read_text())[0]
+          fixture = {'Config': {'Healthcheck': item['Config']['Healthcheck']},
+                     'State': {key: value for key, value in item['State'].items()
+                               if key in ('Running', 'Status', 'Health', 'Healthcheck')}}
+          for key in ('Health', 'Healthcheck'):
+              if key in fixture['State']:
+                  fixture['State'][key] = {'Status': fixture['State'][key]['Status']}
+          print('INSPECT_HEALTH_FIXTURE=' + json.dumps(fixture))
           PY
+      - name: Verify stopped containers do not report healthy
+        run: |
+          set -euo pipefail
+          printf 'STOP\n' | sudo work/orisema stop examples/nginx-health.yaml web
+          sudo work/orisema status examples/nginx-health.yaml | tee work/status-stopped.txt
+          grep -Fq 'health: unavailable (container not running)' work/status-stopped.txt
+          sudo work/orisema plan examples/nginx-health.yaml | tee work/plan-stopped.txt
+          grep -q NOOP work/plan-stopped.txt
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: podman-healthcheck-evidence
-          path: work/
+          path: |
+            work/*.json
+            work/*.txt

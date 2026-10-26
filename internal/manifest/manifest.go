@@ -26,6 +26,14 @@ type Service struct {
 	Image string `yaml:"image"`
 	Ports []Port `yaml:"ports,omitempty"`
 	Healthcheck *Healthcheck `yaml:"healthcheck,omitempty"`
+	Restart *Restart `yaml:"restart,omitempty"`
+}
+
+// Restart describes process-exit recovery. It is independent from application
+// healthchecks and intentionally supports only bounded on-failure retries.
+type Restart struct {
+	Policy string `yaml:"policy"`
+	MaxRetries int `yaml:"maxRetries,omitempty"`
 }
 
 // Healthcheck uses a shell command executed inside the container.
@@ -109,6 +117,20 @@ func (m *Manifest) Validate() error {
 			}
 			if h.Retries < 1 || h.Retries > 100 {
 				return fmt.Errorf("service %q: healthcheck retries must be between 1 and 100", s.Name)
+			}
+		}
+		if r := s.Restart; r != nil {
+			switch r.Policy {
+			case "no":
+				if r.MaxRetries != 0 {
+					return fmt.Errorf("service %q: restart maxRetries is only valid with on-failure", s.Name)
+				}
+			case "on-failure":
+				if r.MaxRetries < 1 || r.MaxRetries > 100 {
+					return fmt.Errorf("service %q: restart maxRetries must be between 1 and 100 for on-failure", s.Name)
+				}
+			default:
+				return fmt.Errorf("service %q: restart policy must be no or on-failure", s.Name)
 			}
 		}
 		for _, p := range s.Ports {

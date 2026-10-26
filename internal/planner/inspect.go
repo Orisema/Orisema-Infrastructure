@@ -80,10 +80,26 @@ func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 		} else if h := inspected.Config.Healthcheck; h != nil && !(len(h.Test) == 1 && h.Test[0] == "NONE") {
 			reasons = append(reasons, "unexpected healthcheck configured")
 		}
+		expectedRestartName := "no"
+		expectedRestartRetries := 0
+		if r := svc.Restart; r != nil {
+			expectedRestartName = r.Policy
+			expectedRestartRetries = r.MaxRetries
+		}
+		actualRestart := inspected.HostConfig.RestartPolicy
+		actualRestartName := actualRestart.Name
+		// Podman 4.9.3 has been observed to report the default policy as either
+		// an empty name (rootful) or "no" (rootless). Both mean no restart.
+		if actualRestartName == "" {
+			actualRestartName = "no"
+		}
+		if actualRestartName != expectedRestartName || actualRestart.MaximumRetryCount != expectedRestartRetries {
+			reasons = append(reasons, "restart policy differs")
+		}
 		if len(reasons) > 0 {
 			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Drift, Reason: strings.Join(reasons, ", ")})
 		} else {
-			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Noop, Reason: "managed image reference, ports and healthcheck configuration match; live health and other settings not verified"})
+			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Noop, Reason: "managed image reference, ports, healthcheck and restart policy configuration match; live health and other settings not verified"})
 		}
 	}
 	return steps

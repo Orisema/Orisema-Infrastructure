@@ -39,6 +39,7 @@ func TestInspectedHealthcheck(t *testing.T) {
 			}
 			item.Config.Image = "nginx:1.27"
 			item.Config.Labels = map[string]string{"dev.orisema.managed": "true", "dev.orisema.app": "health-lab", "dev.orisema.service": "web"}
+			item.HostConfig.RestartPolicy.Name = "no"
 			svc := manifest.Service{Name: "web", Image: item.Config.Image}
 			if tc.declared {
 				svc.Healthcheck = &manifest.Healthcheck{Command: "nginx -t", Interval: "0.5m", Timeout: "5000ms", Retries: 3}

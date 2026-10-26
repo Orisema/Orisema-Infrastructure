@@ -83,7 +83,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		for _, step := range planner.BuildInspected(context.Background(), m, containers, runtime.Client{}) {
 			fmt.Fprintf(stdout, "  [%s] %s: %s (%s)\n", step.Action, step.Name, step.Image, step.Reason)
 		}
-		fmt.Fprintln(stdout, "NOOP checks only ownership labels, configured image reference, ports and healthcheck configuration; live health and other settings not verified. No changes made.")
+		fmt.Fprintln(stdout, "NOOP checks only ownership labels, configured image reference, ports, healthcheck and restart policy configuration; live health and other settings not verified. No changes made.")
 	case "deploy":
 		client := runtime.Client{}
 		containers, err := client.List(context.Background())

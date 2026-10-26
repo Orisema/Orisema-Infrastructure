@@ -20,6 +20,7 @@ func TestBuildInspected(t *testing.T) {
  item.Config.Image=m.Services[0].Image
  item.Config.Labels=map[string]string{"dev.orisema.managed":"true","dev.orisema.app":"hello-orisema","dev.orisema.service":"web"}
  item.HostConfig.PortBindings=map[string][]runtime.Binding{"80/tcp":{{HostIP:"0.0.0.0",HostPort:"8080"}}}
+ item.HostConfig.RestartPolicy.Name="no"
  check:=func(want Action) {
   t.Helper()
   got:=BuildInspected(context.Background(),m,existing,fakeInspector{item:item})

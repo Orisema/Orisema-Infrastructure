@@ -57,7 +57,7 @@ After the first deployment, rerunning `go run ./cmd/orisema deploy examples/ngin
 
 If any service is `DRIFT` or `REVIEW`, deployment is blocked for the entire manifest before creating any containers. `CREATE` services still require typing `DEPLOY`. A second check for name collisions happens immediately before each creation.
 
-**Limits:** This is idempotent only for the fields currently compared (ownership labels, image reference, TCP port bindings). `NOOP` does not imply that the container is running or healthy, that the image digest matches, or that security options and other settings are equivalent. A multi-service deployment can partially complete if a later create fails. No rollback, automatic reconciliation or destructive update exists.
+**Limits:** This is idempotent only for the fields currently compared (ownership labels, image reference, TCP port bindings, declared healthcheck command and timing/retries). `NOOP` does not imply that the container is running or healthy, that the image digest matches, or that security options and other settings are equivalent. A multi-service deployment can partially complete if a later create fails. No rollback, automatic reconciliation or destructive update exists.
 
 ## Experimental service lifecycle
 
@@ -75,7 +75,7 @@ go run ./cmd/orisema start examples/nginx.yaml web
 
 ## Detailed status and integration smoke test
 
-`status` now attempts `podman inspect` for existing containers and displays running state, exit code, restart count, start/finish timestamps, ownership and health if available. Health without an explicit healthcheck is reported as unavailable, **not healthy**. Some Podman versions may expose different health fields.
+`status` now attempts `podman inspect` for existing containers and displays running state, exit code, restart count, start/finish timestamps, ownership and health if available. Health without a configured healthcheck (including `["NONE"]`) is reported as `not configured`. A configured check without a recognized observation is `unavailable`. Both `State.Healthcheck` and `State.Health` are supported; conflicting nonempty values are reported as unavailable. Stopped or paused containers never display a stale `healthy` observation. Health remains the last probe result, not proof of HTTP availability.
 
 The opt-in integration test only reads an existing test container; it does not create, start, stop or remove anything:
 
@@ -113,3 +113,17 @@ podman healthcheck run orisema-health-lab-web
 ```
 
 The sample `nginx -t` check verifies Nginx configuration, **not HTTP reachability**. Health status may be `starting` or `unknown` before the first probe. Do not assume healthcheck support or inspect output are identical across all Podman versions. Existing containers are never silently updated.
+
+
+The command is encoded as an explicit JSON `CMD-SHELL` test when passed to
+Podman. Exec-form `CMD` tests are not equivalent to shell-form commands.
+Durations are compared in nanoseconds, so `30s` and `0.5m` are equivalent.
+An inspect test of `["NONE"]` means disabled: it matches an omitted manifest
+healthcheck, but never a declared one. An active image-inherited healthcheck
+without a manifest declaration is reported as `DRIFT`. Omission does not disable
+an image's healthcheck during creation. Empty or unknown test forms fail the
+comparison conservatively. Start period, startup checks and other undeclared
+healthcheck settings are not compared; `NOOP` remains limited.
+
+See [the healthcheck validation checklist](HEALTHCHECK-VALIDATION.md) for the
+remaining real-Podman checks and the next incremental runtime work.

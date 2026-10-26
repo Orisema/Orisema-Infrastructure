@@ -4,12 +4,12 @@
 package main
 
 import (
-	"context"
 	"bufio"
-	"strings"
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
@@ -36,7 +36,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		service := args[2]
 		found := false
 		for _, svc := range m.Services {
-			if svc.Name == service { found = true; break }
+			if svc.Name == service {
+				found = true
+				break
+			}
 		}
 		if !found {
 			fmt.Fprintf(stderr, "error: service %q not declared in manifest\n", service)
@@ -45,7 +48,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		client := runtime.Client{}
 		if operation == "logs" {
 			out, err := client.Logs(context.Background(), m.Name, service)
-			if err != nil { fmt.Fprintf(stderr, "error: %v\n", err); return 1 }
+			if err != nil {
+				fmt.Fprintf(stderr, "error: %v\n", err)
+				return 1
+			}
 			_, _ = stdout.Write(out)
 			return 0
 		}
@@ -76,7 +82,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		for _, step := range planner.BuildInspected(context.Background(), m, containers, runtime.Client{}) {
 			fmt.Fprintf(stdout, "  [%s] %s: %s (%s)\n", step.Action, step.Name, step.Image, step.Reason)
 		}
-		fmt.Fprintln(stdout, "NOOP checks only ownership labels, configured image reference and ports; health and other settings not verified. No changes made.")
+		fmt.Fprintln(stdout, "NOOP checks only ownership labels, configured image reference, ports and healthcheck configuration; live health and other settings not verified. No changes made.")
 	case "deploy":
 		client := runtime.Client{}
 		containers, err := client.List(context.Background())
@@ -152,7 +158,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				continue
 			}
 			ownership := "unverified"
-			if runtime.Owned(item, m.Name, svc.Name) { ownership = "verified" }
+			if runtime.Owned(item, m.Name, svc.Name) {
+				ownership = "verified"
+			}
 			fmt.Fprintf(stdout, "  %s: %s (image: %s; ownership: %s)\n", name, item.State.Status, item.Config.Image, ownership)
 			fmt.Fprintf(stdout, "    running: %t; exit code: %d; restarts: %d\n", item.State.Running, item.State.ExitCode, item.RestartCount)
 			if item.State.Running && item.State.StartedAt != "" {
@@ -161,10 +169,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			if !item.State.Running && item.State.FinishedAt != "" {
 				fmt.Fprintf(stdout, "    finished: %s\n", item.State.FinishedAt)
 			}
-			health := "not configured or unavailable"
-			if item.State.Healthcheck != nil && item.State.Healthcheck.Status != "" { health = item.State.Healthcheck.Status }
-			if item.State.Health != nil && item.State.Health.Status != "" { health = item.State.Health.Status }
-			fmt.Fprintf(stdout, "    health: %s\n", health)
+			fmt.Fprintf(stdout, "    health: %s\n", item.HealthStatus())
 		}
 
 	}

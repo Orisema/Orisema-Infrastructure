@@ -13,8 +13,8 @@ import (
 func TestValidate(t *testing.T) {
 	good := &Manifest{
 		APIVersion: "orisema.dev/v1alpha1",
-		Name: "demo",
-		Services: []Service{{Name: "web", Image: "docker.io/library/nginx:1.27", Ports: []Port{{Host: 8080, Container: 80}}}},
+		Name:       "demo",
+		Services:   []Service{{Name: "web", Image: "docker.io/library/nginx:1.27", Ports: []Port{{Host: 8080, Container: 80}}}},
 	}
 	if err := good.Validate(); err != nil {
 		t.Fatal(err)
@@ -50,18 +50,33 @@ func TestLoadRejectsMultipleDocuments(t *testing.T) {
 }
 
 func TestHealthcheckValidation(t *testing.T) {
- base := Manifest{APIVersion:"orisema.dev/v1alpha1", Name:"demo", Services:[]Service{{Name:"web", Image:"nginx:1.27"}}}
- cases := []struct { name string; h Healthcheck; valid bool }{
-  {"valid", Healthcheck{Command:"nginx -t",Interval:"30s",Timeout:"5s",Retries:3},true},
-  {"missing command", Healthcheck{Interval:"30s",Timeout:"5s",Retries:3},false},
-  {"short interval", Healthcheck{Command:"nginx -t",Interval:"500ms",Timeout:"5s",Retries:3},false},
-  {"invalid timeout", Healthcheck{Command:"nginx -t",Interval:"30s",Timeout:"oops",Retries:3},false},
-  {"zero retries", Healthcheck{Command:"nginx -t",Interval:"30s",Timeout:"5s"},false},
- }
- for _, tc := range cases { t.Run(tc.name,func(t *testing.T){
-  m:=base
-  m.Services=[]Service{{Name:"web",Image:"nginx:1.27",Healthcheck:&tc.h}}
-  err:=m.Validate()
-  if (err==nil)!=tc.valid {t.Fatalf("valid=%t err=%v",tc.valid,err)}
- })}
+	base := Manifest{APIVersion: "orisema.dev/v1alpha1", Name: "demo", Services: []Service{{Name: "web", Image: "nginx:1.27"}}}
+	cases := []struct {
+		name  string
+		h     Healthcheck
+		valid bool
+	}{
+		{"valid", Healthcheck{Command: "nginx -t", Interval: "30s", Timeout: "5s", Retries: 3}, true},
+		{"missing command", Healthcheck{Interval: "30s", Timeout: "5s", Retries: 3}, false},
+		{"short interval", Healthcheck{Command: "nginx -t", Interval: "500ms", Timeout: "5s", Retries: 3}, false},
+		{"invalid timeout", Healthcheck{Command: "nginx -t", Interval: "30s", Timeout: "oops", Retries: 3}, false},
+		{"zero retries", Healthcheck{Command: "nginx -t", Interval: "30s", Timeout: "5s"}, false},
+		{"newline command", Healthcheck{Command: "true\nfalse", Interval: "30s", Timeout: "5s", Retries: 3}, false},
+		{"NUL command", Healthcheck{Command: "true\x00", Interval: "30s", Timeout: "5s", Retries: 3}, false},
+		{"overflow duration", Healthcheck{Command: "true", Interval: "999999999999h", Timeout: "5s", Retries: 3}, false},
+		{"negative timeout", Healthcheck{Command: "true", Interval: "30s", Timeout: "-1s", Retries: 3}, false},
+		{"too many retries", Healthcheck{Command: "true", Interval: "30s", Timeout: "5s", Retries: 101}, false},
+		{"minimum values", Healthcheck{Command: "true", Interval: "1s", Timeout: "1s", Retries: 1}, true},
+		{"maximum retries", Healthcheck{Command: "true", Interval: "30s", Timeout: "5s", Retries: 100}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := base
+			m.Services = []Service{{Name: "web", Image: "nginx:1.27", Healthcheck: &tc.h}}
+			err := m.Validate()
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%t err=%v", tc.valid, err)
+			}
+		})
+	}
 }

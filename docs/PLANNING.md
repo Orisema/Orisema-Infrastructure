@@ -7,6 +7,8 @@
 - `DRIFT`: owned container has a different configured image reference or published port bindings.
 - `NOOP`: ownership labels, configured image reference and declared TCP port bindings match.
 
-**NOOP is intentionally limited:** it does not verify image digest, image freshness, running state, health, volumes, restart policy, security settings, firewall, or other runtime settings. It is not a declaration of full equivalence or production readiness. `plan` never changes containers.
+**NOOP is intentionally limited:** it does not verify image digest, image freshness, running state, live health, volumes, restart policy, security settings, firewall, or other runtime settings. It is not a declaration of full equivalence or production readiness. `plan` never changes containers.
 
 `deploy` remains create-only and refuses existing names; it does not execute this plan or automatically reconcile drift. No rollback or atomic multi-service deployment is available.
+
+Healthcheck comparison covers shell command, interval, timeout and retries. It distinguishes `CMD-SHELL` from `CMD`; it does not compare startup checks or start period.

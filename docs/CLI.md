@@ -57,7 +57,7 @@ After the first deployment, rerunning `go run ./cmd/orisema deploy examples/ngin
 
 If any service is `DRIFT` or `REVIEW`, deployment is blocked for the entire manifest before creating any containers. `CREATE` services still require typing `DEPLOY`. A second check for name collisions happens immediately before each creation.
 
-**Limits:** This is idempotent only for the fields currently compared (ownership labels, image reference, TCP port bindings). `NOOP` does not imply that the container is running or healthy, that the image digest matches, or that security options and other settings are equivalent. A multi-service deployment can partially complete if a later create fails. No rollback, automatic reconciliation or destructive update exists.
+**Limits:** This is idempotent only for the fields currently compared (ownership labels, image reference, TCP port bindings, declared healthcheck command and timing/retries). `NOOP` does not imply that the container is running or healthy, that the image digest matches, or that security options and other settings are equivalent. A multi-service deployment can partially complete if a later create fails. No rollback, automatic reconciliation or destructive update exists.
 
 ## Experimental service lifecycle
 
@@ -113,3 +113,17 @@ podman healthcheck run orisema-health-lab-web
 ```
 
 The sample `nginx -t` check verifies Nginx configuration, **not HTTP reachability**. Health status may be `starting` or `unknown` before the first probe. Do not assume healthcheck support or inspect output are identical across all Podman versions. Existing containers are never silently updated.
+
+
+The command is encoded as an explicit JSON `CMD-SHELL` test when passed to
+Podman. Exec-form `CMD` tests are not equivalent to shell-form commands.
+Durations are compared in nanoseconds, so `30s` and `0.5m` are equivalent.
+An inspect test of `["NONE"]` means disabled: it matches an omitted manifest
+healthcheck, but never a declared one. An active image-inherited healthcheck
+without a manifest declaration is reported as `DRIFT`. Omission does not disable
+an image's healthcheck during creation. Empty or unknown test forms fail the
+comparison conservatively. Start period, startup checks and other undeclared
+healthcheck settings are not compared; `NOOP` remains limited.
+
+See [the healthcheck validation checklist](HEALTHCHECK-VALIDATION.md) for the
+remaining real-Podman checks and the next incremental runtime work.

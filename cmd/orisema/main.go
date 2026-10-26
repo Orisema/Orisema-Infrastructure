@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
@@ -18,13 +19,13 @@ import (
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 2 {
-		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service>")
+		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service>")
 		return 2
 	}
 	operation := args[0]
 	needsService := operation == "logs" || operation == "start" || operation == "stop"
-	if (needsService && len(args) != 3) || (!needsService && (len(args) != 2 || (operation != "validate" && operation != "plan" && operation != "status" && operation != "deploy"))) {
-		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service>")
+	if (needsService && len(args) != 3) || (!needsService && (len(args) != 2 || (operation != "validate" && operation != "plan" && operation != "status" && operation != "diagnose" && operation != "deploy"))) {
+		fmt.Fprintln(stderr, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service>")
 		return 2
 	}
 	m, err := manifest.Load(args[1])
@@ -170,6 +171,21 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stdout, "    finished: %s\n", item.State.FinishedAt)
 			}
 			fmt.Fprintf(stdout, "    health: %s\n", item.HealthStatus())
+		}
+	case "diagnose":
+		reports, diagnoseErr := diagnostic.Build(context.Background(), m, runtime.Client{})
+		fmt.Fprintf(stdout, "Operational diagnosis for %q (read-only):\n", m.Name)
+		for _, report := range reports {
+			fmt.Fprintf(stdout, "  %s:\n", report.Name)
+			fmt.Fprintf(stdout, "    configuration: %s\n", report.Configuration)
+			fmt.Fprintf(stdout, "    execution: %s\n", report.Execution)
+			fmt.Fprintf(stdout, "    health: %s\n", report.Health)
+			fmt.Fprintf(stdout, "    failure: %s\n", report.Failure)
+			fmt.Fprintf(stdout, "    recommended action: %s\n", report.Recommendation)
+		}
+		if diagnoseErr != nil {
+			fmt.Fprintln(stderr, "diagnosis incomplete: Podman could not be queried; no changes made")
+			return 1
 		}
 
 	}

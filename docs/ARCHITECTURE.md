@@ -57,6 +57,11 @@ checksums são verificados antes da criação da GitHub Release. O comando
 `orisema version` apenas lê dados incorporados e informações do runtime Go; não
 acessa a rede nem arquivos externos.
 
-## Decisões abertas
+## Decisões atuais e abertas
 
-Linguagem (Go é uma candidata), modelo de estado, formato do manifesto, gestão de segredos e estratégia de testes. Não presumir suporte a Windows/macOS até que seja implementado e testado.
+Go 1.23 é a linguagem e versão mínima declarada pelo módulo. Podman em Linux é
+o primeiro runtime; Docker, Windows e macOS não são suportados. O manifesto usa
+`orisema.dev/v1alpha1`, ainda experimental. Modelo de estado futuro, gestão de
+segredos, volumes e estratégia de migração do manifesto permanecem decisões
+abertas. A matriz entre artefatos produzidos e ambientes realmente executados
+está em [COMPATIBILITY.md](COMPATIBILITY.md).

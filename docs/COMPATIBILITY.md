@@ -1,0 +1,67 @@
+# Alpha compatibility matrix
+
+This document distinguishes an artifact that is produced from an environment
+that is actually exercised. Orisema Infrastructure remains **experimental and
+is not recommended for production**.
+
+## Distribution and runtime
+
+| Environment | Artifact | Automated execution | Runtime coverage |
+| --- | --- | --- | --- |
+| Ubuntu 24.04 AMD64 | Linux AMD64 | CLI, packaging, quick start and extended Podman laboratory | Distribution-provided Podman |
+| Ubuntu 22.04 AMD64 | Linux AMD64 | CLI and isolated quick start | Distribution-provided Podman |
+| Linux ARM64 | Linux ARM64 | Cross-build and binary metadata inspection only | Native execution not yet validated |
+| Other Linux distributions | Architecture-dependent | Not continuously tested | Not established |
+| macOS | None | Not tested | Not supported |
+| Windows | None | Not tested | Not supported |
+
+The CI quick-start matrix uses fresh, independent GitHub-hosted runners and
+records `/etc/os-release`, kernel architecture and the exact Podman version as
+workflow artifacts. Package versions can change when runner images or Ubuntu
+repositories change; the workflow evidence for a commit is authoritative.
+
+The local development laboratory has also exercised Ubuntu 24.04.5 LTS AMD64,
+Linux kernel 6.8 and Podman 4.9.3. This is evidence from one environment, not a
+minimum-version guarantee.
+
+## Runtime support
+
+- Podman on Linux is the only supported runtime family.
+- Rootful and rootless Podman are separate environments; consistent invocation
+  is required.
+- Docker CLI/Engine compatibility is not implemented or claimed.
+- Healthcheck inspect fields and scheduling can vary between Podman versions;
+  conservative parsing may report an observation as unavailable.
+- Host firewall, SELinux/AppArmor policy, cgroups configuration and registry
+  access remain operator responsibilities.
+
+## Command support
+
+| Command | Reads Podman | May change Podman | Notes |
+| --- | --- | --- | --- |
+| `version` | No | No | Uses only embedded build and Go runtime information |
+| `validate` | No | No | Validates the current manifest contract |
+| `plan` | Yes | No | Compares only supported declared fields |
+| `status`, `diagnose` | Yes | No | Present distinct runtime and health observations |
+| `logs` | Yes | No | Returns the last 100 lines; does not follow |
+| `deploy` | Yes | Yes | Creates only `CREATE` services after confirmation |
+| `start`, `stop` | Yes | Yes | Require ownership and exact confirmation |
+| `recover plan`, `history`, `verify` | Some | No | Journal commands can require local journal access |
+| `recover prepare` | Yes | Journal only | Reserves an eligible START; does not start it |
+| `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |
+
+## Meaning of `NOOP`
+
+`NOOP` confirms only matching ownership labels, configured image reference, TCP
+port mappings, declared healthcheck command/timing/retries and restart policy.
+It does **not** confirm:
+
+- that the container is running or healthy;
+- image digest, freshness or registry identity;
+- undeclared or image-inherited settings outside the supported comparison;
+- volumes, secrets, environment variables, networks or security context;
+- firewall exposure, dependencies or application-level reachability;
+- production readiness.
+
+A stopped or unhealthy container can correctly remain `NOOP`. Orisema keeps
+declarative comparison, operational diagnosis and recovery evidence separate.

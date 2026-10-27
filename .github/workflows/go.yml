@@ -91,6 +91,27 @@ jobs:
           grep -Fq 'health: unavailable (container not running)' work/status-stopped.txt
           sudo work/orisema plan examples/nginx-health.yaml | tee work/plan-stopped.txt
           grep -q NOOP work/plan-stopped.txt
+      - name: Exercise prepared recovery and verification
+        run: |
+          set -euo pipefail
+          history="$PWD/work/recovery.jsonl"
+          sudo work/orisema recover init examples/nginx-health.yaml \
+            --history "$history" --operator ci
+          sudo work/orisema recover prepare examples/nginx-health.yaml web \
+            --history "$history" --operator ci --reason "isolated integration test" \
+            | tee work/recovery-prepare.txt
+          token="$(awk '/^Reservation token: / { print $3 }' work/recovery-prepare.txt)"
+          test "${#token}" -eq 32
+          printf 'APPLY START web\n' | sudo work/orisema recover apply \
+            examples/nginx-health.yaml web --history "$history" --token "$token"
+          sudo podman healthcheck run orisema-health-lab-web
+          sudo work/orisema recover verify examples/nginx-health.yaml web \
+            --history "$history" --token "$token"
+          sudo work/orisema recover history examples/nginx-health.yaml \
+            --history "$history" | tee work/recovery-history.txt
+          grep -Fq 'status=start-command-succeeded' work/recovery-history.txt
+          grep -Fq 'observation=healthy' work/recovery-history.txt
+          sudo chown "$USER":"$(id -gn)" "$history"
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -98,4 +119,5 @@ jobs:
           name: podman-healthcheck-evidence
           path: |
             work/*.json
+            work/*.jsonl
             work/*.txt

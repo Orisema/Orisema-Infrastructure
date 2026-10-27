@@ -12,3 +12,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    recovery:
+      maxAttempts: 3
+      minInterval: 5m
+      cooldown: 30m

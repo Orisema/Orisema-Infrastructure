@@ -33,12 +33,15 @@ Estado, verificações e logs
   `CREATE`, `NOOP`, `DRIFT` ou `REVIEW`.
 - **Diagnostic:** combina o resultado declarativo com execução e saúde
   observadas para recomendar uma ação somente informativa.
+- **Recovery plan:** transforma o diagnóstico em ações tipadas, pré-condições e
+  riscos, sem possuir capacidade de mutação do runtime.
 - **Runtime:** lista e inspeciona contêineres e executa operações explicitamente
   solicitadas pela CLI.
 
 Saúde não altera o plano declarativo. Diagnóstico não executa recuperação. Essa
 separação permite que um contêiner parado, mas equivalente nos campos
 declarativos, continue `NOOP` enquanto o diagnóstico informa a falha operacional.
+Um plano de recuperação pode recomendar `START`, mas não executa a recomendação.
 
 ## Fora do escopo inicial
 

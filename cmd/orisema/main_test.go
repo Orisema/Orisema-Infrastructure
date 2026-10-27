@@ -62,3 +62,17 @@ func TestRecoveryInitCreatesEmptyJournalWithoutRuntime(t *testing.T) {
 		t.Fatalf("stdout=%q", stdout.String())
 	}
 }
+
+func TestRecoveryApplyCancellationDoesNotRequireOrConsumeHistory(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	manifestData := []byte("apiVersion: orisema.dev/v1alpha1\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n    recovery:\n      maxAttempts: 3\n      minInterval: 5m\n      cooldown: 30m\n")
+	if err := os.WriteFile(manifestPath, manifestData, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"recover", "apply", manifestPath, "web", "--history", filepath.Join(dir, "missing"), "--token", strings.Repeat("a", 32)}, strings.NewReader("NO\n"), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "reservation was not consumed") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}

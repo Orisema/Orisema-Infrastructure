@@ -95,6 +95,12 @@ func Prepare(request PrepareRequest) (Preparation, error) {
 	}
 
 	attempts := make([]Attempt, 0, len(records))
+	consumed := make(map[string]bool)
+	for _, record := range records {
+		if record.Token != "" && (record.Kind == "execution" || record.Kind == "result") {
+			consumed[record.Token] = true
+		}
+	}
 	for _, record := range records {
 		if record.Manifest != request.Manifest || record.Service != request.Report.Service || record.Action != request.Report.Action {
 			continue
@@ -102,7 +108,14 @@ func Prepare(request PrepareRequest) (Preparation, error) {
 		switch record.Kind {
 		case "", "attempt":
 			attempts = append(attempts, Attempt{Service: record.Service, Action: record.Action, Timestamp: record.Timestamp, Succeeded: record.Succeeded})
+		case "execution":
+			if record.Status == "started" {
+				attempts = append(attempts, Attempt{Service: record.Service, Action: record.Action, Timestamp: record.Timestamp})
+			}
 		case "reservation":
+			if consumed[record.Token] {
+				continue
+			}
 			if record.Timestamp.After(request.Now) {
 				return Preparation{}, errors.New("recovery history contains a future reservation")
 			}
@@ -135,6 +148,7 @@ func Prepare(request PrepareRequest) (Preparation, error) {
 		Configuration: request.Report.Configuration,
 		Execution:     request.Report.Execution,
 		Failure:       request.Report.Failure,
+		Policy:        recoveryPolicySnapshot(request.Policy),
 	}
 	if err := validateRecord(record); err != nil {
 		return Preparation{}, err
@@ -154,6 +168,13 @@ func Prepare(request PrepareRequest) (Preparation, error) {
 		return Preparation{}, fmt.Errorf("sync recovery reservation: %w", err)
 	}
 	return Preparation{Token: token, ExpiresAt: expiresAt, Decision: decision}, nil
+}
+
+func recoveryPolicySnapshot(policy *manifest.Recovery) string {
+	if policy == nil {
+		return ""
+	}
+	return fmt.Sprintf("maxAttempts=%d;minInterval=%s;cooldown=%s", policy.MaxAttempts, policy.MinInterval, policy.Cooldown)
 }
 
 func newReservationToken() (string, error) {

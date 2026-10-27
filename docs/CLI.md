@@ -16,6 +16,8 @@ go run ./cmd/orisema plan examples/nginx.yaml
 go run ./cmd/orisema status examples/nginx.yaml
 go run ./cmd/orisema diagnose examples/nginx.yaml
 go run ./cmd/orisema recover plan examples/nginx.yaml
+go run ./cmd/orisema recover plan examples/nginx-restart.yaml --history /secure/path/orisema-recovery.jsonl
+go run ./cmd/orisema recover record examples/nginx-restart.yaml web START failed --history /secure/path/orisema-recovery.jsonl
 ```
 
 The `validate` command checks the manifest structure, service identifiers, images and port ranges.
@@ -29,8 +31,10 @@ as separate fields. It does not restart, replace or otherwise modify a container
 The `recover plan` command converts that diagnosis into typed operator guidance
 with preconditions, risk and confirmation requirements. It is read-only; a
 `recover apply` command does not exist. Optional declarative recovery guardrails
-are displayed, but execution remains blocked until durable attempt history is
-implemented and connected.
+are displayed. An explicit versioned history journal can feed the guardrail
+decision, and `recover record` can append an operator-supplied START result.
+Neither command performs or proves a runtime action; recovery execution remains
+unimplemented. See [RECOVERY-PLANNING.md](RECOVERY-PLANNING.md).
 
 The `plan` command inspects Podman and compares selected declared fields only. It does not reserve ports or provide full configuration equivalence; see [PLANNING.md](PLANNING.md).
 

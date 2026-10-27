@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
@@ -197,11 +198,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover plan <manifest.yaml>")
+	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover plan <manifest.yaml> [--history <path>] OR orisema recover record <manifest.yaml> <service> START <succeeded|failed> --history <path>")
 }
 
 func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
-	if len(args) != 3 || args[1] != "plan" {
+	if len(args) >= 2 && args[1] == "record" {
+		return runRecoveryRecord(args, stdout, stderr)
+	}
+	if (len(args) != 3 && len(args) != 5) || args[1] != "plan" || (len(args) == 5 && args[3] != "--history") {
 		printUsage(stderr)
 		return 2
 	}
@@ -209,6 +213,15 @@ func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
+	}
+	var attempts []recovery.Attempt
+	historyConnected := len(args) == 5
+	if historyConnected {
+		attempts, err = recovery.LoadHistory(args[4], m.Name)
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
 	}
 	reports, diagnoseErr := diagnostic.Build(context.Background(), m, runtime.Client{})
 	fmt.Fprintf(stdout, "Recovery plan for %q (read-only):\n", m.Name)
@@ -227,13 +240,46 @@ func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
 		} else {
 			fmt.Fprintf(stdout, "    guardrails: max attempts %d; minimum interval %s; cooldown %s\n", policy.MaxAttempts, policy.MinInterval, policy.Cooldown)
 		}
-		fmt.Fprintln(stdout, "    execution eligible: false (persistent attempt history is not connected)")
+		if historyConnected {
+			decision := recovery.Evaluate(time.Now(), step.Service, step.Action, policy, attempts)
+			fmt.Fprintf(stdout, "    guardrail decision: allowed=%t (%s)\n", decision.Allowed, decision.Reason)
+			if !decision.RetryAfter.IsZero() {
+				fmt.Fprintf(stdout, "    retry after: %s\n", decision.RetryAfter.Format(time.RFC3339))
+			}
+			fmt.Fprintln(stdout, "    execution eligible: false (recovery execution is not implemented)")
+		} else {
+			fmt.Fprintln(stdout, "    execution eligible: false (persistent attempt history is not connected)")
+		}
 	}
 	fmt.Fprintln(stdout, "No changes made. Recovery execution is not implemented.")
 	if diagnoseErr != nil {
 		fmt.Fprintln(stderr, "recovery plan incomplete: Podman could not be queried")
 		return 1
 	}
+	return 0
+}
+
+func runRecoveryRecord(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 8 || args[6] != "--history" || args[4] != "START" || (args[5] != "succeeded" && args[5] != "failed") {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	service := args[3]
+	if recovery.PolicyFor(m, service) == nil {
+		fmt.Fprintf(stderr, "error: service %q is missing or has no recovery guardrails\n", service)
+		return 1
+	}
+	record := recovery.HistoryRecord{Manifest: m.Name, Service: service, Action: diagnostic.ActionStart, Timestamp: time.Now().UTC(), Succeeded: args[5] == "succeeded"}
+	if err := recovery.AppendHistory(args[7], record); err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Recorded operator-supplied START result for %s in %s. No runtime changes made.\n", service, args[7])
 	return 0
 }
 

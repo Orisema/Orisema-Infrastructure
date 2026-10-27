@@ -68,14 +68,37 @@ cooldown window plus the minimum interval. Future timestamps block evaluation
 conservatively. Only `START` is eligible for evaluation; other typed actions
 remain non-executable.
 
-The CLI displays declared guardrails but reports execution as ineligible because
-persistent attempt history is not connected yet. It does not create or update a
-history file.
+The CLI displays declared guardrails. Without `--history`, it reports execution
+as ineligible because persistent attempt history is not connected. With an
+explicit history file, it loads the matching manifest's records and reports the
+guardrail decision, while still reporting execution as ineligible because no
+recovery executor exists.
+
+History uses a versioned JSON Lines journal. The file is limited to 1 MiB,
+locked during reads and writes, synchronized after appends, restricted to the
+current user and rejected if it is a symbolic link, non-regular file, corrupt,
+or has broader read permissions. Records are isolated by manifest, service and
+action. A missing or invalid file blocks the plan instead of being interpreted
+as an empty history. Create the journal with `recover record` before connecting
+it to `recover plan`.
+
+The explicit `recover record` command appends an operator-supplied observation:
+
+```sh
+go run ./cmd/orisema recover record examples/nginx-restart.yaml web START failed \
+  --history /secure/path/orisema-recovery.jsonl
+```
+
+The result may be `succeeded` or `failed`. This command does not contact Podman,
+perform a recovery attempt, or prove that one occurred. Protect the journal and
+record a result only after separately observing the operation. Orisema does not
+create parent directories for the supplied path.
 
 ## Usage
 
 ```sh
-go run ./cmd/orisema recover plan examples/nginx-health.yaml
+go run ./cmd/orisema recover plan examples/nginx-restart.yaml \
+  --history /secure/path/orisema-recovery.jsonl
 ```
 
 Review the typed action and evidence. Use the existing `start` command only as

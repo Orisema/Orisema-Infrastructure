@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,12 +25,57 @@ const (
 // HistoryRecord is an operator-supplied audit entry. Recording an entry does
 // not perform or prove a runtime mutation.
 type HistoryRecord struct {
-	Version   int               `json:"version"`
-	Manifest  string            `json:"manifest"`
-	Service   string            `json:"service"`
-	Action    diagnostic.Action `json:"action"`
-	Timestamp time.Time         `json:"timestamp"`
-	Succeeded bool              `json:"succeeded"`
+	Version       int               `json:"version"`
+	Kind          string            `json:"kind,omitempty"`
+	Manifest      string            `json:"manifest"`
+	Service       string            `json:"service"`
+	Action        diagnostic.Action `json:"action"`
+	Timestamp     time.Time         `json:"timestamp"`
+	Succeeded     bool              `json:"succeeded,omitempty"`
+	Token         string            `json:"token,omitempty"`
+	ExpiresAt     time.Time         `json:"expiresAt,omitempty"`
+	Operator      string            `json:"operator,omitempty"`
+	Reason        string            `json:"reason,omitempty"`
+	Container     string            `json:"container,omitempty"`
+	Configuration string            `json:"configuration,omitempty"`
+	Execution     string            `json:"execution,omitempty"`
+	Failure       string            `json:"failure,omitempty"`
+}
+
+// InitHistory creates a new journal with an auditable genesis record. It never
+// opens or truncates an existing path.
+func InitHistory(path, manifestName, operator string, now time.Time) error {
+	operator = strings.TrimSpace(operator)
+	if manifestName == "" || operator == "" {
+		return errors.New("manifest and operator are required")
+	}
+	if len(operator) > 128 {
+		return errors.New("operator must be at most 128 bytes")
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	record := HistoryRecord{Version: historyVersion, Kind: "journal", Manifest: manifestName, Timestamp: now.UTC(), Operator: operator}
+	if err := validateRecord(record); err != nil {
+		return err
+	}
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("encode recovery journal: %w", err)
+	}
+	encoded = append(encoded, '\n')
+	f, err := openHistory(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.Write(encoded); err != nil {
+		return fmt.Errorf("initialize recovery history: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("sync recovery history: %w", err)
+	}
+	return nil
 }
 
 func LoadHistory(path, manifestName string) ([]Attempt, error) {
@@ -50,8 +96,25 @@ func LoadHistory(path, manifestName string) ([]Attempt, error) {
 		return nil, fmt.Errorf("recovery history exceeds %d bytes", maxHistorySize)
 	}
 
+	records, err := readHistoryRecords(f)
+	if err != nil {
+		return nil, err
+	}
 	var attempts []Attempt
-	scanner := bufio.NewScanner(io.LimitReader(f, maxHistorySize+1))
+	for _, record := range records {
+		if record.Kind != "" && record.Kind != "attempt" {
+			continue
+		}
+		if record.Manifest == manifestName {
+			attempts = append(attempts, Attempt{Service: record.Service, Action: record.Action, Timestamp: record.Timestamp, Succeeded: record.Succeeded})
+		}
+	}
+	return attempts, nil
+}
+
+func readHistoryRecords(r io.Reader) ([]HistoryRecord, error) {
+	var records []HistoryRecord
+	scanner := bufio.NewScanner(io.LimitReader(r, maxHistorySize+1))
 	scanner.Buffer(make([]byte, 4096), 64*1024)
 	line := 0
 	for scanner.Scan() {
@@ -63,14 +126,12 @@ func LoadHistory(path, manifestName string) ([]Attempt, error) {
 		if err := validateRecord(record); err != nil {
 			return nil, fmt.Errorf("recovery history line %d: %w", line, err)
 		}
-		if record.Manifest == manifestName {
-			attempts = append(attempts, Attempt{Service: record.Service, Action: record.Action, Timestamp: record.Timestamp, Succeeded: record.Succeeded})
-		}
+		records = append(records, record)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("read recovery history: %w", err)
 	}
-	return attempts, nil
+	return records, nil
 }
 
 func AppendHistory(path string, record HistoryRecord) error {
@@ -143,14 +204,36 @@ func validateRecord(record HistoryRecord) error {
 	if record.Version != historyVersion {
 		return fmt.Errorf("unsupported history version %d", record.Version)
 	}
-	if record.Manifest == "" || record.Service == "" {
-		return errors.New("manifest and service are required")
+	if record.Manifest == "" || record.Timestamp.IsZero() {
+		return errors.New("manifest and timestamp are required")
+	}
+	if record.Kind == "journal" {
+		if record.Operator == "" {
+			return errors.New("journal operator is required")
+		}
+		return nil
+	}
+	if record.Service == "" {
+		return errors.New("service is required")
 	}
 	if record.Action != diagnostic.ActionStart {
 		return errors.New("only START attempts can be recorded")
 	}
-	if record.Timestamp.IsZero() {
-		return errors.New("timestamp is required")
+	switch record.Kind {
+	case "", "attempt":
+		return nil
+	case "reservation":
+		if record.Token == "" || record.Operator == "" || record.Reason == "" {
+			return errors.New("reservation token, operator and reason are required")
+		}
+		if !record.ExpiresAt.After(record.Timestamp) {
+			return errors.New("reservation expiry must be after its timestamp")
+		}
+		if record.Container == "" || record.Configuration == "" || record.Execution == "" || record.Failure == "" {
+			return errors.New("reservation observation is incomplete")
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported history record kind %q", record.Kind)
 	}
-	return nil
 }

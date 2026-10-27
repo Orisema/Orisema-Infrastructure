@@ -52,6 +52,7 @@ commands, exit codes and diagnostic output.
   of a restart loop; no time window or historical rate is available yet.
 - Runtime and inspect errors are reported but not retried automatically.
 - Recommendations do not evaluate dependencies or root cause.
-- No restart policy, recovery history, automatic recovery or rollback exists.
+- Restart policy comparison, a local recovery journal and explicitly prepared
+  `START` execution exist. Automatic recovery and rollback do not.
 - Rootless compatibility must be validated for each supported Podman version
   and host configuration.

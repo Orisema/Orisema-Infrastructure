@@ -10,7 +10,9 @@ Container names are expected to follow `orisema-<manifest-name>-<service-name>`.
 
 The command only reports existence, current state and image reference. It does **not** verify ports, volumes, image digests, security configuration or desired-state equivalence.
 
-`plan` remains an offline preview of the manifest, not an actionable state diff. No `deploy` command is provided yet.
+`plan` compares the supported declarative fields with local Podman state.
+`deploy` creates only services classified as `CREATE`, after explicit
+confirmation; it never replaces or updates an existing container.
 
 Run as the same user that owns the rootless Podman containers. Rootful and rootless Podman show different container sets.
 

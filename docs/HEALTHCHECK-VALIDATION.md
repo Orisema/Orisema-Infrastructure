@@ -61,7 +61,9 @@ The original `hello-orisema` laboratory was not accessed or changed.
 It accepts the known `starting`, `healthy` and `unhealthy` observations from
 either runtime health field, reports conflicts conservatively, and suppresses
 stale health observations for stopped or paused containers. Unit tests cover
-synthetic inspect variants. CI also checks real healthy and stopped states.
+synthetic inspect variants. CI also checks real healthy and stopped states, then
+exercises prepared START recovery and records a separate healthy observation in
+the recovery journal.
 Planning remains read-only; a stopped matching container remains `NOOP` and is
 not restarted automatically. Ownership protections are unchanged.
 

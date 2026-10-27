@@ -83,6 +83,22 @@ func InitHistory(path, manifestName, operator string, now time.Time) error {
 }
 
 func LoadHistory(path, manifestName string) ([]Attempt, error) {
+	records, err := LoadJournal(path, manifestName)
+	if err != nil {
+		return nil, err
+	}
+	var attempts []Attempt
+	for _, record := range records {
+		if record.Kind == "" || record.Kind == "attempt" || (record.Kind == "execution" && record.Status == "started") {
+			attempts = append(attempts, Attempt{Service: record.Service, Action: record.Action, Timestamp: record.Timestamp, Succeeded: record.Succeeded})
+		}
+	}
+	return attempts, nil
+}
+
+// LoadJournal returns validated records for one manifest under a shared lock.
+// Callers receive a snapshot; no runtime state is queried.
+func LoadJournal(path, manifestName string) ([]HistoryRecord, error) {
 	f, err := openHistory(path, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
@@ -104,13 +120,13 @@ func LoadHistory(path, manifestName string) ([]Attempt, error) {
 	if err != nil {
 		return nil, err
 	}
-	var attempts []Attempt
+	filtered := make([]HistoryRecord, 0, len(records))
 	for _, record := range records {
-		if record.Manifest == manifestName && (record.Kind == "" || record.Kind == "attempt" || (record.Kind == "execution" && record.Status == "started")) {
-			attempts = append(attempts, Attempt{Service: record.Service, Action: record.Action, Timestamp: record.Timestamp, Succeeded: record.Succeeded})
+		if record.Manifest == manifestName {
+			filtered = append(filtered, record)
 		}
 	}
-	return attempts, nil
+	return filtered, nil
 }
 
 func readHistoryRecords(r io.Reader) ([]HistoryRecord, error) {
@@ -243,8 +259,11 @@ func validateRecord(record HistoryRecord) error {
 		}
 		return nil
 	case "result":
-		if record.Token == "" || (record.Status != "succeeded" && record.Status != "failed") {
-			return errors.New("result token and succeeded or failed status are required")
+		if record.Token == "" || (record.Status != "succeeded" && record.Status != "failed" && record.Status != "reconciled-succeeded" && record.Status != "reconciled-failed") {
+			return errors.New("result token and a supported terminal status are required")
+		}
+		if strings.HasPrefix(record.Status, "reconciled-") && (record.Operator == "" || record.Reason == "" || record.Container == "" || record.Configuration == "" || record.Execution == "" || record.Failure == "") {
+			return errors.New("reconciled result audit evidence is incomplete")
 		}
 		return nil
 	default:

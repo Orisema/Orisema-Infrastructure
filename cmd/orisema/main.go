@@ -198,7 +198,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover init <manifest.yaml> --history <path> --operator <name> OR orisema recover plan <manifest.yaml> [--history <path>] OR orisema recover prepare <manifest.yaml> <service> --history <path> --operator <name> --reason <text> OR orisema recover apply <manifest.yaml> <service> --history <path> --token <token> OR orisema recover record <manifest.yaml> <service> START <succeeded|failed> --history <path>")
+	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover <init|history|plan|prepare|apply|reconcile|record> ...")
 }
 
 func runRecoveryPlan(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -213,6 +213,12 @@ func runRecoveryPlan(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 	}
 	if len(args) >= 2 && args[1] == "apply" {
 		return runRecoveryApply(args, stdin, stdout, stderr)
+	}
+	if len(args) >= 2 && args[1] == "history" {
+		return runRecoveryHistory(args, stdout, stderr)
+	}
+	if len(args) >= 2 && args[1] == "reconcile" {
+		return runRecoveryReconcile(args, stdin, stdout, stderr)
 	}
 	if (len(args) != 3 && len(args) != 5) || args[1] != "plan" || (len(args) == 5 && args[3] != "--history") {
 		printUsage(stderr)
@@ -266,6 +272,118 @@ func runRecoveryPlan(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 		return 1
 	}
 	return 0
+}
+
+func runRecoveryHistory(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 5 || args[3] != "--history" {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	records, err := recovery.LoadJournal(args[4], m.Name)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	resolved := make(map[string]bool)
+	consumed := make(map[string]bool)
+	for _, record := range records {
+		if record.Kind == "result" {
+			resolved[record.Token] = true
+		}
+		if record.Kind == "execution" {
+			consumed[record.Token] = true
+		}
+	}
+	fmt.Fprintf(stdout, "Recovery journal for %q (read-only):\n", m.Name)
+	for _, record := range records {
+		switch record.Kind {
+		case "journal":
+			fmt.Fprintf(stdout, "  %s JOURNAL initialized by %s\n", record.Timestamp.Format(time.RFC3339), record.Operator)
+		case "reservation":
+			state := "active"
+			if consumed[record.Token] {
+				state = "consumed"
+			} else if !record.ExpiresAt.After(time.Now()) {
+				state = "expired"
+			}
+			fmt.Fprintf(stdout, "  %s RESERVATION %s token=%s state=%s expires=%s\n", record.Timestamp.Format(time.RFC3339), record.Service, shortToken(record.Token), state, record.ExpiresAt.Format(time.RFC3339))
+		case "execution":
+			state := "unresolved"
+			if resolved[record.Token] {
+				state = "resolved"
+			}
+			fmt.Fprintf(stdout, "  %s EXECUTION %s token=%s state=%s\n", record.Timestamp.Format(time.RFC3339), record.Service, shortToken(record.Token), state)
+		case "result":
+			fmt.Fprintf(stdout, "  %s RESULT %s token=%s status=%s\n", record.Timestamp.Format(time.RFC3339), record.Service, shortToken(record.Token), record.Status)
+		default:
+			fmt.Fprintf(stdout, "  %s ATTEMPT %s action=%s succeeded=%t\n", record.Timestamp.Format(time.RFC3339), record.Service, record.Action, record.Succeeded)
+		}
+	}
+	unresolved := recovery.UnresolvedExecutions(records)
+	fmt.Fprintf(stdout, "Unresolved executions: %d\n", len(unresolved))
+	for _, record := range unresolved {
+		fmt.Fprintf(stdout, "  token=%s service=%s begun=%s\n", record.Token, record.Service, record.Timestamp.Format(time.RFC3339))
+	}
+	return 0
+}
+
+func runRecoveryReconcile(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) != 14 || args[4] != "--history" || args[6] != "--token" || args[8] != "--outcome" || args[10] != "--operator" || args[12] != "--reason" || (args[9] != "succeeded" && args[9] != "failed") {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	service := args[3]
+	if recovery.PolicyFor(m, service) == nil {
+		fmt.Fprintf(stderr, "error: service %q is missing or has no recovery guardrails\n", service)
+		return 1
+	}
+	confirmation := "RECONCILE " + strings.ToUpper(args[9]) + " " + service
+	fmt.Fprintf(stdout, "This records an operator assertion; it does not change Podman.\nType %s to continue: ", confirmation)
+	answer, readErr := bufio.NewReader(stdin).ReadString('\n')
+	if readErr != nil || strings.TrimSpace(answer) != confirmation {
+		fmt.Fprintln(stderr, "cancelled; journal was not changed")
+		return 1
+	}
+	reports, diagnoseErr := diagnostic.Build(context.Background(), m, runtime.Client{})
+	if diagnoseErr != nil {
+		fmt.Fprintln(stderr, "error: reconciliation blocked because Podman could not be queried")
+		return 1
+	}
+	var report *diagnostic.Report
+	for i := range reports {
+		if reports[i].Service == service {
+			report = &reports[i]
+			break
+		}
+	}
+	if report == nil {
+		fmt.Fprintf(stderr, "error: service %q has no diagnostic report\n", service)
+		return 1
+	}
+	err = recovery.ReconcileExecution(recovery.ReconcileRequest{HistoryPath: args[5], Manifest: m.Name, Service: service, Token: args[7], Outcome: args[9], Operator: args[11], Reason: args[13], Report: *report})
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Recorded reconciled-%s for %s. No runtime changes made.\n", args[9], service)
+	return 0
+}
+
+func shortToken(token string) string {
+	if len(token) <= 8 {
+		return token
+	}
+	return token[:8] + "..."
 }
 
 func runRecoveryApply(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

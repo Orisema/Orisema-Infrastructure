@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Orisema/Orisema-Infrastructure/internal/buildinfo"
 	"github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
@@ -20,6 +21,10 @@ import (
 )
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) == 1 && args[0] == "version" {
+		fmt.Fprint(stdout, buildinfo.Current().String())
+		return 0
+	}
 	if len(args) > 0 && args[0] == "recover" {
 		return runRecoveryPlan(args, stdin, stdout, stderr)
 	}
@@ -198,7 +203,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
 func runRecoveryPlan(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

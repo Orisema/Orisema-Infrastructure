@@ -198,12 +198,18 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover plan <manifest.yaml> [--history <path>] OR orisema recover record <manifest.yaml> <service> START <succeeded|failed> --history <path>")
+	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover init <manifest.yaml> --history <path> --operator <name> OR orisema recover plan <manifest.yaml> [--history <path>] OR orisema recover prepare <manifest.yaml> <service> --history <path> --operator <name> --reason <text> OR orisema recover record <manifest.yaml> <service> START <succeeded|failed> --history <path>")
 }
 
 func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[1] == "record" {
 		return runRecoveryRecord(args, stdout, stderr)
+	}
+	if len(args) >= 2 && args[1] == "prepare" {
+		return runRecoveryPrepare(args, stdout, stderr)
+	}
+	if len(args) >= 2 && args[1] == "init" {
+		return runRecoveryInit(args, stdout, stderr)
 	}
 	if (len(args) != 3 && len(args) != 5) || args[1] != "plan" || (len(args) == 5 && args[3] != "--history") {
 		printUsage(stderr)
@@ -256,6 +262,75 @@ func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "recovery plan incomplete: Podman could not be queried")
 		return 1
 	}
+	return 0
+}
+
+func runRecoveryInit(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 7 || args[3] != "--history" || args[5] != "--operator" {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	if err := recovery.InitHistory(args[4], m.Name, args[6], time.Now()); err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Initialized recovery history for %q at %s. No runtime changes made.\n", m.Name, args[4])
+	return 0
+}
+
+func runRecoveryPrepare(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 10 || args[4] != "--history" || args[6] != "--operator" || args[8] != "--reason" {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	service := args[3]
+	policy := recovery.PolicyFor(m, service)
+	if policy == nil {
+		fmt.Fprintf(stderr, "error: service %q is missing or has no recovery guardrails\n", service)
+		return 1
+	}
+	reports, diagnoseErr := diagnostic.Build(context.Background(), m, runtime.Client{})
+	if diagnoseErr != nil {
+		fmt.Fprintln(stderr, "error: preparation blocked because Podman could not be queried")
+		return 1
+	}
+	var report *diagnostic.Report
+	for i := range reports {
+		if reports[i].Service == service {
+			report = &reports[i]
+			break
+		}
+	}
+	if report == nil {
+		fmt.Fprintf(stderr, "error: service %q has no diagnostic report\n", service)
+		return 1
+	}
+	prepared, err := recovery.Prepare(recovery.PrepareRequest{
+		HistoryPath: args[5],
+		Manifest:    m.Name,
+		Report:      *report,
+		Policy:      policy,
+		Operator:    args[7],
+		Reason:      args[9],
+	})
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Prepared START for %s after read-only runtime revalidation.\n", report.Name)
+	fmt.Fprintf(stdout, "Reservation token: %s\n", prepared.Token)
+	fmt.Fprintf(stdout, "Expires: %s\n", prepared.ExpiresAt.Format(time.RFC3339))
+	fmt.Fprintln(stdout, "No runtime changes made. There is no recover apply command.")
 	return 0
 }
 

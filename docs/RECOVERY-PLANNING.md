@@ -79,8 +79,16 @@ locked during reads and writes, synchronized after appends, restricted to the
 current user and rejected if it is a symbolic link, non-regular file, corrupt,
 or has broader read permissions. Records are isolated by manifest, service and
 action. A missing or invalid file blocks the plan instead of being interpreted
-as an empty history. Create the journal with `recover record` before connecting
-it to `recover plan`.
+as an empty history. Initialize it explicitly before first use:
+
+```sh
+go run ./cmd/orisema recover init examples/nginx-restart.yaml \
+  --history /secure/path/orisema-recovery.jsonl \
+  --operator alice
+```
+
+Initialization writes an auditable genesis record with manifest, operator and
+timestamp. It uses exclusive creation and never truncates an existing path.
 
 The explicit `recover record` command appends an operator-supplied observation:
 
@@ -93,6 +101,41 @@ The result may be `succeeded` or `failed`. This command does not contact Podman,
 perform a recovery attempt, or prove that one occurred. Protect the journal and
 record a result only after separately observing the operation. Orisema does not
 create parent directories for the supplied path.
+
+## Atomic preparation
+
+`recover prepare` performs a fresh read-only diagnosis and, only when the
+recommendation is `START`, atomically evaluates the guardrails and appends a
+short-lived reservation to the same journal:
+
+```sh
+go run ./cmd/orisema recover prepare examples/nginx-restart.yaml web \
+  --history /secure/path/orisema-recovery.jsonl \
+  --operator alice \
+  --reason "incident reviewed"
+```
+
+The reservation contains a random 128-bit token, a five-minute expiry, the
+operator and reason, plus the observed container name, configuration, execution
+and failure. The journal must already exist (normally through `recover init`)
+and have safe permissions. The
+decision and append occur under one exclusive file lock, so concurrent local
+preparations for the same manifest, service and action cannot both succeed.
+
+Preparation fails closed when Podman inspection is unavailable, the current
+diagnosis is not `START`, ownership or supported configuration does not match,
+guardrails reject another attempt, history is unsafe, or an unexpired
+reservation already exists. Expired reservations no longer block a new prepare.
+
+The token is an audit and coordination artifact only. There is intentionally no
+command that consumes it: `recover prepare` never starts a container and
+`recover apply` still does not exist. File locking coordinates processes using
+the same local journal; it is not a distributed lock and the journal is not
+tamper-evident.
+The operator field is a supplied audit label, not an authenticated identity.
+Runtime state may change after preparation; any future token consumer must
+revalidate ownership, configuration, state and expiry again under its own
+execution boundary.
 
 ## Usage
 

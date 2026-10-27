@@ -60,3 +60,21 @@ func TestHistoryMissingFailsClosed(t *testing.T) {
 		t.Fatal("expected missing history to fail")
 	}
 }
+
+func TestInitHistoryCreatesOnceWithoutAnAttempt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.jsonl")
+	now := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
+	if err := InitHistory(path, "demo", "alice", now); err != nil {
+		t.Fatal(err)
+	}
+	attempts, err := LoadHistory(path, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(attempts) != 0 {
+		t.Fatalf("journal genesis counted as attempts: %#v", attempts)
+	}
+	if err := InitHistory(path, "demo", "alice", now); err == nil {
+		t.Fatal("expected existing journal initialization to fail")
+	}
+}

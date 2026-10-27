@@ -37,3 +37,28 @@ func TestRecoveryRecordWritesScopedHistoryWithoutRuntime(t *testing.T) {
 		t.Fatalf("stdout=%q", stdout.String())
 	}
 }
+
+func TestRecoveryInitCreatesEmptyJournalWithoutRuntime(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	historyPath := filepath.Join(dir, "history.jsonl")
+	manifestData := []byte("apiVersion: orisema.dev/v1alpha1\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n")
+	if err := os.WriteFile(manifestPath, manifestData, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"recover", "init", manifestPath, "--history", historyPath, "--operator", "alice"}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, stderr.String())
+	}
+	attempts, err := recovery.LoadHistory(historyPath, "demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(attempts) != 0 {
+		t.Fatalf("attempts=%#v", attempts)
+	}
+	if !strings.Contains(stdout.String(), "No runtime changes made") {
+		t.Fatalf("stdout=%q", stdout.String())
+	}
+}

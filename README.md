@@ -6,6 +6,9 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 
 **Status:** protótipo experimental com CLI funcional para Podman; ainda não está pronto para produção.
 
+**Aviso:** o Orisema Infrastructure está em desenvolvimento experimental e não
+é recomendado para ambientes de produção.
+
 ## Objetivos
 
 - Implantação declarativa e verificável de aplicações em contêineres.
@@ -22,6 +25,23 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Como contribuir](CONTRIBUTING.md)
 - [Governança](GOVERNANCE.md)
 - [Segurança](SECURITY.md)
+- [Instalação e verificação de releases](docs/INSTALLATION.md)
+
+## Versão do binário
+
+Builds locais não exigem metadados externos e se identificam como builds de
+desenvolvimento:
+
+```sh
+go build -o orisema ./cmd/orisema
+./orisema version
+```
+
+Releases planejadas distribuem binários para Linux AMD64 e Linux ARM64. Podman
+em Linux é o único runtime suportado inicialmente; Docker, Windows e macOS não
+têm suporte oficial nesta etapa. Consulte as diferenças entre alvos compilados
+e plataformas efetivamente testadas em
+[Instalação](docs/INSTALLATION.md).
 
 ## Licença
 

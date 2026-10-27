@@ -41,6 +41,27 @@ func TestRecoveryRecordWritesScopedHistoryWithoutRuntime(t *testing.T) {
 	}
 }
 
+func TestVersionDoesNotRequireManifestOrRuntime(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"version"}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("code=%d stderr=%q", code, stderr.String())
+	}
+	for _, expected := range []string{"Orisema Infrastructure", "Version: development", "Commit: unknown", "Built: unknown", "Go: go", "OS/Arch: "} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("version output %q does not contain %q", stdout.String(), expected)
+		}
+	}
+}
+
+func TestVersionRejectsExtraArguments(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"version", "extra"}, strings.NewReader(""), &stdout, &stderr)
+	if code != 2 || !strings.Contains(stderr.String(), "Usage:") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestRecoveryInitCreatesEmptyJournalWithoutRuntime(t *testing.T) {
 	dir := t.TempDir()
 	manifestPath := filepath.Join(dir, "manifest.yaml")

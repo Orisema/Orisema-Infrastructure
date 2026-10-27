@@ -26,6 +26,8 @@ Estado, verificações e logs
 - **Executor:** execução controlada do plano aprovado.
 - **Provider:** integração com Podman e futuros runtimes.
 - **State:** registro das operações sem segredos.
+- **Build info:** metadados imutáveis incorporados ao binário durante o build,
+  com valores explícitos de desenvolvimento quando não injetados.
 
 ## Separação de responsabilidades atual
 
@@ -46,6 +48,14 @@ Um plano de recuperação pode recomendar `START`, mas não executa a recomenda�
 ## Fora do escopo inicial
 
 Orquestração multi-node, painel web e gestão central de identidade.
+
+## Distribuição experimental
+
+O pipeline acionado somente por tags compila binários Linux AMD64 e ARM64 com
+`CGO_ENABLED=0`, `-trimpath` e metadados via linker. Os arquivos compactados e
+checksums são verificados antes da criação da GitHub Release. O comando
+`orisema version` apenas lê dados incorporados e informações do runtime Go; não
+acessa a rede nem arquivos externos.
 
 ## Decisões abertas
 

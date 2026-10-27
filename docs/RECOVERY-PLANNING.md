@@ -48,6 +48,30 @@ Without durable history, Orisema cannot safely distinguish a new incident from
 a restart loop. Restart-policy counters and healthcheck retries are not a
 substitute for recovery history.
 
+## Declarative guardrails
+
+A service may declare the limits that a future executor would have to enforce:
+
+```yaml
+recovery:
+  maxAttempts: 3
+  minInterval: 5m
+  cooldown: 30m
+```
+
+`maxAttempts` must be 1–10, `minInterval` must be 1 second through 24 hours,
+and `cooldown` must be at least `minInterval` and at most 168 hours. This
+declaration is a constraint, not permission to act.
+
+The recovery package now models attempt records and evaluates a rolling
+cooldown window plus the minimum interval. Future timestamps block evaluation
+conservatively. Only `START` is eligible for evaluation; other typed actions
+remain non-executable.
+
+The CLI displays declared guardrails but reports execution as ineligible because
+persistent attempt history is not connected yet. It does not create or update a
+history file.
+
 ## Usage
 
 ```sh

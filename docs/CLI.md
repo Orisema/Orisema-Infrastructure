@@ -28,7 +28,9 @@ as separate fields. It does not restart, replace or otherwise modify a container
 
 The `recover plan` command converts that diagnosis into typed operator guidance
 with preconditions, risk and confirmation requirements. It is read-only; a
-`recover apply` command does not exist.
+`recover apply` command does not exist. Optional declarative recovery guardrails
+are displayed, but execution remains blocked until durable attempt history is
+implemented and connected.
 
 The `plan` command inspects Podman and compares selected declared fields only. It does not reserve ports or provide full configuration equivalence; see [PLANNING.md](PLANNING.md).
 

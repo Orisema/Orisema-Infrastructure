@@ -221,6 +221,13 @@ func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
 		for _, condition := range step.Preconditions {
 			fmt.Fprintf(stdout, "      - %s\n", condition)
 		}
+		policy := recovery.PolicyFor(m, step.Service)
+		if policy == nil {
+			fmt.Fprintln(stdout, "    guardrails: not declared")
+		} else {
+			fmt.Fprintf(stdout, "    guardrails: max attempts %d; minimum interval %s; cooldown %s\n", policy.MaxAttempts, policy.MinInterval, policy.Cooldown)
+		}
+		fmt.Fprintln(stdout, "    execution eligible: false (persistent attempt history is not connected)")
 	}
 	fmt.Fprintln(stdout, "No changes made. Recovery execution is not implemented.")
 	if diagnoseErr != nil {

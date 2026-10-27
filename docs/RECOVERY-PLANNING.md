@@ -157,6 +157,39 @@ Podman and the journal do not share a transaction, so a process crash can leave
 a begun attempt with an unknown runtime result; this is intentionally safer than
 silently retrying.
 
+## Interrupted attempts
+
+The journal can be inspected without querying or changing Podman:
+
+```sh
+go run ./cmd/orisema recover history examples/nginx-restart.yaml \
+  --history /secure/path/orisema-recovery.jsonl
+```
+
+Reservations and terminal results show only a token prefix. A begun execution
+without a result is listed as unresolved and includes its full, already-consumed
+token so it can be reconciled.
+
+Orisema never infers that an interrupted attempt succeeded merely because a
+container is currently running. After investigating runtime and application
+evidence, an operator may explicitly reconcile the consumed token:
+
+```sh
+go run ./cmd/orisema recover reconcile examples/nginx-restart.yaml web \
+  --history /secure/path/orisema-recovery.jsonl \
+  --token <unresolved-token> \
+  --outcome succeeded \
+  --operator alice \
+  --reason "verified service logs and external probe"
+# Type: RECONCILE SUCCEEDED web
+```
+
+The outcome may be `succeeded` or `failed`. Reconciliation performs a fresh
+read-only diagnosis, records the operator-supplied assertion and observed state,
+and never changes Podman. It requires exact confirmation, is single-writer under
+the journal lock and cannot replace an existing result. The operator field is
+still a label rather than an authenticated identity.
+
 ## Usage
 
 ```sh

@@ -37,6 +37,7 @@ const (
 // detected failure and recommended operator action as independent dimensions.
 type Report struct {
 	Name           string
+	Service        string
 	Configuration  string
 	Execution      string
 	Health         string
@@ -54,6 +55,7 @@ func Build(ctx context.Context, m *manifest.Manifest, client Runtime) ([]Report,
 		for _, svc := range m.Services {
 			reports = append(reports, Report{
 				Name:           containerName(m.Name, svc.Name),
+				Service:        svc.Name,
 				Configuration:  "unknown",
 				Execution:      "unavailable",
 				Health:         "unavailable",
@@ -72,6 +74,7 @@ func Build(ctx context.Context, m *manifest.Manifest, client Runtime) ([]Report,
 		if !exists {
 			reports = append(reports, Report{
 				Name:           name,
+				Service:        svc.Name,
 				Configuration:  "absent",
 				Execution:      "not found",
 				Health:         "unavailable",
@@ -86,6 +89,7 @@ func Build(ctx context.Context, m *manifest.Manifest, client Runtime) ([]Report,
 		if inspectErr != nil {
 			reports = append(reports, Report{
 				Name:           name,
+				Service:        svc.Name,
 				Configuration:  "review",
 				Execution:      observedListState(found.State),
 				Health:         "unavailable",
@@ -99,6 +103,7 @@ func Build(ctx context.Context, m *manifest.Manifest, client Runtime) ([]Report,
 		step := planner.BuildInspected(ctx, &manifest.Manifest{Name: m.Name, Services: []manifest.Service{svc}}, []runtime.Container{found}, fixedInspector{item: item})[0]
 		report := Report{
 			Name:          name,
+			Service:       svc.Name,
 			Configuration: configurationStatus(step),
 			Execution:     executionStatus(item),
 			Health:        item.HealthStatus(),

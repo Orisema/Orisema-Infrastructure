@@ -9,6 +9,7 @@ import "github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 
 type Step struct {
 	Name                 string
+	Service              string
 	Action               diagnostic.Action
 	Reason               string
 	Preconditions        []string
@@ -21,7 +22,7 @@ type Step struct {
 func Build(reports []diagnostic.Report) []Step {
 	steps := make([]Step, 0, len(reports))
 	for _, report := range reports {
-		step := Step{Name: report.Name, Action: report.Action, Reason: report.Failure}
+		step := Step{Name: report.Name, Service: report.Service, Action: report.Action, Reason: report.Failure}
 		switch report.Action {
 		case diagnostic.ActionNone:
 			step.Preconditions = []string{"continue observation"}

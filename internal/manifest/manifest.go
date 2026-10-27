@@ -27,6 +27,15 @@ type Service struct {
 	Ports []Port `yaml:"ports,omitempty"`
 	Healthcheck *Healthcheck `yaml:"healthcheck,omitempty"`
 	Restart *Restart `yaml:"restart,omitempty"`
+	Recovery *Recovery `yaml:"recovery,omitempty"`
+}
+
+// Recovery constrains a future explicitly authorized recovery executor. Merely
+// declaring it never enables execution.
+type Recovery struct {
+	MaxAttempts int `yaml:"maxAttempts"`
+	MinInterval string `yaml:"minInterval"`
+	Cooldown string `yaml:"cooldown"`
 }
 
 // Restart describes process-exit recovery. It is independent from application
@@ -131,6 +140,19 @@ func (m *Manifest) Validate() error {
 				}
 			default:
 				return fmt.Errorf("service %q: restart policy must be no or on-failure", s.Name)
+			}
+		}
+		if r := s.Recovery; r != nil {
+			if r.MaxAttempts < 1 || r.MaxAttempts > 10 {
+				return fmt.Errorf("service %q: recovery maxAttempts must be between 1 and 10", s.Name)
+			}
+			minInterval, err := time.ParseDuration(r.MinInterval)
+			if err != nil || minInterval < time.Second || minInterval > 24*time.Hour {
+				return fmt.Errorf("service %q: recovery minInterval must be between 1s and 24h", s.Name)
+			}
+			cooldown, err := time.ParseDuration(r.Cooldown)
+			if err != nil || cooldown < minInterval || cooldown > 7*24*time.Hour {
+				return fmt.Errorf("service %q: recovery cooldown must be at least minInterval and at most 168h", s.Name)
 			}
 		}
 		for _, p := range s.Ports {

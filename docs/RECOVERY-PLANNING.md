@@ -147,8 +147,10 @@ go run ./cmd/orisema recover apply examples/nginx-restart.yaml web \
 After confirmation, Orisema performs a fresh diagnosis. Under the journal lock
 it verifies the reservation, policy snapshot, expiry, observations and current
 guardrails, then appends and synchronizes a begun attempt before calling
-`podman start`. The token becomes single-use. A success or failure result is
-appended afterward; a crash after the begun record still consumes one attempt.
+`podman start`. The token becomes single-use. A `start-command-succeeded` or
+`start-command-failed` result is appended afterward; these describe the Podman
+command, not application recovery. A crash after the begun record still
+consumes one attempt.
 
 `recover apply` does not restart a running container, deploy a missing one,
 replace drift, handle unhealthy applications, retry automatically or roll back.
@@ -184,11 +186,39 @@ go run ./cmd/orisema recover reconcile examples/nginx-restart.yaml web \
 # Type: RECONCILE SUCCEEDED web
 ```
 
-The outcome may be `succeeded` or `failed`. Reconciliation performs a fresh
+The outcome may be `succeeded` or `failed`, recorded distinctly as
+`reconciled-command-succeeded` or `reconciled-command-failed`. Reconciliation performs a fresh
 read-only diagnosis, records the operator-supplied assertion and observed state,
 and never changes Podman. It requires exact confirmation, is single-writer under
 the journal lock and cannot replace an existing result. The operator field is
 still a label rather than an authenticated identity.
+
+## Post-command verification
+
+A successful START command is not proof that the application recovered. After
+allowing the service and any healthcheck to settle, record a fresh read-only
+observation:
+
+```sh
+go run ./cmd/orisema recover verify examples/nginx-restart.yaml web \
+  --history /secure/path/orisema-recovery.jsonl \
+  --token <consumed-token>
+```
+
+Verification requires a terminal command result and appends one of:
+
+- `healthy`: running with an observed healthy configured healthcheck;
+- `starting`: running while the configured healthcheck is still starting;
+- `running-unverified`: running without a configured healthcheck;
+- `unhealthy`: running with an unhealthy healthcheck;
+- `not-running`: the process is no longer running;
+- `configuration-changed`: supported declarative fields no longer match;
+- `unknown`: runtime evidence is insufficient.
+
+Multiple observations may be appended as state changes. Verification does not
+mutate Podman and does not claim that the START command caused the observed
+state. Only `healthy` includes application-level health evidence, and even that
+is bounded by the declared healthcheck.
 
 ## Usage
 

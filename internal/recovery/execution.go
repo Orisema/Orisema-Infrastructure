@@ -145,9 +145,9 @@ func CompleteExecution(path, token string, succeeded bool, detail string, now ti
 	if now.Before(execution.Timestamp) {
 		return errors.New("execution result timestamp precedes the begun attempt")
 	}
-	status := "failed"
+	status := "start-command-failed"
 	if succeeded {
-		status = "succeeded"
+		status = "start-command-succeeded"
 	}
 	record := HistoryRecord{
 		Version:   historyVersion,

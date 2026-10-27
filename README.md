@@ -26,6 +26,8 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Governança](GOVERNANCE.md)
 - [Segurança](SECURITY.md)
 - [Instalação e verificação de releases](docs/INSTALLATION.md)
+- [Quick start em host Linux descartável](docs/QUICKSTART.md)
+- [Compatibilidade e comandos suportados](docs/COMPATIBILITY.md)
 
 ## Versão do binário
 
@@ -42,6 +44,14 @@ em Linux é o único runtime suportado inicialmente; Docker, Windows e macOS nã
 têm suporte oficial nesta etapa. Consulte as diferenças entre alvos compilados
 e plataformas efetivamente testadas em
 [Instalação](docs/INSTALLATION.md).
+
+## Quick start
+
+Em um host Linux descartável com Podman, siga o
+[quick start revisável](docs/QUICKSTART.md). Ele começa por `validate` e `plan`,
+exige confirmação explícita antes de criar o contêiner e termina com limpeza
+manual baseada nos labels de ownership. Não execute o laboratório em um host de
+produção.
 
 ## Licença
 

@@ -129,3 +129,53 @@ jobs:
             work/*.json
             work/*.jsonl
             work/*.txt
+  quickstart-matrix:
+    name: quickstart (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install Podman and record environment
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y podman
+          mkdir -p work
+          cat /etc/os-release | tee work/os-release.txt
+          uname -srm | tee work/kernel.txt
+          sudo podman version | tee work/podman-version.txt
+      - name: Reproduce documented quick start
+        run: |
+          set -euo pipefail
+          go build -o work/orisema ./cmd/orisema
+          work/orisema version | tee work/orisema-version.txt
+          work/orisema validate examples/nginx.yaml
+          sudo work/orisema plan examples/nginx.yaml | tee work/plan-before.txt
+          grep -Fq '[CREATE]' work/plan-before.txt
+          printf 'DEPLOY\n' | sudo work/orisema deploy examples/nginx.yaml
+          sudo work/orisema status examples/nginx.yaml | tee work/status.txt
+          sudo work/orisema plan examples/nginx.yaml | tee work/plan-after.txt
+          grep -Fq '[NOOP]' work/plan-after.txt
+          curl --fail --head --retry 5 --retry-delay 1 http://127.0.0.1:8080/ \
+            | tee work/http-head.txt
+          sudo work/orisema logs examples/nginx.yaml web | tee work/logs.txt
+          test "$(sudo podman inspect --format '{{ index .Config.Labels "dev.orisema.managed" }}' orisema-hello-orisema-web)" = true
+          test "$(sudo podman inspect --format '{{ index .Config.Labels "dev.orisema.app" }}' orisema-hello-orisema-web)" = hello-orisema
+          test "$(sudo podman inspect --format '{{ index .Config.Labels "dev.orisema.service" }}' orisema-hello-orisema-web)" = web
+      - name: Remove only the isolated quick-start container
+        if: always()
+        run: sudo podman rm --force orisema-hello-orisema-web || true
+      - name: Save compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compatibility-${{ matrix.os }}
+          path: work/*.txt

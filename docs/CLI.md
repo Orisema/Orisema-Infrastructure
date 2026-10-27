@@ -4,11 +4,15 @@ This is an **experimental laboratory CLI**, not production-ready. `validate` wor
 
 ## Requirements
 
-Go 1.23+ and access to the Go module dependency `gopkg.in/yaml.v3`.
+Precompiled release binaries do not require Go. Building from source requires
+Go 1.23+ and access to the module dependency `gopkg.in/yaml.v3`. Commands that
+inspect or change containers require Podman on Linux; `version` and `validate`
+do not query Podman.
 
 ## Run
 
 ```sh
+go run ./cmd/orisema version
 go mod tidy
 go test ./...
 go run ./cmd/orisema validate examples/nginx.yaml
@@ -25,6 +29,9 @@ go run ./cmd/orisema recover history examples/nginx-restart.yaml --history /secu
 go run ./cmd/orisema recover reconcile examples/nginx-restart.yaml web --history /secure/path/orisema-recovery.jsonl --token <unresolved-token> --outcome succeeded --operator alice --reason "evidence reviewed"
 go run ./cmd/orisema recover record examples/nginx-restart.yaml web START failed --history /secure/path/orisema-recovery.jsonl
 ```
+
+See [COMPATIBILITY.md](COMPATIBILITY.md) for a compact command/mutation matrix
+and [QUICKSTART.md](QUICKSTART.md) for the reviewed end-to-end laboratory.
 
 The `validate` command checks the manifest structure, service identifiers, images and port ranges.
 

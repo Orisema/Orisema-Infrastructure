@@ -8,17 +8,19 @@ is not recommended for production**.
 
 | Environment | Artifact | Automated execution | Runtime coverage |
 | --- | --- | --- | --- |
-| Ubuntu 24.04 AMD64 | Linux AMD64 | CLI, packaging, quick start and extended Podman laboratory | Distribution-provided Podman |
-| Ubuntu 22.04 AMD64 | Linux AMD64 | CLI and isolated quick start | Distribution-provided Podman |
+| Ubuntu 24.04.5 AMD64 | Linux AMD64 | CLI, packaging, quick start and extended Podman laboratory | Podman 4.9.3 observed |
+| Ubuntu 22.04.5 AMD64 | Linux AMD64 | CLI and isolated quick start | Podman 3.4.4 observed |
 | Linux ARM64 | Linux ARM64 | Cross-build and binary metadata inspection only | Native execution not yet validated |
 | Other Linux distributions | Architecture-dependent | Not continuously tested | Not established |
 | macOS | None | Not tested | Not supported |
 | Windows | None | Not tested | Not supported |
 
-The CI quick-start matrix uses fresh, independent GitHub-hosted runners and
-records `/etc/os-release`, kernel architecture and the exact Podman version as
-workflow artifacts. Package versions can change when runner images or Ubuntu
-repositories change; the workflow evidence for a commit is authoritative.
+The versions above were observed by the CI quick-start matrix on 2026-10-27.
+The matrix uses fresh, independent GitHub-hosted runners and records
+`/etc/os-release`, kernel architecture and the exact Podman version as workflow
+artifacts. Package versions can change when runner images or Ubuntu repositories
+change; the workflow evidence for a commit is authoritative. These observations
+are not minimum-version guarantees.
 
 The local development laboratory has also exercised Ubuntu 24.04.5 LTS AMD64,
 Linux kernel 6.8 and Podman 4.9.3. This is evidence from one environment, not a

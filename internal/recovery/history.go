@@ -22,8 +22,9 @@ const (
 	maxHistorySize = 1 << 20
 )
 
-// HistoryRecord is an operator-supplied audit entry. Recording an entry does
-// not perform or prove a runtime mutation.
+// HistoryRecord is one versioned journal entry. Attempt entries may be supplied
+// by an operator; reservation, execution and result entries are written by the
+// coordinated recovery flow.
 type HistoryRecord struct {
 	Version       int               `json:"version"`
 	Kind          string            `json:"kind,omitempty"`
@@ -40,6 +41,9 @@ type HistoryRecord struct {
 	Configuration string            `json:"configuration,omitempty"`
 	Execution     string            `json:"execution,omitempty"`
 	Failure       string            `json:"failure,omitempty"`
+	Policy        string            `json:"policy,omitempty"`
+	Status        string            `json:"status,omitempty"`
+	Detail        string            `json:"detail,omitempty"`
 }
 
 // InitHistory creates a new journal with an auditable genesis record. It never
@@ -102,10 +106,7 @@ func LoadHistory(path, manifestName string) ([]Attempt, error) {
 	}
 	var attempts []Attempt
 	for _, record := range records {
-		if record.Kind != "" && record.Kind != "attempt" {
-			continue
-		}
-		if record.Manifest == manifestName {
+		if record.Manifest == manifestName && (record.Kind == "" || record.Kind == "attempt" || (record.Kind == "execution" && record.Status == "started")) {
 			attempts = append(attempts, Attempt{Service: record.Service, Action: record.Action, Timestamp: record.Timestamp, Succeeded: record.Succeeded})
 		}
 	}
@@ -231,6 +232,19 @@ func validateRecord(record HistoryRecord) error {
 		}
 		if record.Container == "" || record.Configuration == "" || record.Execution == "" || record.Failure == "" {
 			return errors.New("reservation observation is incomplete")
+		}
+		return nil
+	case "execution":
+		if record.Token == "" || record.Status != "started" || record.Policy == "" {
+			return errors.New("execution token, started status and policy are required")
+		}
+		if record.Container == "" || record.Configuration == "" || record.Execution == "" || record.Failure == "" {
+			return errors.New("execution observation is incomplete")
+		}
+		return nil
+	case "result":
+		if record.Token == "" || (record.Status != "succeeded" && record.Status != "failed") {
+			return errors.New("result token and succeeded or failed status are required")
 		}
 		return nil
 	default:

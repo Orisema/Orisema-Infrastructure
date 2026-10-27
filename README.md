@@ -4,7 +4,7 @@
 
 Projeto comunitário para simplificar a implantação, atualização, diagnóstico e recuperação de aplicações em servidores Linux.
 
-**Status:** Fase 0 — documentação e planejamento. Ainda não existe software pronto para produção.
+**Status:** protótipo experimental com CLI funcional para Podman; ainda não está pronto para produção.
 
 ## Objetivos
 

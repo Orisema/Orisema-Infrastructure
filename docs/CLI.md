@@ -19,6 +19,7 @@ go run ./cmd/orisema recover plan examples/nginx.yaml
 go run ./cmd/orisema recover init examples/nginx-restart.yaml --history /secure/path/orisema-recovery.jsonl --operator alice
 go run ./cmd/orisema recover plan examples/nginx-restart.yaml --history /secure/path/orisema-recovery.jsonl
 go run ./cmd/orisema recover prepare examples/nginx-restart.yaml web --history /secure/path/orisema-recovery.jsonl --operator alice --reason "incident reviewed"
+go run ./cmd/orisema recover apply examples/nginx-restart.yaml web --history /secure/path/orisema-recovery.jsonl --token <token-from-prepare>
 go run ./cmd/orisema recover record examples/nginx-restart.yaml web START failed --history /secure/path/orisema-recovery.jsonl
 ```
 
@@ -32,13 +33,15 @@ as separate fields. It does not restart, replace or otherwise modify a container
 
 The `recover plan` command converts that diagnosis into typed operator guidance
 with preconditions, risk and confirmation requirements. It is read-only; a
-`recover apply` command does not exist. Optional declarative recovery guardrails
-are displayed. An explicit versioned history journal can feed the guardrail
+separate command is required for execution. Optional declarative recovery guardrails
+are displayed. An explicit versioned history journal feeds the guardrail
 decision, and `recover record` can append an operator-supplied START result.
 `recover prepare` revalidates the runtime and atomically reserves an eligible
 START for five minutes, preventing concurrent local preparation through the
-same journal. None of these commands performs or proves a runtime action;
-recovery execution remains unimplemented. See
+same journal. `recover apply` consumes one unexpired token after exact textual
+confirmation, revalidates again, durably begins the attempt, performs only
+`podman start`, and records the result. It provides no automatic retry or
+rollback. See
 [RECOVERY-PLANNING.md](RECOVERY-PLANNING.md).
 
 The `plan` command inspects Podman and compares selected declared fields only. It does not reserve ports or provide full configuration equivalence; see [PLANNING.md](PLANNING.md).

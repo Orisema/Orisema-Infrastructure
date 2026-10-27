@@ -21,7 +21,7 @@ import (
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "recover" {
-		return runRecoveryPlan(args, stdout, stderr)
+		return runRecoveryPlan(args, stdin, stdout, stderr)
 	}
 	if len(args) < 2 {
 		printUsage(stderr)
@@ -198,10 +198,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover init <manifest.yaml> --history <path> --operator <name> OR orisema recover plan <manifest.yaml> [--history <path>] OR orisema recover prepare <manifest.yaml> <service> --history <path> --operator <name> --reason <text> OR orisema recover record <manifest.yaml> <service> START <succeeded|failed> --history <path>")
+	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover init <manifest.yaml> --history <path> --operator <name> OR orisema recover plan <manifest.yaml> [--history <path>] OR orisema recover prepare <manifest.yaml> <service> --history <path> --operator <name> --reason <text> OR orisema recover apply <manifest.yaml> <service> --history <path> --token <token> OR orisema recover record <manifest.yaml> <service> START <succeeded|failed> --history <path>")
 }
 
-func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
+func runRecoveryPlan(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[1] == "record" {
 		return runRecoveryRecord(args, stdout, stderr)
 	}
@@ -210,6 +210,9 @@ func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
 	}
 	if len(args) >= 2 && args[1] == "init" {
 		return runRecoveryInit(args, stdout, stderr)
+	}
+	if len(args) >= 2 && args[1] == "apply" {
+		return runRecoveryApply(args, stdin, stdout, stderr)
 	}
 	if (len(args) != 3 && len(args) != 5) || args[1] != "plan" || (len(args) == 5 && args[3] != "--history") {
 		printUsage(stderr)
@@ -252,16 +255,82 @@ func runRecoveryPlan(args []string, stdout, stderr io.Writer) int {
 			if !decision.RetryAfter.IsZero() {
 				fmt.Fprintf(stdout, "    retry after: %s\n", decision.RetryAfter.Format(time.RFC3339))
 			}
-			fmt.Fprintln(stdout, "    execution eligible: false (recovery execution is not implemented)")
+			fmt.Fprintln(stdout, "    direct execution eligible: false (recover prepare and a fresh confirmation are required)")
 		} else {
 			fmt.Fprintln(stdout, "    execution eligible: false (persistent attempt history is not connected)")
 		}
 	}
-	fmt.Fprintln(stdout, "No changes made. Recovery execution is not implemented.")
+	fmt.Fprintln(stdout, "No changes made. Only a separately prepared and explicitly confirmed START can be executed.")
 	if diagnoseErr != nil {
 		fmt.Fprintln(stderr, "recovery plan incomplete: Podman could not be queried")
 		return 1
 	}
+	return 0
+}
+
+func runRecoveryApply(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) != 8 || args[4] != "--history" || args[6] != "--token" {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	service := args[3]
+	policy := recovery.PolicyFor(m, service)
+	if policy == nil {
+		fmt.Fprintf(stderr, "error: service %q is missing or has no recovery guardrails\n", service)
+		return 1
+	}
+	confirmation := "APPLY START " + service
+	fmt.Fprintf(stdout, "Prepared recovery will start orisema-%s-%s. No rollback is available.\n", m.Name, service)
+	fmt.Fprintf(stdout, "Type %s to continue: ", confirmation)
+	answer, readErr := bufio.NewReader(stdin).ReadString('\n')
+	if readErr != nil || strings.TrimSpace(answer) != confirmation {
+		fmt.Fprintln(stderr, "cancelled; reservation was not consumed")
+		return 1
+	}
+	reports, diagnoseErr := diagnostic.Build(context.Background(), m, runtime.Client{})
+	if diagnoseErr != nil {
+		fmt.Fprintln(stderr, "error: execution blocked because Podman could not be queried; reservation was not consumed")
+		return 1
+	}
+	var report *diagnostic.Report
+	for i := range reports {
+		if reports[i].Service == service {
+			report = &reports[i]
+			break
+		}
+	}
+	if report == nil {
+		fmt.Fprintf(stderr, "error: service %q has no diagnostic report; reservation was not consumed\n", service)
+		return 1
+	}
+	token := args[7]
+	if err := recovery.BeginExecution(recovery.BeginRequest{HistoryPath: args[5], Manifest: m.Name, Token: token, Report: *report, Policy: policy}); err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	client := runtime.Client{}
+	if err := client.Control(context.Background(), m.Name, service, "start"); err != nil {
+		detail := err.Error()
+		if len(detail) > 512 {
+			detail = detail[:512]
+		}
+		if recordErr := recovery.CompleteExecution(args[5], token, false, detail, time.Now()); recordErr != nil {
+			fmt.Fprintf(stderr, "error: start failed: %v; additionally, audit result failed: %v\n", err, recordErr)
+			return 1
+		}
+		fmt.Fprintf(stderr, "error: start failed and was recorded: %v\n", err)
+		return 1
+	}
+	if err := recovery.CompleteExecution(args[5], token, true, "podman start completed", time.Now()); err != nil {
+		fmt.Fprintf(stderr, "error: start completed but audit result could not be recorded: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "START completed for %s and the result was recorded.\n", service)
 	return 0
 }
 
@@ -330,7 +399,7 @@ func runRecoveryPrepare(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "Prepared START for %s after read-only runtime revalidation.\n", report.Name)
 	fmt.Fprintf(stdout, "Reservation token: %s\n", prepared.Token)
 	fmt.Fprintf(stdout, "Expires: %s\n", prepared.ExpiresAt.Format(time.RFC3339))
-	fmt.Fprintln(stdout, "No runtime changes made. There is no recover apply command.")
+	fmt.Fprintln(stdout, "No runtime changes made. Use recover apply with this token before it expires, then confirm explicitly.")
 	return 0
 }
 

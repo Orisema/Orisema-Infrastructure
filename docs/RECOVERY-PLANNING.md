@@ -32,10 +32,9 @@ authorization.
 - Runtime and inspection failures produce `RETRY_RUNTIME`; unknown state is not
   treated as absence.
 
-## Guardrails before execution can exist
+## Guardrails for bounded execution
 
-There is intentionally no `recover apply` command. A later proposal must first
-define and persist:
+The narrowly scoped `recover apply` path depends on:
 
 1. an attempt limit scoped to a service and incident;
 2. a minimum interval between attempts;
@@ -71,8 +70,8 @@ remain non-executable.
 The CLI displays declared guardrails. Without `--history`, it reports execution
 as ineligible because persistent attempt history is not connected. With an
 explicit history file, it loads the matching manifest's records and reports the
-guardrail decision, while still reporting execution as ineligible because no
-recovery executor exists.
+guardrail decision. Planning itself remains read-only; execution requires a
+separate reservation and confirmation.
 
 History uses a versioned JSON Lines journal. The file is limited to 1 MiB,
 locked during reads and writes, synchronized after appends, restricted to the
@@ -127,15 +126,36 @@ diagnosis is not `START`, ownership or supported configuration does not match,
 guardrails reject another attempt, history is unsafe, or an unexpired
 reservation already exists. Expired reservations no longer block a new prepare.
 
-The token is an audit and coordination artifact only. There is intentionally no
-command that consumes it: `recover prepare` never starts a container and
-`recover apply` still does not exist. File locking coordinates processes using
-the same local journal; it is not a distributed lock and the journal is not
-tamper-evident.
+`recover prepare` never starts a container. File locking coordinates processes
+using the same local journal; it is not a distributed lock and the journal is
+not tamper-evident.
 The operator field is a supplied audit label, not an authenticated identity.
-Runtime state may change after preparation; any future token consumer must
-revalidate ownership, configuration, state and expiry again under its own
-execution boundary.
+Runtime state may change after preparation, so token consumption revalidates
+ownership, supported configuration, stopped state, policy and expiry.
+
+## Explicit START execution
+
+Only a prepared `START` can be consumed:
+
+```sh
+go run ./cmd/orisema recover apply examples/nginx-restart.yaml web \
+  --history /secure/path/orisema-recovery.jsonl \
+  --token <token-from-prepare>
+# Type: APPLY START web
+```
+
+After confirmation, Orisema performs a fresh diagnosis. Under the journal lock
+it verifies the reservation, policy snapshot, expiry, observations and current
+guardrails, then appends and synchronizes a begun attempt before calling
+`podman start`. The token becomes single-use. A success or failure result is
+appended afterward; a crash after the begun record still consumes one attempt.
+
+`recover apply` does not restart a running container, deploy a missing one,
+replace drift, handle unhealthy applications, retry automatically or roll back.
+The runtime inspection inside the lifecycle operation rechecks ownership again.
+Podman and the journal do not share a transaction, so a process crash can leave
+a begun attempt with an unknown runtime result; this is intentionally safer than
+silently retrying.
 
 ## Usage
 
@@ -144,6 +164,5 @@ go run ./cmd/orisema recover plan examples/nginx-restart.yaml \
   --history /secure/path/orisema-recovery.jsonl
 ```
 
-Review the typed action and evidence. Use the existing `start` command only as
-a separate, explicitly confirmed operator decision. No command in this planning
-flow executes a recommendation.
+Review the typed action and evidence. Execution is limited to the separately
+prepared, unexpired and explicitly confirmed `START` flow described above.

@@ -20,6 +20,7 @@ go run ./cmd/orisema recover init examples/nginx-restart.yaml --history /secure/
 go run ./cmd/orisema recover plan examples/nginx-restart.yaml --history /secure/path/orisema-recovery.jsonl
 go run ./cmd/orisema recover prepare examples/nginx-restart.yaml web --history /secure/path/orisema-recovery.jsonl --operator alice --reason "incident reviewed"
 go run ./cmd/orisema recover apply examples/nginx-restart.yaml web --history /secure/path/orisema-recovery.jsonl --token <token-from-prepare>
+go run ./cmd/orisema recover verify examples/nginx-restart.yaml web --history /secure/path/orisema-recovery.jsonl --token <consumed-token>
 go run ./cmd/orisema recover history examples/nginx-restart.yaml --history /secure/path/orisema-recovery.jsonl
 go run ./cmd/orisema recover reconcile examples/nginx-restart.yaml web --history /secure/path/orisema-recovery.jsonl --token <unresolved-token> --outcome succeeded --operator alice --reason "evidence reviewed"
 go run ./cmd/orisema recover record examples/nginx-restart.yaml web START failed --history /secure/path/orisema-recovery.jsonl
@@ -42,13 +43,18 @@ decision, and `recover record` can append an operator-supplied START result.
 START for five minutes, preventing concurrent local preparation through the
 same journal. `recover apply` consumes one unexpired token after exact textual
 confirmation, revalidates again, durably begins the attempt, performs only
-`podman start`, and records the result. It provides no automatic retry or
+`podman start`, and records the command result as `start-command-succeeded` or
+`start-command-failed`. It does not call command success “application recovery”
+and provides no automatic retry or
 rollback. See
 [RECOVERY-PLANNING.md](RECOVERY-PLANNING.md).
 `recover history` presents a read-only journal view and identifies begun
 executions without a result. `recover reconcile` records an explicitly confirmed
 operator assertion plus a fresh diagnostic for one such consumed token; it does
 not infer outcomes or mutate Podman.
+`recover verify` appends a fresh post-command observation such as `healthy`,
+`unhealthy` or `running-unverified`. It is read-only with respect to Podman and
+does not infer causality.
 
 The `plan` command inspects Podman and compares selected declared fields only. It does not reserve ports or provide full configuration equivalence; see [PLANNING.md](PLANNING.md).
 

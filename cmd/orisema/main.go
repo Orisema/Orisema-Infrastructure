@@ -198,7 +198,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover <init|history|plan|prepare|apply|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
 func runRecoveryPlan(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -219,6 +219,9 @@ func runRecoveryPlan(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 	}
 	if len(args) >= 2 && args[1] == "reconcile" {
 		return runRecoveryReconcile(args, stdin, stdout, stderr)
+	}
+	if len(args) >= 2 && args[1] == "verify" {
+		return runRecoveryVerify(args, stdout, stderr)
 	}
 	if (len(args) != 3 && len(args) != 5) || args[1] != "plan" || (len(args) == 5 && args[3] != "--history") {
 		printUsage(stderr)
@@ -320,6 +323,8 @@ func runRecoveryHistory(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "  %s EXECUTION %s token=%s state=%s\n", record.Timestamp.Format(time.RFC3339), record.Service, shortToken(record.Token), state)
 		case "result":
 			fmt.Fprintf(stdout, "  %s RESULT %s token=%s status=%s\n", record.Timestamp.Format(time.RFC3339), record.Service, shortToken(record.Token), record.Status)
+		case "verification":
+			fmt.Fprintf(stdout, "  %s VERIFICATION %s token=%s observation=%s\n", record.Timestamp.Format(time.RFC3339), record.Service, shortToken(record.Token), record.Status)
 		default:
 			fmt.Fprintf(stdout, "  %s ATTEMPT %s action=%s succeeded=%t\n", record.Timestamp.Format(time.RFC3339), record.Service, record.Action, record.Succeeded)
 		}
@@ -329,6 +334,46 @@ func runRecoveryHistory(args []string, stdout, stderr io.Writer) int {
 	for _, record := range unresolved {
 		fmt.Fprintf(stdout, "  token=%s service=%s begun=%s\n", record.Token, record.Service, record.Timestamp.Format(time.RFC3339))
 	}
+	return 0
+}
+
+func runRecoveryVerify(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 8 || args[4] != "--history" || args[6] != "--token" {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	service := args[3]
+	if recovery.PolicyFor(m, service) == nil {
+		fmt.Fprintf(stderr, "error: service %q is missing or has no recovery guardrails\n", service)
+		return 1
+	}
+	reports, diagnoseErr := diagnostic.Build(context.Background(), m, runtime.Client{})
+	if diagnoseErr != nil {
+		fmt.Fprintln(stderr, "error: verification blocked because Podman could not be queried")
+		return 1
+	}
+	var report *diagnostic.Report
+	for i := range reports {
+		if reports[i].Service == service {
+			report = &reports[i]
+			break
+		}
+	}
+	if report == nil {
+		fmt.Fprintf(stderr, "error: service %q has no diagnostic report\n", service)
+		return 1
+	}
+	status, err := recovery.VerifyExecution(recovery.VerifyRequest{HistoryPath: args[5], Manifest: m.Name, Service: service, Token: args[7], Report: *report})
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Recorded post-command observation for %s: %s. No runtime changes made; causality was not inferred.\n", service, status)
 	return 0
 }
 
@@ -375,7 +420,7 @@ func runRecoveryReconcile(args []string, stdin io.Reader, stdout, stderr io.Writ
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "Recorded reconciled-%s for %s. No runtime changes made.\n", args[9], service)
+	fmt.Fprintf(stdout, "Recorded reconciled-command-%s for %s. No runtime changes made.\n", args[9], service)
 	return 0
 }
 
@@ -438,17 +483,17 @@ func runRecoveryApply(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			detail = detail[:512]
 		}
 		if recordErr := recovery.CompleteExecution(args[5], token, false, detail, time.Now()); recordErr != nil {
-			fmt.Fprintf(stderr, "error: start failed: %v; additionally, audit result failed: %v\n", err, recordErr)
+			fmt.Fprintf(stderr, "error: START command failed: %v; additionally, audit result failed: %v\n", err, recordErr)
 			return 1
 		}
-		fmt.Fprintf(stderr, "error: start failed and was recorded: %v\n", err)
+		fmt.Fprintf(stderr, "error: START command failed and was recorded: %v\n", err)
 		return 1
 	}
 	if err := recovery.CompleteExecution(args[5], token, true, "podman start completed", time.Now()); err != nil {
-		fmt.Fprintf(stderr, "error: start completed but audit result could not be recorded: %v\n", err)
+		fmt.Fprintf(stderr, "error: START command completed but its audit result could not be recorded: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "START completed for %s and the result was recorded.\n", service)
+	fmt.Fprintf(stdout, "START command completed for %s and was recorded; application recovery is not yet verified.\n", service)
 	return 0
 }
 

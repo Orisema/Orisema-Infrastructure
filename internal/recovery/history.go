@@ -259,14 +259,41 @@ func validateRecord(record HistoryRecord) error {
 		}
 		return nil
 	case "result":
-		if record.Token == "" || (record.Status != "succeeded" && record.Status != "failed" && record.Status != "reconciled-succeeded" && record.Status != "reconciled-failed") {
+		if record.Token == "" || !supportedResultStatus(record.Status) {
 			return errors.New("result token and a supported terminal status are required")
 		}
 		if strings.HasPrefix(record.Status, "reconciled-") && (record.Operator == "" || record.Reason == "" || record.Container == "" || record.Configuration == "" || record.Execution == "" || record.Failure == "") {
 			return errors.New("reconciled result audit evidence is incomplete")
 		}
 		return nil
+	case "verification":
+		if record.Token == "" || !supportedVerificationStatus(record.Status) {
+			return errors.New("verification token and supported observation status are required")
+		}
+		if record.Container == "" || record.Configuration == "" || record.Execution == "" || record.Failure == "" {
+			return errors.New("verification observation is incomplete")
+		}
+		return nil
 	default:
 		return fmt.Errorf("unsupported history record kind %q", record.Kind)
+	}
+}
+
+func supportedResultStatus(status string) bool {
+	switch status {
+	case "succeeded", "failed", "reconciled-succeeded", "reconciled-failed", // version 1 compatibility
+		"start-command-succeeded", "start-command-failed", "reconciled-command-succeeded", "reconciled-command-failed":
+		return true
+	default:
+		return false
+	}
+}
+
+func supportedVerificationStatus(status string) bool {
+	switch status {
+	case "healthy", "starting", "running-unverified", "unhealthy", "not-running", "configuration-changed", "unknown":
+		return true
+	default:
+		return false
 	}
 }

@@ -105,14 +105,14 @@ func ReconcileExecution(request ReconcileRequest) error {
 		Action:        execution.Action,
 		Timestamp:     request.Now,
 		Token:         request.Token,
-		Status:        "reconciled-" + request.Outcome,
+		Status:        "reconciled-command-" + request.Outcome,
 		Operator:      request.Operator,
 		Reason:        request.Reason,
 		Container:     request.Report.Name,
 		Configuration: request.Report.Configuration,
 		Execution:     request.Report.Execution,
 		Failure:       request.Report.Failure,
-		Detail:        fmt.Sprintf("operator reconciled interrupted attempt as %s", request.Outcome),
+		Detail:        fmt.Sprintf("operator reconciled interrupted START command as %s", request.Outcome),
 	}
 	return appendLockedRecord(f, info.Size(), record)
 }

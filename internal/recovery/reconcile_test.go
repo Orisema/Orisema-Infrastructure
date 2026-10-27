@@ -51,7 +51,7 @@ func TestReconcileExecutionRecordsEvidence(t *testing.T) {
 		t.Fatalf("expected resolution, got %#v", got)
 	}
 	result := records[len(records)-1]
-	if result.Status != "reconciled-succeeded" || result.Operator != "alice" || result.Execution == "" {
+	if result.Status != "reconciled-command-succeeded" || result.Operator != "alice" || result.Execution == "" {
 		t.Fatalf("unexpected result: %#v", result)
 	}
 }

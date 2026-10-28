@@ -67,7 +67,40 @@ func (c Client) Deploy(ctx context.Context, app string, s manifest.Service) (str
 	// No shell interpolation; arguments are passed directly to Podman.
 	out, err := exec.CommandContext(ctx, bin, args...).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("podman run failed: %w: %s", err, strings.TrimSpace(string(out)))
+		cleanup := c.cleanupFailedCreate(name, app, s.Name)
+		return "", fmt.Errorf("podman run failed: %w: %s%s", err, strings.TrimSpace(string(out)), cleanup)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// cleanupFailedCreate handles Podman's documented behavior of retaining a
+// created-but-not-started container after some `podman run` failures (for
+// example, an occupied host port). It removes only the exact new name and only
+// after its Orisema ownership labels have been verified.
+func (c Client) cleanupFailedCreate(name, app, service string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	containers, err := c.List(ctx)
+	if err != nil {
+		return fmt.Sprintf("; automatic cleanup could not list containers: %v", err)
+	}
+	if _, exists := Find(containers, name); !exists {
+		return ""
+	}
+	item, err := c.Inspect(ctx, name)
+	if err != nil {
+		return fmt.Sprintf("; automatic cleanup refused: ownership could not be verified: %v", err)
+	}
+	if !Owned(item, app, service) {
+		return "; automatic cleanup refused: ownership labels do not match"
+	}
+	bin := c.Binary
+	if bin == "" {
+		bin = "podman"
+	}
+	out, err := exec.CommandContext(ctx, bin, "rm", "--force", name).CombinedOutput()
+	if err != nil {
+		return fmt.Sprintf("; automatic cleanup failed: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return "; partially created container removed"
 }

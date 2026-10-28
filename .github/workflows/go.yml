@@ -120,6 +120,18 @@ jobs:
           grep -Fq 'status=start-command-succeeded' work/recovery-history.txt
           grep -Fq 'observation=healthy' work/recovery-history.txt
           sudo chown "$USER":"$(id -gn)" "$history"
+      - name: Exercise fail-closed negative regressions
+        run: |
+          set -euo pipefail
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/alpha1-negative" \
+            scripts/alpha1-negative-regressions.sh
+          sudo chown -R "$USER":"$(id -gn)" work/alpha1-negative
+      - name: Exercise recovery concurrency under the race detector
+        run: |
+          go test -race ./internal/recovery \
+            -run 'Test(BeginConcurrentSingleWinner|PrepareConcurrentSingleWinner|ConsumedTokenCannotBeReused)'
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -129,6 +141,7 @@ jobs:
             work/*.json
             work/*.jsonl
             work/*.txt
+            work/alpha1-negative/*.txt
   quickstart-matrix:
     name: quickstart (${{ matrix.os }})
     strategy:

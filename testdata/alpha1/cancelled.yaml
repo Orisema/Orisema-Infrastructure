@@ -1,0 +1,5 @@
+apiVersion: orisema.dev/v1alpha1
+name: regression-cancel
+services:
+  - name: web
+    image: docker.io/library/nginx:1.27

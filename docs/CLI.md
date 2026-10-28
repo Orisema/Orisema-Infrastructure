@@ -1,4 +1,4 @@
-# CLI prototype (v0.1.0-dev)
+# CLI prototype (Alpha 2 development)
 
 This is an **experimental laboratory CLI**, not production-ready. `validate` works offline; `plan`, `status` and lifecycle commands query local Podman.
 
@@ -33,7 +33,9 @@ go run ./cmd/orisema recover record examples/nginx-restart.yaml web START failed
 See [COMPATIBILITY.md](COMPATIBILITY.md) for a compact command/mutation matrix
 and [QUICKSTART.md](QUICKSTART.md) for the reviewed end-to-end laboratory.
 
-The `validate` command checks the manifest structure, service identifiers, images and port ranges.
+The `validate` command checks the versioned manifest structure, service
+identifiers, images, port ranges and version-specific bind rules. See the
+[`v1alpha2` contract](MANIFEST-V1ALPHA2.md).
 
 The `status` command reads local Podman containers without changing them (see [PODMAN.md](PODMAN.md)).
 
@@ -67,8 +69,10 @@ The `plan` command inspects Podman and compares selected declared fields only. I
 
 ## Scope and limits
 
-- YAML schema: `orisema.dev/v1alpha1`; subject to breaking changes.
-- Only service names, images and TCP port mappings are represented.
+- YAML schemas: legacy `orisema.dev/v1alpha1` and current
+  `orisema.dev/v1alpha2`; migration is documented and never implicit.
+- Only service names, images, TCP port mappings and the existing documented
+  health/restart/recovery fields are represented.
 - No support yet for secrets, persistent storage, custom networks, or full security context management.
 - Do not use this prototype to deploy production applications.
 
@@ -83,9 +87,16 @@ go run ./cmd/orisema status examples/nginx.yaml
 curl -I http://127.0.0.1:8080/
 ```
 
-Deployment uses `podman run --detach` with a managed label and `no-new-privileges`. It skips matching owned containers, blocks DRIFT/REVIEW and never uses `--replace`. Published ports bind on all host interfaces by default, so verify the firewall and avoid production servers.
+Deployment uses `podman run --detach` with managed labels and
+`no-new-privileges`. It skips matching owned containers, blocks DRIFT/REVIEW and
+never uses `--replace`. `v1alpha2` requires loopback-only binds; legacy
+`v1alpha1` ports retain their all-interface behavior.
 
-**Known limitations:** No rollback, no automatic updates, no volume support, no health verification, no preflight check for port conflicts, no image digest enforcement, no transaction across multiple services. A failure may leave a created container behind. Podman itself detects conflicts when creating containers. Do not use this command for sensitive workloads.
+**Known limitations:** No rollback, automatic updates, volume support, health
+verification, preflight reservation of ports, image digest enforcement or
+transaction across multiple services. Podman detects conflicts when creating
+containers; a partially created owned container is removed only after its
+ownership labels are verified. Do not use this command for sensitive workloads.
 
 To clean up the test manually after confirming its identity:
 

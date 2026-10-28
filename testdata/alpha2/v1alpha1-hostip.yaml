@@ -1,0 +1,9 @@
+apiVersion: orisema.dev/v1alpha1
+name: alpha1-new-field
+services:
+  - name: web
+    image: docker.io/library/nginx:1.27
+    ports:
+      - host: 18087
+        container: 80
+        hostIP: 127.0.0.1

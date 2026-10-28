@@ -125,7 +125,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 0
 		}
 		fmt.Fprintln(stdout, "Only CREATE services will be started. Existing containers will not be changed.")
-		fmt.Fprintln(stdout, "Images may be downloaded; published ports bind to all interfaces. No rollback or health verification.")
+		if m.APIVersion == "orisema.dev/v1alpha1" {
+			fmt.Fprintln(stdout, "Images may be downloaded; legacy v1alpha1 ports bind to all interfaces. No rollback or health verification.")
+		} else {
+			fmt.Fprintln(stdout, "Images may be downloaded; v1alpha2 ports use their explicit loopback hostIP. No rollback or health verification.")
+		}
 		fmt.Fprint(stdout, "Type DEPLOY to continue: ")
 		reader := bufio.NewReader(stdin)
 		answer, err := reader.ReadString('\n')

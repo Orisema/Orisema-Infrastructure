@@ -116,3 +116,40 @@ func TestDeployHealthcheckArguments(t *testing.T) {
 		})
 	}
 }
+
+func TestDeployExplicitHostIPArguments(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ORISEMA_ARGV_HELPER", "1")
+	for _, tc := range []struct {
+		name   string
+		hostIP string
+		want   string
+	}{
+		{name: "IPv4 loopback", hostIP: "127.0.0.1", want: "127.0.0.1:8080:80/tcp"},
+		{name: "IPv6 loopback", hostIP: "::1", want: "[::1]:8080:80/tcp"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := manifest.Service{Name: "web", Image: "nginx:1.27", Ports: []manifest.Port{{Host: 8080, Container: 80, HostIP: tc.hostIP}}}
+			out, err := (Client{Binary: binary}).Deploy(context.Background(), "bind-lab", svc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var args []string
+			if err := json.Unmarshal([]byte(out), &args); err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for i := range args {
+				if i > 0 && args[i-1] == "--publish" && args[i] == tc.want {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("argv = %#v; want publish %q", args, tc.want)
+			}
+		})
+	}
+}

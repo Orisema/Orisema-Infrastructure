@@ -4,6 +4,21 @@ Todas as mudanças relevantes deste projeto são registradas neste arquivo. O
 formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento usa SemVer com identificadores de pré-lançamento.
 
+## [0.1.0-alpha.2] - Unreleased
+
+### Adicionado
+
+- Contrato `orisema.dev/v1alpha2` com `kind: Application` e migração explícita
+  a partir de `v1alpha1`.
+- Bind loopback obrigatório e explícito para portas, com comparação de drift.
+- Política formal de campos rejeitados, saída humana e exit codes.
+
+### Compatibilidade
+
+- Manifestos `v1alpha1` continuam legíveis sem mudança silenciosa de semântica.
+- Environment, secrets, volumes, permissões customizadas e `--output json`
+  permanecem fora do contrato e falham fechado.
+
 ## [0.1.0-alpha.1] - 2026-10-28
 
 Primeira versão experimental instalável. **Não indicada para produção.**

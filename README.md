@@ -27,6 +27,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Segurança](SECURITY.md)
 - [Changelog](CHANGELOG.md)
 - [Limitações conhecidas da Alpha 1](docs/KNOWN_LIMITATIONS.md)
+- [Contrato de manifesto da Alpha 2](docs/MANIFEST-V1ALPHA2.md)
 - [Instalação e verificação de releases](docs/INSTALLATION.md)
 - [Quick start em host Linux descartável](docs/QUICKSTART.md)
 - [Compatibilidade e comandos suportados](docs/COMPATIBILITY.md)

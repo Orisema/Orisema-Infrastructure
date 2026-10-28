@@ -1,4 +1,5 @@
-apiVersion: orisema.dev/v1alpha1
+apiVersion: orisema.dev/v1alpha2
+kind: Application
 name: restart-lab
 services:
   - name: web

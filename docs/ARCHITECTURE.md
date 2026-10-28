@@ -60,8 +60,10 @@ acessa a rede nem arquivos externos.
 ## Decisões atuais e abertas
 
 Go 1.23 é a linguagem e versão mínima declarada pelo módulo. Podman em Linux é
-o primeiro runtime; Docker, Windows e macOS não são suportados. O manifesto usa
-`orisema.dev/v1alpha1`, ainda experimental. Modelo de estado futuro, gestão de
-segredos, volumes e estratégia de migração do manifesto permanecem decisões
-abertas. A matriz entre artefatos produzidos e ambientes realmente executados
-está em [COMPATIBILITY.md](COMPATIBILITY.md).
+o primeiro runtime; Docker, Windows e macOS não são suportados. O contrato atual
+é `orisema.dev/v1alpha2`, mantendo leitura compatível de `v1alpha1`; versão,
+migração e guardrails estão definidos em
+[MANIFEST-V1ALPHA2.md](MANIFEST-V1ALPHA2.md). Gestão de segredos, volumes e um
+formato de saída estruturado permanecem deliberadamente fora do contrato. A
+matriz entre artefatos produzidos e ambientes realmente executados está em
+[COMPATIBILITY.md](COMPATIBILITY.md).

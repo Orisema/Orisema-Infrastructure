@@ -1,9 +1,9 @@
 # Quick start on a disposable Linux host
 
 Orisema Infrastructure is **experimental and not recommended for production**.
-This walkthrough creates a real Nginx container, publishes TCP port 8080 on all
-host interfaces and downloads an image through Podman. Use a disposable Linux
-host, confirm that port 8080 is free and review firewall exposure first.
+This walkthrough creates a real Nginx container, publishes TCP port 8080 only
+on `127.0.0.1` and downloads an image through Podman. Use a disposable Linux
+host and confirm that port 8080 is free.
 
 ## Prerequisites
 
@@ -27,7 +27,8 @@ orisema validate examples/nginx.yaml
 ```
 
 Read `examples/nginx.yaml`. The example declares the container name
-`orisema-hello-orisema-web` and maps host port 8080 to port 80.
+`orisema-hello-orisema-web` and maps `127.0.0.1:8080` to port 80 using the
+`orisema.dev/v1alpha2` contract.
 
 ## 2. Preview without changing Podman
 

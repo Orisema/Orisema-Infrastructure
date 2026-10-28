@@ -52,6 +52,12 @@ minimum-version guarantee.
 | `recover prepare` | Yes | Journal only | Reserves an eligible START; does not start it |
 | `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |
 
+Controlled update and application rollback are exercised only by the Alpha 3
+laboratory; they are not public CLI commands. The laboratory preserves the old
+container as the rollback unit and proves that an unrelated container and named
+volume retain their identity. It does not promise data rollback or restoration.
+See [the controlled update laboratory](CONTROLLED-UPDATE-LAB.md).
+
 ## Manifest compatibility
 
 - `orisema.dev/v1alpha1` remains readable with its legacy all-interface port

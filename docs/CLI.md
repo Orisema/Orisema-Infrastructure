@@ -98,6 +98,11 @@ transaction across multiple services. Podman detects conflicts when creating
 containers; a partially created owned container is removed only after its
 ownership labels are verified. Do not use this command for sensitive workloads.
 
+Alpha 3 separately specifies and exercises controlled update and application
+rollback in a disposable [laboratory](CONTROLLED-UPDATE-LAB.md). That workflow
+is deliberately not exposed as a supported CLI command and does not restore
+application data.
+
 To clean up the test manually after confirming its identity:
 
 ```sh

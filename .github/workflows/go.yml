@@ -140,6 +140,13 @@ jobs:
             ORISEMA_EVIDENCE_DIR="$PWD/work/alpha2-contract" \
             scripts/alpha2-contract-regressions.sh
           sudo chown -R "$USER":"$(id -gn)" work/alpha2-contract
+      - name: Exercise Alpha 3 update and rollback laboratory
+        run: |
+          set -euo pipefail
+          printf 'UPDATE web\n' | sudo env \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/alpha3-update" \
+            scripts/alpha3-update-lab.sh
+          sudo chown -R "$USER":"$(id -gn)" work/alpha3-update
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -151,6 +158,8 @@ jobs:
             work/*.txt
             work/alpha1-negative/*.txt
             work/alpha2-contract/*.txt
+            work/alpha3-update/*.json
+            work/alpha3-update/*.txt
   quickstart-matrix:
     name: quickstart (${{ matrix.os }})
     strategy:

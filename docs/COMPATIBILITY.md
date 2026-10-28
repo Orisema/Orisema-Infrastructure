@@ -52,6 +52,15 @@ minimum-version guarantee.
 | `recover prepare` | Yes | Journal only | Reserves an eligible START; does not start it |
 | `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |
 
+## Manifest compatibility
+
+- `orisema.dev/v1alpha1` remains readable with its legacy all-interface port
+  behavior; it cannot use `kind` or `hostIP`.
+- `orisema.dev/v1alpha2` requires `kind: Application` and an explicit loopback
+  `hostIP` for every port.
+- Environment, secrets, volumes, custom permissions and JSON output are not
+  supported and fail closed. See [the Alpha 2 contract](MANIFEST-V1ALPHA2.md).
+
 ## Meaning of `NOOP`
 
 `NOOP` confirms only matching ownership labels, configured image reference, TCP

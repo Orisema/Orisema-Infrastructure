@@ -62,6 +62,38 @@ func TestVersionRejectsExtraArguments(t *testing.T) {
 	}
 }
 
+func TestDocumentedExitCodeClasses(t *testing.T) {
+	dir := t.TempDir()
+	valid := filepath.Join(dir, "valid.yaml")
+	invalid := filepath.Join(dir, "invalid.yaml")
+	validData := "apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n"
+	invalidData := "apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n    environment: []\n"
+	if err := os.WriteFile(valid, []byte(validData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(invalid, []byte(invalidData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		args []string
+		want int
+	}{
+		{name: "success", args: []string{"validate", valid}, want: 0},
+		{name: "validation failure", args: []string{"validate", invalid}, want: 1},
+		{name: "unsupported JSON output", args: []string{"--output", "json", "validate", valid}, want: 2},
+		{name: "invalid usage", args: nil, want: 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if got := run(tc.args, strings.NewReader(""), &stdout, &stderr); got != tc.want {
+				t.Fatalf("run(%q) = %d, want %d; stdout=%q stderr=%q", tc.args, got, tc.want, stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
 func TestRecoveryInitCreatesEmptyJournalWithoutRuntime(t *testing.T) {
 	dir := t.TempDir()
 	manifestPath := filepath.Join(dir, "manifest.yaml")

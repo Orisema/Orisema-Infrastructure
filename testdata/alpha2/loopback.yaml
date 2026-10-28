@@ -1,0 +1,10 @@
+apiVersion: orisema.dev/v1alpha2
+kind: Application
+name: alpha2-bind
+services:
+  - name: web
+    image: docker.io/library/nginx:1.27
+    ports:
+      - host: 18085
+        container: 80
+        hostIP: 127.0.0.1

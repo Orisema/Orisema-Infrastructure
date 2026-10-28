@@ -54,13 +54,13 @@ seu checksum e executaram `version`, `validate` e `plan` sem compilação local.
 
 ## v0.1.0-alpha.2 — Contrato e segurança
 
-- [ ] Decidir e documentar evolução de schema (`apiVersion`/`kind` são
-  propostas, não novos contratos implícitos).
-- [ ] Validar campos desconhecidos e estabelecer estratégia de migração.
-- [ ] Planejar e testar binds explícitos de interface e segurança de portas.
-- [ ] Definir modelo seguro de env/segredos/volumes/permissões antes de
-  implementar.
-- [ ] Definir exit codes e saída legível por máquina sem expor segredos.
+- [x] Decidir e documentar evolução de schema com `v1alpha2` e
+  `kind: Application`.
+- [x] Validar campos desconhecidos e estabelecer estratégia de migração.
+- [x] Planejar e testar binds loopback explícitos e segurança de portas.
+- [x] Definir env/segredos/volumes/permissões como rejeitados até existir um
+  modelo seguro.
+- [x] Definir exit codes; adiar saída JSON até existir envelope tipado e seguro.
 - [ ] Ampliar testes de concorrência, timeout, interrupção e recuperação.
 - [ ] Revisar política de auditoria: operador informado não é identidade
   autenticada; journal local não é tamper-evident.

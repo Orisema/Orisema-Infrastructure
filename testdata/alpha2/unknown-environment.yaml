@@ -1,0 +1,8 @@
+apiVersion: orisema.dev/v1alpha2
+kind: Application
+name: alpha2-unknown
+services:
+  - name: web
+    image: docker.io/library/nginx:1.27
+    environment:
+      EXAMPLE: rejected

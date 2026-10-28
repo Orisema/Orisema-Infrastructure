@@ -1,5 +1,6 @@
 # Example only. No containers are started by validate or plan.
-apiVersion: orisema.dev/v1alpha1
+apiVersion: orisema.dev/v1alpha2
+kind: Application
 name: hello-orisema
 services:
   - name: web
@@ -7,3 +8,4 @@ services:
     ports:
       - host: 8080
         container: 80
+        hostIP: 127.0.0.1

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"regexp"
 	"strings"
@@ -17,46 +18,48 @@ import (
 
 type Manifest struct {
 	APIVersion string    `yaml:"apiVersion"`
+	Kind       string    `yaml:"kind,omitempty"`
 	Name       string    `yaml:"name"`
 	Services   []Service `yaml:"services"`
 }
 
 type Service struct {
-	Name  string `yaml:"name"`
-	Image string `yaml:"image"`
-	Ports []Port `yaml:"ports,omitempty"`
+	Name        string       `yaml:"name"`
+	Image       string       `yaml:"image"`
+	Ports       []Port       `yaml:"ports,omitempty"`
 	Healthcheck *Healthcheck `yaml:"healthcheck,omitempty"`
-	Restart *Restart `yaml:"restart,omitempty"`
-	Recovery *Recovery `yaml:"recovery,omitempty"`
+	Restart     *Restart     `yaml:"restart,omitempty"`
+	Recovery    *Recovery    `yaml:"recovery,omitempty"`
 }
 
 // Recovery constrains a future explicitly authorized recovery executor. Merely
 // declaring it never enables execution.
 type Recovery struct {
-	MaxAttempts int `yaml:"maxAttempts"`
+	MaxAttempts int    `yaml:"maxAttempts"`
 	MinInterval string `yaml:"minInterval"`
-	Cooldown string `yaml:"cooldown"`
+	Cooldown    string `yaml:"cooldown"`
 }
 
 // Restart describes process-exit recovery. It is independent from application
 // healthchecks and intentionally supports only bounded on-failure retries.
 type Restart struct {
-	Policy string `yaml:"policy"`
-	MaxRetries int `yaml:"maxRetries,omitempty"`
+	Policy     string `yaml:"policy"`
+	MaxRetries int    `yaml:"maxRetries,omitempty"`
 }
 
 // Healthcheck uses a shell command executed inside the container.
 // Duration fields use Go duration syntax, such as 30s or 1m.
 type Healthcheck struct {
- Command string `yaml:"command"`
- Interval string `yaml:"interval"`
- Timeout string `yaml:"timeout"`
- Retries int `yaml:"retries"`
+	Command  string `yaml:"command"`
+	Interval string `yaml:"interval"`
+	Timeout  string `yaml:"timeout"`
+	Retries  int    `yaml:"retries"`
 }
 
 type Port struct {
-	Host      int `yaml:"host"`
-	Container int `yaml:"container"`
+	Host      int    `yaml:"host"`
+	Container int    `yaml:"container"`
+	HostIP    string `yaml:"hostIP,omitempty"`
 }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
@@ -87,8 +90,19 @@ func Load(path string) (*Manifest, error) {
 }
 
 func (m *Manifest) Validate() error {
-	if m.APIVersion != "orisema.dev/v1alpha1" {
-		return errors.New("apiVersion must be orisema.dev/v1alpha1")
+	alpha2 := false
+	switch m.APIVersion {
+	case "orisema.dev/v1alpha1":
+		if m.Kind != "" {
+			return errors.New("kind is not part of orisema.dev/v1alpha1; migrate the manifest to orisema.dev/v1alpha2")
+		}
+	case "orisema.dev/v1alpha2":
+		alpha2 = true
+		if m.Kind != "Application" {
+			return errors.New("kind must be Application for orisema.dev/v1alpha2")
+		}
+	default:
+		return errors.New("apiVersion must be orisema.dev/v1alpha1 or orisema.dev/v1alpha2")
 	}
 	if !identifier.MatchString(m.Name) {
 		return errors.New("name must be lowercase letters, digits or hyphens and start with a letter (max 63 chars)")
@@ -99,6 +113,7 @@ func (m *Manifest) Validate() error {
 	seen := map[string]bool{}
 	ports := map[int]bool{}
 	for _, s := range m.Services {
+		containerPorts := map[int]bool{}
 		if !identifier.MatchString(s.Name) {
 			return fmt.Errorf("invalid service name %q", s.Name)
 		}
@@ -162,7 +177,19 @@ func (m *Manifest) Validate() error {
 			if ports[p.Host] {
 				return fmt.Errorf("host port %d is used more than once", p.Host)
 			}
+			if alpha2 {
+				if containerPorts[p.Container] {
+					return fmt.Errorf("service %q: v1alpha2 container port %d is published more than once", s.Name, p.Container)
+				}
+				ip := net.ParseIP(p.HostIP)
+				if ip == nil || !ip.IsLoopback() {
+					return fmt.Errorf("service %q: v1alpha2 port hostIP must be an explicit loopback IP (127.0.0.0/8 or ::1)", s.Name)
+				}
+			} else if p.HostIP != "" {
+				return fmt.Errorf("service %q: hostIP is not part of v1alpha1; migrate the manifest to orisema.dev/v1alpha2", s.Name)
+			}
 			ports[p.Host] = true
+			containerPorts[p.Container] = true
 		}
 	}
 	return nil

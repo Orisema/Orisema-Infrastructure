@@ -6,6 +6,7 @@ package planner
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -58,7 +59,18 @@ func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 		} else {
 			for containerPort, hostPort := range expected {
 				bindings, ok := actual[containerPort]
-				if !ok || len(bindings) != 1 || bindings[0].HostPort != hostPort || (bindings[0].HostIP != "" && bindings[0].HostIP != "0.0.0.0") {
+				expectedIP := ""
+				for _, declared := range svc.Ports {
+					if strconv.Itoa(declared.Container)+"/tcp" == containerPort {
+						expectedIP = declared.HostIP
+						break
+					}
+				}
+				ipMatches := false
+				if len(bindings) == 1 {
+					ipMatches = hostIPMatches(expectedIP, bindings[0].HostIP)
+				}
+				if !ok || len(bindings) != 1 || bindings[0].HostPort != hostPort || !ipMatches {
 					reasons = append(reasons, "published port binding differs")
 					break
 				}
@@ -103,4 +115,13 @@ func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 		}
 	}
 	return steps
+}
+
+func hostIPMatches(expected, actual string) bool {
+	if expected == "" {
+		return actual == "" || actual == "0.0.0.0"
+	}
+	expectedIP := net.ParseIP(expected)
+	actualIP := net.ParseIP(actual)
+	return expectedIP != nil && actualIP != nil && expectedIP.Equal(actualIP)
 }

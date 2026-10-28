@@ -7,6 +7,9 @@
 - `DRIFT`: owned container has a different configured image reference, published port bindings, declared healthcheck or restart policy.
 - `NOOP`: ownership labels, configured image reference, declared TCP port bindings, healthcheck configuration and restart policy match.
 
+For `v1alpha2`, port comparison includes the loopback `hostIP`; a different
+bind address is `DRIFT`. `v1alpha1` retains its legacy all-interface comparison.
+
 **NOOP is intentionally limited:** it does not verify image digest, image
 freshness, running state, live health, volumes, environment variables, networks,
 security settings, firewall or other undeclared runtime settings. It compares

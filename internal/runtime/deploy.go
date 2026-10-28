@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -61,7 +62,11 @@ func (c Client) Deploy(ctx context.Context, app string, s manifest.Service) (str
 		args = append(args, "--restart", policy)
 	}
 	for _, p := range s.Ports {
-		args = append(args, "--publish", strconv.Itoa(p.Host)+":"+strconv.Itoa(p.Container)+"/tcp")
+		published := strconv.Itoa(p.Host) + ":" + strconv.Itoa(p.Container) + "/tcp"
+		if p.HostIP != "" {
+			published = net.JoinHostPort(p.HostIP, strconv.Itoa(p.Host)) + ":" + strconv.Itoa(p.Container) + "/tcp"
+		}
+		args = append(args, "--publish", published)
 	}
 	args = append(args, s.Image)
 	// No shell interpolation; arguments are passed directly to Podman.

@@ -14,6 +14,11 @@ The command only reports existence, current state and image reference. It does *
 `deploy` creates only services classified as `CREATE`, after explicit
 confirmation; it never replaces or updates an existing container.
 
+Current `v1alpha2` manifests require an explicit loopback `hostIP` for every
+published port. The runtime passes that IP directly to `podman run --publish`,
+and planning compares the observed bind. Legacy `v1alpha1` manifests retain
+their historical all-interface bind behavior; migrate before new deployments.
+
 Run as the same user that owns the rootless Podman containers. Rootful and rootless Podman show different container sets.
 
 No credentials or application environment variables should be committed.

@@ -4,16 +4,22 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+*'
+  issues:
+    types: [closed]
 
 permissions:
   contents: write
 
 jobs:
   release:
+    if: github.event_name == 'push' || github.event.issue.number == 14
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || 'v0.1.0-alpha.1' }}
+      COMMIT: ${{ github.sha }}
     steps:
-      - name: Check out tagged source
+      - name: Check out immutable release source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -22,12 +28,31 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Validate tag points at this checkout
+      - name: Create the Alpha 1 tag after its gate issue closes
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$GITHUB_REF_TYPE" = tag
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git rev-list -n 1 "$GITHUB_REF_NAME")" = "$GITHUB_SHA"
+          test '${{ github.event.issue.number }}' = 14
+          existing="$(gh api \
+            "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" \
+            --jq '.object.sha' 2>/dev/null || true)"
+          if [ -n "$existing" ]; then
+            test "$existing" = "$COMMIT"
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$VERSION" \
+              -f "sha=$COMMIT"
+          fi
+      - name: Validate release source and tag
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$COMMIT"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" \
+            --jq '.object.sha')" = "$COMMIT"
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Test source
         run: |
           go mod download
@@ -35,9 +60,6 @@ jobs:
           go test ./...
           go test -race ./...
       - name: Build and verify release archives
-        env:
-          VERSION: ${{ github.ref_name }}
-          COMMIT: ${{ github.sha }}
         run: |
           scripts/build-release.sh
           scripts/verify-release.sh
@@ -45,27 +67,35 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            dist/orisema_linux_amd64.tar.gz \
-            dist/orisema_linux_arm64.tar.gz \
-            dist/checksums.txt \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --generate-notes \
-            --prerelease \
-            --title "Orisema Infrastructure $GITHUB_REF_NAME"
+          set -euo pipefail
+          assets=(
+            dist/orisema_linux_amd64.tar.gz
+            dist/orisema_linux_arm64.tar.gz
+            dist/checksums.txt
+          )
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$VERSION" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$VERSION" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --generate-notes \
+              --prerelease \
+              --title "Orisema Infrastructure $VERSION"
+          fi
       - name: Verify installation from the published release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           install_dir="$(mktemp -d)"
-          gh release download "$GITHUB_REF_NAME" \
+          gh release download "$VERSION" \
             --repo "$GITHUB_REPOSITORY" \
             --dir "$install_dir"
           cd "$install_dir"
           sha256sum --check checksums.txt
           tar -xzf orisema_linux_amd64.tar.gz
           ./orisema version | tee installed-version.txt
-          grep -Fq "Version: $GITHUB_REF_NAME" installed-version.txt
-          grep -Fq "Commit: $GITHUB_SHA" installed-version.txt
+          grep -Fq "Version: $VERSION" installed-version.txt
+          grep -Fq "Commit: $COMMIT" installed-version.txt

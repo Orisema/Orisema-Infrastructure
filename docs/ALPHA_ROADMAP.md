@@ -36,8 +36,8 @@ datas nem declara funcionalidade de produção.
 - [x] Adicionar testes de regressão: nome/porta ocupados, ownership,
   DRIFT/REVIEW, indisponibilidade de runtime, confirmação cancelada, recovery
   START e concorrência (#14).
-- [ ] Configurar private vulnerability reporting; a política de suporte a
-  versões experimentais e o canal documentado já estão publicados (#14).
+- [x] Configurar private vulnerability reporting e publicar política de suporte
+  a versões experimentais (#14).
 - [x] Publicar changelog, known limitations e aviso explícito de não produção
   (#14).
 

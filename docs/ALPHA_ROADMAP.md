@@ -70,15 +70,15 @@ promessa de recuperação automática de aplicações unhealthy.
 
 ## v0.1.0-alpha.3 — Atualização controlada
 
-- [ ] Especificar plano de atualização separado de `CREATE`, com confirmação e
+- [x] Especificar plano de atualização separado de `CREATE`, com confirmação e
   revalidação.
-- [ ] Registrar estado anterior suficiente para rollback de aplicação, sem
+- [x] Registrar estado anterior suficiente para rollback de aplicação, sem
   prometer rollback de dados.
-- [ ] Implementar atualização conservadora e verificação pós-mudança em
+- [x] Implementar atualização conservadora e verificação pós-mudança em
   laboratório.
-- [ ] Definir recuperação após falha parcial/interrupção e limites de
+- [x] Definir recuperação após falha parcial/interrupção e limites de
   persistência.
-- [ ] Validar que volumes e contêineres não gerenciados são preservados.
+- [x] Validar que volumes e contêineres não gerenciados são preservados.
 
 **Gate:** atualização e retorno de versão em laboratório com evidências; limites
 de rollback documentados.

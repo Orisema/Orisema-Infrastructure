@@ -2,6 +2,11 @@
 
 Etapas propostas, sem datas prometidas.
 
+O plano verificável para as versões experimentais está em
+[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Issues #12 e #13 concluíram
+versionamento/distribuição e documentação/compatibilidade; regressão e segurança
+do release permanecem na Issue #14.
+
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.
 - [x] Publicar manifesto e documentação inicial.

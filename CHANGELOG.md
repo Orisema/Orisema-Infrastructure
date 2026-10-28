@@ -4,6 +4,20 @@ Todas as mudanças relevantes deste projeto são registradas neste arquivo. O
 formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento usa SemVer com identificadores de pré-lançamento.
 
+## [0.1.0-alpha.3] - Unreleased
+
+### Adicionado
+
+- Especificação e laboratório executável de atualização conservadora,
+  verificação de saúde, falha parcial e rollback de aplicação.
+- Evidência de preservação de contêiner e volume externos ao alvo.
+
+### Limitações
+
+- O laboratório não é um comando público da CLI e não restaura dados.
+- Estados interrompidos exigem inspeção manual até existir journal durável e
+  reconciliação específicos para update.
+
 ## [0.1.0-alpha.2] - Unreleased
 
 ### Adicionado

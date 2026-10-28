@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
@@ -18,15 +19,76 @@ func TestMain(m *testing.M) {
 	if os.Getenv("ORISEMA_ARGV_HELPER") == "1" {
 		switch os.Args[1] {
 		case "ps":
-			os.Stdout.WriteString("[]")
+			_, stateErr := os.Stat(os.Getenv("ORISEMA_RM_MARKER") + ".created")
+			if os.Getenv("ORISEMA_RUN_FAIL") == "1" && stateErr == nil {
+				os.Stdout.WriteString(`[{"Names":["orisema-health-lab-web"],"State":"created","Image":"nginx:1.27"}]`)
+			} else {
+				os.Stdout.WriteString("[]")
+			}
 		case "run":
+			if os.Getenv("ORISEMA_RUN_FAIL") == "1" {
+				if err := os.WriteFile(os.Getenv("ORISEMA_RM_MARKER")+".created", []byte("created"), 0o600); err != nil {
+					os.Exit(3)
+				}
+				os.Stderr.WriteString("port is already allocated")
+				os.Exit(125)
+			}
 			json.NewEncoder(os.Stdout).Encode(os.Args[1:])
+		case "inspect":
+			if os.Getenv("ORISEMA_INSPECT_UNOWNED") == "1" {
+				os.Stdout.WriteString(`[{"Name":"orisema-health-lab-web","Config":{"Image":"nginx:1.27","Labels":{}}}]`)
+			} else {
+				os.Stdout.WriteString(`[{"Name":"orisema-health-lab-web","Config":{"Image":"nginx:1.27","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"health-lab","dev.orisema.service":"web"}}}]`)
+			}
+		case "rm":
+			if path := os.Getenv("ORISEMA_RM_MARKER"); path != "" {
+				if err := os.WriteFile(path, []byte(os.Args[len(os.Args)-1]), 0o600); err != nil {
+					os.Exit(3)
+				}
+			}
 		default:
 			os.Exit(2)
 		}
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
+}
+
+func TestDeployCleansUpOwnedContainerLeftByFailedRun(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := t.TempDir() + "/removed"
+	t.Setenv("ORISEMA_ARGV_HELPER", "1")
+	t.Setenv("ORISEMA_RUN_FAIL", "1")
+	t.Setenv("ORISEMA_RM_MARKER", marker)
+	_, err = (Client{Binary: binary}).Deploy(context.Background(), "health-lab", manifest.Service{Name: "web", Image: "nginx:1.27"})
+	if err == nil {
+		t.Fatal("Deploy() unexpectedly succeeded")
+	}
+	if got, readErr := os.ReadFile(marker); readErr != nil || string(got) != "orisema-health-lab-web" {
+		t.Fatalf("safe cleanup marker = %q, %v", got, readErr)
+	}
+}
+
+func TestDeployDoesNotCleanUpContainerWithoutOwnership(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := t.TempDir() + "/removed"
+	t.Setenv("ORISEMA_ARGV_HELPER", "1")
+	t.Setenv("ORISEMA_RUN_FAIL", "1")
+	t.Setenv("ORISEMA_RM_MARKER", marker)
+	t.Setenv("ORISEMA_INSPECT_UNOWNED", "1")
+	_, err = (Client{Binary: binary}).Deploy(context.Background(), "health-lab", manifest.Service{Name: "web", Image: "nginx:1.27"})
+	if err == nil || !strings.Contains(err.Error(), "cleanup refused") {
+		t.Fatalf("Deploy() error = %v; want safe cleanup refusal", err)
+	}
+	if _, statErr := os.Stat(marker); !os.IsNotExist(statErr) {
+		t.Fatalf("unowned container removal marker exists: %v", statErr)
+	}
 }
 
 func TestDeployHealthcheckArguments(t *testing.T) {

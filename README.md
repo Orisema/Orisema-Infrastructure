@@ -25,6 +25,8 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Como contribuir](CONTRIBUTING.md)
 - [Governança](GOVERNANCE.md)
 - [Segurança](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+- [Limitações conhecidas da Alpha 1](docs/KNOWN_LIMITATIONS.md)
 - [Instalação e verificação de releases](docs/INSTALLATION.md)
 - [Quick start em host Linux descartável](docs/QUICKSTART.md)
 - [Compatibilidade e comandos suportados](docs/COMPATIBILITY.md)

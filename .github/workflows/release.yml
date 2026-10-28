@@ -54,3 +54,18 @@ jobs:
             --generate-notes \
             --prerelease \
             --title "Orisema Infrastructure $GITHUB_REF_NAME"
+      - name: Verify installation from the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          install_dir="$(mktemp -d)"
+          gh release download "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir "$install_dir"
+          cd "$install_dir"
+          sha256sum --check checksums.txt
+          tar -xzf orisema_linux_amd64.tar.gz
+          ./orisema version | tee installed-version.txt
+          grep -Fq "Version: $GITHUB_REF_NAME" installed-version.txt
+          grep -Fq "Commit: $GITHUB_SHA" installed-version.txt

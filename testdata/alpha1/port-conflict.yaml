@@ -1,0 +1,8 @@
+apiVersion: orisema.dev/v1alpha1
+name: regression-port
+services:
+  - name: web
+    image: docker.io/library/nginx:1.27
+    ports:
+      - host: 18084
+        container: 80

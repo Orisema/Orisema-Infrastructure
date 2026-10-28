@@ -22,7 +22,7 @@ jobs:
       - name: Check out immutable release source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          persist-credentials: false
+          persist-credentials: true
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
@@ -30,20 +30,16 @@ jobs:
           cache: false
       - name: Create the Alpha 1 tag after its gate issue closes
         if: github.event_name == 'issues'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test '${{ github.event.issue.number }}' = 14
-          existing="$(gh api \
-            "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" \
-            --jq '.object.sha' 2>/dev/null || true)"
+          existing="$(git ls-remote --refs origin "refs/tags/$VERSION" \
+            | awk '{print $1}')"
           if [ -n "$existing" ]; then
             test "$existing" = "$COMMIT"
           else
-            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
-              -f "ref=refs/tags/$VERSION" \
-              -f "sha=$COMMIT"
+            git tag "$VERSION" "$COMMIT"
+            git push origin "refs/tags/$VERSION"
           fi
       - name: Validate release source and tag
         run: |

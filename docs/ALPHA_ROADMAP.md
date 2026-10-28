@@ -45,11 +45,12 @@ datas nem declara funcionalidade de produção.
 reproduzível em dois ambientes Linux independentes, CI verde, nenhuma mutação
 indevida nos cenários negativos e documentação revisada.
 
-**Situação do gate em 28/10/2026:** quick start passou em Ubuntu 22.04.5 com
+**Gate concluído em 28/10/2026:** quick start passou em Ubuntu 22.04.5 com
 Podman 3.4.4 e Ubuntu 24.04.5 com Podman 4.9.3. A suíte negativa cobre conflito
 de nome/porta, ownership, DRIFT/REVIEW, runtime indisponível, cancelamento e
-concorrência de recovery. Resta publicar a tag e validar a instalação a partir
-do artefato da release antes de anunciar a Alpha 1.
+concorrência de recovery. A tag `v0.1.0-alpha.1` foi publicada como pré-release;
+o workflow e uma verificação independente baixaram o artefato AMD64, validaram
+seu checksum e executaram `version`, `validate` e `plan` sem compilação local.
 
 ## v0.1.0-alpha.2 — Contrato e segurança
 

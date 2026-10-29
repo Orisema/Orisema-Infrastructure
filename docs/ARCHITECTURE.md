@@ -45,6 +45,13 @@ separação permite que um contêiner parado, mas equivalente nos campos
 declarativos, continue `NOOP` enquanto o diagnóstico informa a falha operacional.
 Um plano de recuperação pode recomendar `START`, mas não executa a recomendação.
 
+O journal de operações da Alpha 4, em `internal/operation`, persiste snapshots
+versionados por escrita temporária, `fsync`, rename atômico e sincronização do
+diretório. Sua máquina de estados rejeita transições inválidas e a avaliação de
+operações incompletas é somente leitura. O componente ainda não executa nem
+autoriza update ou rollback; consulte
+[ALPHA4-RECOVERY-DESIGN.md](ALPHA4-RECOVERY-DESIGN.md).
+
 ## Fora do escopo inicial
 
 Orquestração multi-node, painel web e gestão central de identidade.

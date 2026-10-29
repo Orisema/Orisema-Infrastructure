@@ -25,6 +25,18 @@ do release permanecem na Issue #14.
 - [x] Diagnóstico e verificações de saúde.
 - [ ] Operação remota segura por SSH.
 
+### Alpha 4 — recuperação confiável
+
+- [x] Auditar o journal `START` existente e preservar seu contrato.
+- [x] Introduzir snapshots duráveis e uma máquina de estados para operações.
+- [ ] Detectar conflitos entre operações da mesma aplicação.
+- [ ] Integrar diagnóstico somente leitura à CLI.
+- [ ] Conectar update/rollback somente após revalidação de ownership, journal
+  de intenção e confirmação explícita.
+
+O primeiro slice não executa retomada, update ou rollback. Operações
+incompletas sempre exigem intervenção.
+
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.
 - [ ] Integração opcional com monitoramento.

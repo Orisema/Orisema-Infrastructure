@@ -43,7 +43,7 @@ go build -o orisema ./cmd/orisema
 ./orisema version
 ```
 
-O [pré-release v0.1.0-alpha.1](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.1)
+O [pré-release v0.1.0-alpha.3](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.3)
 distribui binários para Linux AMD64 e Linux ARM64. Podman
 em Linux é o único runtime suportado inicialmente; Docker, Windows e macOS não
 têm suporte oficial nesta etapa. Consulte as diferenças entre alvos compilados

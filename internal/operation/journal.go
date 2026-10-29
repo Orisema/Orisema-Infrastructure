@@ -11,12 +11,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
 )
 
 const Version = 1
+
+var ErrApplicationBusy = errors.New("application already has an incomplete operation")
 
 var safeID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
@@ -96,8 +99,78 @@ func (s *Store) Create(op Operation) error {
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
+		operations, err := s.listUnlocked()
+		if err != nil {
+			return fmt.Errorf("check concurrent operations: %w", err)
+		}
+		for _, existing := range operations {
+			if existing.Application == op.Application && !existing.State.Terminal() {
+				return fmt.Errorf("%w: %s (%s)", ErrApplicationBusy, existing.ID, existing.State)
+			}
+		}
 		return s.atomicWrite(path, op)
 	})
+}
+
+// List returns every validated operation in deterministic creation order. A
+// single corrupt or unsafe snapshot makes the entire query fail closed.
+func (s *Store) List() ([]Operation, error) {
+	var result []Operation
+	err := s.withLock(".store.lock", func() error {
+		var err error
+		result, err = s.listUnlocked()
+		return err
+	})
+	return result, err
+}
+
+// Incomplete returns only non-terminal operations. It is read-only and does
+// not infer that any operation can be resumed.
+func (s *Store) Incomplete() ([]Operation, error) {
+	operations, err := s.List()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Operation, 0, len(operations))
+	for _, op := range operations {
+		if !op.State.Terminal() {
+			result = append(result, op)
+		}
+	}
+	return result, nil
+}
+
+func (s *Store) listUnlocked() ([]Operation, error) {
+	entries, err := os.ReadDir(s.root)
+	if err != nil {
+		return nil, fmt.Errorf("list operation journals: %w", err)
+	}
+	operations := make([]Operation, 0)
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		id := strings.TrimSuffix(name, ".json")
+		if !safeID.MatchString(id) {
+			return nil, fmt.Errorf("unsafe operation journal filename %q", name)
+		}
+		op, err := s.Load(id)
+		if err != nil {
+			return nil, err
+		}
+		if op.ID != id {
+			return nil, fmt.Errorf("operation journal filename %q does not match ID %q", name, op.ID)
+		}
+		operations = append(operations, op)
+	}
+	sort.Slice(operations, func(i, j int) bool {
+		if operations[i].CreatedAt.Equal(operations[j].CreatedAt) {
+			return operations[i].ID < operations[j].ID
+		}
+		return operations[i].CreatedAt.Before(operations[j].CreatedAt)
+	})
+	return operations, nil
 }
 
 func (s *Store) Load(id string) (Operation, error) {

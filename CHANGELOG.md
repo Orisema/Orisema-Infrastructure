@@ -13,6 +13,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
   interrupções.
 - Exclusão de operações ativas por aplicação e listagem determinística,
   falhando fechado diante de qualquer snapshot inválido.
+- Comando `operation diagnose` somente leitura para identificar operações
+  incompletas e intervenção obrigatória sem consultar o runtime.
 
 ### Limitações
 

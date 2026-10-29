@@ -63,6 +63,47 @@ func OpenStore(root string) (*Store, error) {
 	if err := os.Mkdir(root, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
 		return nil, fmt.Errorf("create operation journal directory: %w", err)
 	}
+	store, err := openStoreDirectory(root)
+	if err != nil {
+		return nil, err
+	}
+	lock, err := os.OpenFile(filepath.Join(root, ".store.lock"), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("initialize operation journal lock: %w", err)
+	}
+	if err := lock.Chmod(0o600); err != nil {
+		lock.Close()
+		return nil, err
+	}
+	if err := lock.Close(); err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
+// OpenExistingStore opens a journal without creating or changing any file.
+// It is intended for read-only diagnosis.
+func OpenExistingStore(root string) (*Store, error) {
+	store, err := openStoreDirectory(root)
+	if err != nil {
+		return nil, err
+	}
+	lock, err := os.OpenFile(filepath.Join(root, ".store.lock"), os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, fmt.Errorf("open existing operation journal lock: %w", err)
+	}
+	info, statErr := lock.Stat()
+	closeErr := lock.Close()
+	if statErr != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+		return nil, errors.New("operation journal lock is unsafe")
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	return store, nil
+}
+
+func openStoreDirectory(root string) (*Store, error) {
 	info, err := os.Lstat(root)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, errors.New("operation journal path must be a real directory")
@@ -116,12 +157,29 @@ func (s *Store) Create(op Operation) error {
 // single corrupt or unsafe snapshot makes the entire query fail closed.
 func (s *Store) List() ([]Operation, error) {
 	var result []Operation
-	err := s.withLock(".store.lock", func() error {
+	err := s.withReadLock(func() error {
 		var err error
 		result, err = s.listUnlocked()
 		return err
 	})
 	return result, err
+}
+
+func (s *Store) withReadLock(fn func() error) error {
+	f, err := os.OpenFile(filepath.Join(s.root, ".store.lock"), os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return fmt.Errorf("open operation journal read lock: %w", err)
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+		return errors.New("operation journal lock is unsafe")
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_SH); err != nil {
+		return fmt.Errorf("lock operation journal for reading: %w", err)
+	}
+	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN) //nolint:errcheck
+	return fn()
 }
 
 // Incomplete returns only non-terminal operations. It is read-only and does

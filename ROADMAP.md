@@ -34,6 +34,7 @@ do release permanecem na Issue #14.
 - [x] Estruturar e revalidar evidências de ownership e recursos.
 - [x] Definir verificação objetiva de saúde com timeout e falhas consecutivas.
 - [x] Persistir política, observações e avaliações de saúde em `VERIFYING`.
+- [x] Definir decisão pós-verificação sem executar a transição proposta.
 - [ ] Conectar update/rollback somente após revalidação de ownership, journal
   de intenção e confirmação explícita.
 

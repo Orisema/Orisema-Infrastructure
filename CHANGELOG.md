@@ -21,6 +21,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
   consecutivas e resultados inconclusivos explícitos.
 - Persistência atômica da política, observações e avaliação de saúde vinculada
   ao estado `VERIFYING`, com recomputação fail-closed na leitura.
+- Decisão pura pós-verificação para `WAIT`, `COMPLETE`,
+  `RECOVERY_REQUIRED` ou `BLOCKED`, condicionada a evidência fresca de recursos.
 
 ### Limitações
 

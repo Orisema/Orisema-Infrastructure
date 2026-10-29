@@ -71,7 +71,7 @@ func TestOperationDiagnosisIsReadOnlyAndConservative(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
-	op := operation.Operation{ID: "update-1", Application: "demo", Services: []string{"web"}, Type: "UPDATE", CreatedAt: now, Previous: "nginx:old", RecoveryData: "old-container-id"}
+	op := operation.Operation{ID: "update-1", Application: "demo", Services: []string{"web"}, Type: "UPDATE", CreatedAt: now, Previous: "nginx:old", RecoveryData: "old-container-id", Resources: []operation.Resource{{Kind: "container", Name: "orisema-demo-web", ID: "old-container-id", Ownership: operation.OwnershipManaged, Application: "demo", Service: "web"}, {Kind: "volume", Name: "customer-data", ID: "volume-id", Ownership: operation.OwnershipExternal}}}
 	if err := store.Create(op); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestOperationDiagnosisIsReadOnlyAndConservative(t *testing.T) {
 	if code != 0 || stderr.Len() != 0 {
 		t.Fatalf("code=%d stderr=%q", code, stderr.String())
 	}
-	for _, expected := range []string{"update-1", "RECOVERY_REQUIRED", "intervention required: true", "automatic resume safe: false", "rollback candidate: true", "No runtime inspection or changes made"} {
+	for _, expected := range []string{"update-1", "RECOVERY_REQUIRED", "intervention required: true", "automatic resume safe: false", "rollback candidate: true", "ownership evidence complete: true (managed=1; external=1)", "No runtime inspection or changes made"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("stdout %q missing %q", stdout.String(), expected)
 		}

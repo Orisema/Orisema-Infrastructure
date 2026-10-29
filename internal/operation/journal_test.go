@@ -4,6 +4,7 @@
 package operation
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -145,5 +146,82 @@ func TestAssessmentNeverAuthorizesAutomaticResume(t *testing.T) {
 	a := Assess(op)
 	if a.ResumeSafe || !a.Intervention || !a.RollbackCandidate {
 		t.Fatalf("unsafe assessment: %#v", a)
+	}
+}
+
+func TestConcurrentCreateAllowsOneActiveOperationPerApplication(t *testing.T) {
+	store, op, now := fixture(t)
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for i, id := range []string{"op-a", "op-b"} {
+		wg.Add(1)
+		go func(id string, offset int) {
+			defer wg.Done()
+			<-start
+			candidate := op
+			candidate.ID = id
+			candidate.CreatedAt = now.Add(time.Duration(offset) * time.Second)
+			errs <- store.Create(candidate)
+		}(id, i)
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	var success, busy int
+	for err := range errs {
+		if err == nil {
+			success++
+		} else if errors.Is(err, ErrApplicationBusy) {
+			busy++
+		} else {
+			t.Fatal(err)
+		}
+	}
+	if success != 1 || busy != 1 {
+		t.Fatalf("success=%d busy=%d", success, busy)
+	}
+}
+
+func TestDifferentApplicationsAndTerminalRelease(t *testing.T) {
+	store, op, now := fixture(t)
+	if err := store.Create(op); err != nil {
+		t.Fatal(err)
+	}
+	other := op
+	other.ID, other.Application = "op-other", "other"
+	if err := store.Create(other); err != nil {
+		t.Fatalf("different application blocked: %v", err)
+	}
+	states := []State{Preparing, Applying, Verifying, Completed}
+	for i, state := range states {
+		if _, err := store.Transition(op.ID, state, "", "", now.Add(time.Duration(i+1)*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	next := op
+	next.ID, next.CreatedAt = "op-next", now.Add(10*time.Second)
+	if err := store.Create(next); err != nil {
+		t.Fatalf("terminal operation did not release application: %v", err)
+	}
+	incomplete, err := store.Incomplete()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(incomplete) != 2 || incomplete[0].ID != "op-other" || incomplete[1].ID != "op-next" {
+		t.Fatalf("unexpected deterministic incomplete list: %#v", incomplete)
+	}
+}
+
+func TestConflictCheckFailsClosedOnCorruptJournal(t *testing.T) {
+	store, op, _ := fixture(t)
+	if err := os.WriteFile(filepath.Join(store.root, "broken.json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Create(op); err == nil || !strings.Contains(err.Error(), "check concurrent") {
+		t.Fatalf("expected corrupt journal to block create, got %v", err)
+	}
+	if operations, err := store.List(); err == nil || operations != nil {
+		t.Fatalf("expected corrupt list to fail closed, got %#v, %v", operations, err)
 	}
 }

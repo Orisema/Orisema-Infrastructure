@@ -28,6 +28,12 @@ renamed and followed by a directory sync. The containing directory must be
 private. Separate lock files serialize creation and transitions. Corrupt,
 unsafe or unsupported-version snapshots fail closed.
 
+Creation is also serialized across the store. A non-terminal operation reserves
+its application name, so a second operation for that application is rejected.
+Different applications remain independent, and only a terminal `COMPLETED` or
+`ROLLED_BACK` operation releases the application. The read-only listing is
+deterministic; one corrupt snapshot blocks both listing and conflict decisions.
+
 Allowed states are `PENDING`, `PREPARING`, `APPLYING`, `VERIFYING`,
 `COMPLETED`, `FAILED`, `INTERRUPTED`, `RECOVERY_REQUIRED`, `ROLLING_BACK` and
 `ROLLED_BACK`. Invalid transitions and timestamp regression are rejected.
@@ -41,5 +47,5 @@ rollback candidate when both previous-version and recovery evidence exist; it
 still requires fresh ownership/runtime validation and explicit authorization.
 
 This slice does not inspect Podman, execute updates, remove containers or
-volumes, resume an operation, or roll anything back. Cross-operation exclusion
-for the same application and CLI diagnosis are subsequent Alpha 4 slices.
+volumes, resume an operation, or roll anything back. CLI diagnosis is a
+subsequent Alpha 4 slice.

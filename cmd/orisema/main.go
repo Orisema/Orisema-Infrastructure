@@ -241,6 +241,7 @@ func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "    intervention required: %t\n", assessment.Intervention)
 		fmt.Fprintf(stdout, "    automatic resume safe: %t\n", assessment.ResumeSafe)
 		fmt.Fprintf(stdout, "    rollback candidate: %t\n", assessment.RollbackCandidate)
+		fmt.Fprintf(stdout, "    ownership evidence complete: %t (managed=%d; external=%d)\n", assessment.OwnershipComplete, assessment.ManagedResources, assessment.ExternalResources)
 		fmt.Fprintf(stdout, "    reason: %s\n", assessment.Reason)
 	}
 	fmt.Fprintln(stdout, "No runtime inspection or changes made.")

@@ -1,0 +1,45 @@
+# Alpha 4 reliable recovery design
+
+Status: first safe implementation slice. No update or rollback mutation is
+exposed by the CLI.
+
+## Audit of the existing recovery journal
+
+The existing `internal/recovery` JSON Lines history is appropriate for its
+narrow `START` flow: it uses restrictive permissions, rejects symbolic links,
+locks readers and writers, synchronizes appended records and consumes a
+reservation before Podman is called. A begun record without a result is kept as
+an unresolved attempt and requires explicit reconciliation.
+
+That schema intentionally accepts only `START`; extending its fields to mean a
+multi-step update would weaken its validation and compatibility guarantees.
+Alpha 4 therefore preserves it and introduces `internal/operation` as a
+runtime-independent operation journal.
+
+## Implemented contract
+
+Each operation is one versioned JSON snapshot containing its ID, application,
+services, type, current state, timestamps, resources, recovery evidence,
+failure detail and the complete transition event list. Secrets must never be
+placed in these fields.
+
+Snapshots are written to a mode `0600` temporary file, synchronized, atomically
+renamed and followed by a directory sync. The containing directory must be
+private. Separate lock files serialize creation and transitions. Corrupt,
+unsafe or unsupported-version snapshots fail closed.
+
+Allowed states are `PENDING`, `PREPARING`, `APPLYING`, `VERIFYING`,
+`COMPLETED`, `FAILED`, `INTERRUPTED`, `RECOVERY_REQUIRED`, `ROLLING_BACK` and
+`ROLLED_BACK`. Invalid transitions and timestamp regression are rejected.
+Terminal operations cannot transition further.
+
+## Conservative recovery boundary
+
+The read-only assessment never authorizes automatic resume. Every incomplete
+operation requires intervention. A `RECOVERY_REQUIRED` operation is only a
+rollback candidate when both previous-version and recovery evidence exist; it
+still requires fresh ownership/runtime validation and explicit authorization.
+
+This slice does not inspect Podman, execute updates, remove containers or
+volumes, resume an operation, or roll anything back. Cross-operation exclusion
+for the same application and CLI diagnosis are subsequent Alpha 4 slices.

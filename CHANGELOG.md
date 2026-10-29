@@ -19,6 +19,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
   fail-closed de identidade, escopo e ownership.
 - Avaliador determinístico de saúde pós-operação com timeout, falhas
   consecutivas e resultados inconclusivos explícitos.
+- Persistência atômica da política, observações e avaliação de saúde vinculada
+  ao estado `VERIFYING`, com recomputação fail-closed na leitura.
 
 ### Limitações
 

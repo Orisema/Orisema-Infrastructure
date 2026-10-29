@@ -83,6 +83,10 @@ promessa de recuperação automática de aplicações unhealthy.
 **Gate:** atualização e retorno de versão em laboratório com evidências; limites
 de rollback documentados.
 
+**Estado:** gate concluído. As versões `v0.1.0-alpha.2` e
+`v0.1.0-alpha.3` são publicadas como pré-releases reproduzíveis, com binários
+Linux AMD64/ARM64, checksums e verificação de instalação no CI.
+
 ## Beta e futuro (fora do Alpha inicial)
 
 - Matriz ampliada de distribuições/Podman; adaptador Docker somente após testes.

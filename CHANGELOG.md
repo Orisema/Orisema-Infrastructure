@@ -4,7 +4,7 @@ Todas as mudanças relevantes deste projeto são registradas neste arquivo. O
 formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento usa SemVer com identificadores de pré-lançamento.
 
-## [0.1.0-alpha.3] - Unreleased
+## [0.1.0-alpha.3] - 2026-10-29
 
 ### Adicionado
 
@@ -18,7 +18,7 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 - Estados interrompidos exigem inspeção manual até existir journal durável e
   reconciliação específicos para update.
 
-## [0.1.0-alpha.2] - Unreleased
+## [0.1.0-alpha.2] - 2026-10-29
 
 ### Adicionado
 
@@ -62,3 +62,5 @@ Primeira versão experimental instalável. **Não indicada para produção.**
   comprovado a Docker, macOS ou Windows.
 
 [0.1.0-alpha.1]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.1
+[0.1.0-alpha.2]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.2
+[0.1.0-alpha.3]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.3

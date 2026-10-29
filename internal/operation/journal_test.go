@@ -143,6 +143,7 @@ func TestAssessmentNeverAuthorizesAutomaticResume(t *testing.T) {
 	op.Version, op.State, op.UpdatedAt = Version, RecoveryRequired, now
 	op.Events = []Event{{At: now, To: RecoveryRequired}}
 	op.Previous, op.RecoveryData = "old-image", "container-id"
+	op.Resources = []Resource{{Kind: "container", Name: "orisema-demo-web", ID: "container-id", Ownership: OwnershipManaged, Application: "demo", Service: "web"}}
 	a := Assess(op)
 	if a.ResumeSafe || !a.Intervention || !a.RollbackCandidate {
 		t.Fatalf("unsafe assessment: %#v", a)

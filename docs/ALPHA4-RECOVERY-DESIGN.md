@@ -34,6 +34,13 @@ Different applications remain independent, and only a terminal `COMPLETED` or
 `ROLLED_BACK` operation releases the application. The read-only listing is
 deterministic; one corrupt snapshot blocks both listing and conflict decisions.
 
+Resource evidence is structured as `managed`, `external` or `unknown`.
+Managed resources require exact identity plus application/service scope. External
+resources require a stable identity and carry no managed scope. Unknown,
+missing, duplicate or changed evidence blocks recovery. The pure revalidation
+contract compares a fresh observation with the journal without querying or
+mutating Podman; runtime collection remains a later integration step.
+
 Allowed states are `PENDING`, `PREPARING`, `APPLYING`, `VERIFYING`,
 `COMPLETED`, `FAILED`, `INTERRUPTED`, `RECOVERY_REQUIRED`, `ROLLING_BACK` and
 `ROLLED_BACK`. Invalid transitions and timestamp regression are rejected.

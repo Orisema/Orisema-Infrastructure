@@ -15,6 +15,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
   falhando fechado diante de qualquer snapshot inválido.
 - Comando `operation diagnose` somente leitura para identificar operações
   incompletas e intervenção obrigatória sem consultar o runtime.
+- Contrato estruturado de recursos managed/external/unknown e revalidação
+  fail-closed de identidade, escopo e ownership.
 
 ### Limitações
 

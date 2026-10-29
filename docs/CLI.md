@@ -13,6 +13,7 @@ do not query Podman.
 
 ```sh
 go run ./cmd/orisema version
+go run ./cmd/orisema operation diagnose --journal /secure/path/orisema-operations
 go mod tidy
 go test ./...
 go run ./cmd/orisema validate examples/nginx.yaml
@@ -36,6 +37,11 @@ and [QUICKSTART.md](QUICKSTART.md) for the reviewed end-to-end laboratory.
 The `validate` command checks the versioned manifest structure, service
 identifiers, images, port ranges and version-specific bind rules. See the
 [`v1alpha2` contract](MANIFEST-V1ALPHA2.md).
+
+`operation diagnose` reads the Alpha 4 operation journal without querying
+Podman or changing journal files. It lists only incomplete operations and
+always reports automatic resume as unsafe. Missing, corrupt or unsafe journal
+state returns an error instead of being treated as empty.
 
 The `status` command reads local Podman containers without changing them (see [PODMAN.md](PODMAN.md)).
 

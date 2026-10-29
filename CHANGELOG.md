@@ -17,6 +17,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
   incompletas e intervenção obrigatória sem consultar o runtime.
 - Contrato estruturado de recursos managed/external/unknown e revalidação
   fail-closed de identidade, escopo e ownership.
+- Avaliador determinístico de saúde pós-operação com timeout, falhas
+  consecutivas e resultados inconclusivos explícitos.
 
 ### Limitações
 

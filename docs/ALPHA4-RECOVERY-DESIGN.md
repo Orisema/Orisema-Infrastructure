@@ -63,3 +63,13 @@ orisema operation diagnose --journal /secure/path/orisema-operations
 
 It opens only an existing store, creates no directory or lock, and lists
 incomplete operations with their conservative assessment.
+
+## Objective health evaluation
+
+The runtime-independent evaluator accepts a verification start, current time,
+bounded policy and ordered observations. Only a running container with a
+configured healthcheck observed as `healthy` inside the window succeeds.
+Missing healthchecks, stopped containers, unknown results and unavailable
+runtime never imply success. Consecutive `unhealthy` observations fail at the
+configured threshold; `starting` may remain pending only until the deterministic
+timeout. The evaluator does not poll, sleep, retry or mutate anything.

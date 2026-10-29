@@ -32,6 +32,7 @@ do release permanecem na Issue #14.
 - [x] Detectar conflitos entre operações da mesma aplicação.
 - [x] Integrar diagnóstico somente leitura à CLI.
 - [x] Estruturar e revalidar evidências de ownership e recursos.
+- [x] Definir verificação objetiva de saúde com timeout e falhas consecutivas.
 - [ ] Conectar update/rollback somente após revalidação de ownership, journal
   de intenção e confirmação explícita.
 

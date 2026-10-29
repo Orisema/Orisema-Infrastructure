@@ -47,5 +47,12 @@ rollback candidate when both previous-version and recovery evidence exist; it
 still requires fresh ownership/runtime validation and explicit authorization.
 
 This slice does not inspect Podman, execute updates, remove containers or
-volumes, resume an operation, or roll anything back. CLI diagnosis is a
-subsequent Alpha 4 slice.
+volumes, resume an operation, or roll anything back. The read-only CLI command
+is available as:
+
+```sh
+orisema operation diagnose --journal /secure/path/orisema-operations
+```
+
+It opens only an existing store, creates no directory or lock, and lists
+incomplete operations with their conservative assessment.

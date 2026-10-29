@@ -24,10 +24,12 @@ var ErrApplicationBusy = errors.New("application already has an incomplete opera
 var safeID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 type Resource struct {
-	Kind      string `json:"kind"`
-	Name      string `json:"name"`
-	ID        string `json:"id,omitempty"`
-	Ownership string `json:"ownership"`
+	Kind        string    `json:"kind"`
+	Name        string    `json:"name"`
+	ID          string    `json:"id,omitempty"`
+	Ownership   Ownership `json:"ownership"`
+	Application string    `json:"application,omitempty"`
+	Service     string    `json:"service,omitempty"`
 }
 
 type Event struct {
@@ -308,6 +310,9 @@ type Assessment struct {
 	ResumeSafe        bool
 	RollbackCandidate bool
 	Intervention      bool
+	OwnershipComplete bool
+	ManagedResources  int
+	ExternalResources int
 	Reason            string
 }
 
@@ -316,6 +321,11 @@ func Assess(op Operation) Assessment {
 		return Assessment{Terminal: true, Reason: "operation reached a terminal state"}
 	}
 	a := Assessment{Intervention: true, Reason: "operation is incomplete; inspect journal and runtime evidence before any mutation"}
+	a.OwnershipComplete, a.ManagedResources, a.ExternalResources = ResourceEvidenceComplete(op.Resources)
+	if !a.OwnershipComplete {
+		a.Reason = "operation resource ownership evidence is incomplete or ambiguous; recovery is blocked"
+		return a
+	}
 	if op.State == RecoveryRequired && op.Previous != "" && op.RecoveryData != "" {
 		a.RollbackCandidate = true
 		a.Reason = "rollback evidence is recorded but still requires ownership revalidation and explicit authorization"
@@ -399,6 +409,18 @@ func validate(op Operation) error {
 	}
 	if len(op.Events) == 0 || op.Events[len(op.Events)-1].To != op.State {
 		return errors.New("operation events do not describe the current state")
+	}
+	if err := validateResources(op.Resources); err != nil {
+		return err
+	}
+	services := make(map[string]bool, len(op.Services))
+	for _, service := range op.Services {
+		services[service] = true
+	}
+	for _, resource := range op.Resources {
+		if resource.Ownership == OwnershipManaged && (resource.Application != op.Application || !services[resource.Service]) {
+			return fmt.Errorf("managed resource %s/%s is outside the operation application or services", resource.Kind, resource.Name)
+		}
 	}
 	return nil
 }

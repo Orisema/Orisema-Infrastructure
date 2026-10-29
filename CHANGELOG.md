@@ -4,7 +4,7 @@ Todas as mudanças relevantes deste projeto são registradas neste arquivo. O
 formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento usa SemVer com identificadores de pré-lançamento.
 
-## [0.1.0-alpha.4] - Unreleased
+## [0.1.0-alpha.4] - 2026-10-29
 
 ### Adicionado
 
@@ -23,6 +23,9 @@ versionamento usa SemVer com identificadores de pré-lançamento.
   ao estado `VERIFYING`, com recomputação fail-closed na leitura.
 - Decisão pura pós-verificação para `WAIT`, `COMPLETE`,
   `RECOVERY_REQUIRED` ou `BLOCKED`, condicionada a evidência fresca de recursos.
+- Commit atômico e auditável de decisões elegíveis `COMPLETE` e
+  `RECOVERY_REQUIRED`, com recarga sob lock, evidência observada persistida e
+  rejeição fail-closed de decisões duplicadas, concorrentes ou adulteradas.
 
 ### Limitações
 
@@ -89,3 +92,4 @@ Primeira versão experimental instalável. **Não indicada para produção.**
 [0.1.0-alpha.1]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.1
 [0.1.0-alpha.2]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.2
 [0.1.0-alpha.3]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.3
+[0.1.0-alpha.4]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.4

@@ -18,10 +18,10 @@ const (
 )
 
 type ResourceEvidence struct {
-	Safe     bool
-	Managed  int
-	External int
-	Issues   []string
+	Safe     bool     `json:"safe"`
+	Managed  int      `json:"managed"`
+	External int      `json:"external"`
+	Issues   []string `json:"issues,omitempty"`
 }
 
 // RevalidateResources compares a recorded resource set with a fresh

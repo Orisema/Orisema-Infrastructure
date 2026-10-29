@@ -31,6 +31,7 @@ do release permanecem na Issue #14.
 - [x] Introduzir snapshots duráveis e uma máquina de estados para operações.
 - [x] Detectar conflitos entre operações da mesma aplicação.
 - [x] Integrar diagnóstico somente leitura à CLI.
+- [x] Estruturar e revalidar evidências de ownership e recursos.
 - [ ] Conectar update/rollback somente após revalidação de ownership, journal
   de intenção e confirmação explícita.
 

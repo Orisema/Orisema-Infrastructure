@@ -15,6 +15,7 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/buildinfo"
 	"github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/operation"
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
 	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
@@ -27,6 +28,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if len(args) > 0 && args[0] == "recover" {
 		return runRecoveryPlan(args, stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "operation" {
+		return runOperationDiagnosis(args, stdout, stderr)
 	}
 	if len(args) < 2 {
 		printUsage(stderr)
@@ -207,7 +211,40 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+}
+
+func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 4 || args[1] != "diagnose" || args[2] != "--journal" {
+		printUsage(stderr)
+		return 2
+	}
+	store, err := operation.OpenExistingStore(args[3])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	operations, err := store.Incomplete()
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintln(stdout, "Incomplete operation diagnosis (read-only):")
+	if len(operations) == 0 {
+		fmt.Fprintln(stdout, "  none")
+	}
+	for _, op := range operations {
+		assessment := operation.Assess(op)
+		fmt.Fprintf(stdout, "  [%s] application=%s type=%s state=%s\n", op.ID, op.Application, op.Type, op.State)
+		fmt.Fprintf(stdout, "    services: %s\n", strings.Join(op.Services, ", "))
+		fmt.Fprintf(stdout, "    created: %s; updated: %s\n", op.CreatedAt.Format(time.RFC3339), op.UpdatedAt.Format(time.RFC3339))
+		fmt.Fprintf(stdout, "    intervention required: %t\n", assessment.Intervention)
+		fmt.Fprintf(stdout, "    automatic resume safe: %t\n", assessment.ResumeSafe)
+		fmt.Fprintf(stdout, "    rollback candidate: %t\n", assessment.RollbackCandidate)
+		fmt.Fprintf(stdout, "    reason: %s\n", assessment.Reason)
+	}
+	fmt.Fprintln(stdout, "No runtime inspection or changes made.")
+	return 0
 }
 
 func runRecoveryPlan(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

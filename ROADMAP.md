@@ -30,7 +30,7 @@ do release permanecem na Issue #14.
 - [x] Auditar o journal `START` existente e preservar seu contrato.
 - [x] Introduzir snapshots duráveis e uma máquina de estados para operações.
 - [x] Detectar conflitos entre operações da mesma aplicação.
-- [ ] Integrar diagnóstico somente leitura à CLI.
+- [x] Integrar diagnóstico somente leitura à CLI.
 - [ ] Conectar update/rollback somente após revalidação de ownership, journal
   de intenção e confirmação explícita.
 

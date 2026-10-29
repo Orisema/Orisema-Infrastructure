@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/operation"
 	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
 )
 
@@ -60,6 +62,96 @@ func TestVersionRejectsExtraArguments(t *testing.T) {
 	if code != 2 || !strings.Contains(stderr.String(), "Usage:") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
+}
+
+func TestOperationDiagnosisIsReadOnlyAndConservative(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "operations")
+	store, err := operation.OpenStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
+	op := operation.Operation{ID: "update-1", Application: "demo", Services: []string{"web"}, Type: "UPDATE", CreatedAt: now, Previous: "nginx:old", RecoveryData: "old-container-id"}
+	if err := store.Create(op); err != nil {
+		t.Fatal(err)
+	}
+	for i, state := range []operation.State{operation.Preparing, operation.Applying, operation.RecoveryRequired} {
+		if _, err := store.Transition(op.ID, state, "", "candidate failed", now.Add(time.Duration(i+1)*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before, err := directorySnapshot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"operation", "diagnose", "--journal", root}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("code=%d stderr=%q", code, stderr.String())
+	}
+	for _, expected := range []string{"update-1", "RECOVERY_REQUIRED", "intervention required: true", "automatic resume safe: false", "rollback candidate: true", "No runtime inspection or changes made"} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("stdout %q missing %q", stdout.String(), expected)
+		}
+	}
+	after, err := directorySnapshot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before != after {
+		t.Fatalf("diagnosis changed journal\nbefore=%s\nafter=%s", before, after)
+	}
+}
+
+func TestOperationDiagnosisFailsClosedAndValidatesUsage(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"operation", "diagnose"}, strings.NewReader(""), &stdout, &stderr); code != 2 {
+		t.Fatalf("usage code=%d stderr=%q", code, stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"operation", "diagnose", "--journal", filepath.Join(t.TempDir(), "missing")}, strings.NewReader(""), &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "real directory") {
+		t.Fatalf("missing code=%d stderr=%q", code, stderr.String())
+	}
+	root := filepath.Join(t.TempDir(), "operations")
+	store, err := operation.OpenStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Create(operation.Operation{ID: "broken", Application: "demo", Services: []string{"web"}, Type: "UPDATE"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "broken.json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"operation", "diagnose", "--journal", root}, strings.NewReader(""), &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "decode operation journal") {
+		t.Fatalf("corrupt code=%d stderr=%q", code, stderr.String())
+	}
+}
+
+func directorySnapshot(root string) (string, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return "", err
+	}
+	var result strings.Builder
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&result, "%s:%d:%o:%d;", entry.Name(), info.Size(), info.Mode().Perm(), info.ModTime().UnixNano())
+		if strings.HasSuffix(entry.Name(), ".json") {
+			data, err := os.ReadFile(filepath.Join(root, entry.Name()))
+			if err != nil {
+				return "", err
+			}
+			result.Write(data)
+		}
+	}
+	return result.String(), nil
 }
 
 func TestDocumentedExitCodeClasses(t *testing.T) {

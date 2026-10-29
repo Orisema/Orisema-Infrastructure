@@ -29,6 +29,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Limitações conhecidas da Alpha 1](docs/KNOWN_LIMITATIONS.md)
 - [Contrato de manifesto da Alpha 2](docs/MANIFEST-V1ALPHA2.md)
 - [Laboratório de update e rollback da Alpha 3](docs/CONTROLLED-UPDATE-LAB.md)
+- [Projeto de recuperação confiável da Alpha 4](docs/ALPHA4-RECOVERY-DESIGN.md)
 - [Instalação e verificação de releases](docs/INSTALLATION.md)
 - [Quick start em host Linux descartável](docs/QUICKSTART.md)
 - [Compatibilidade e comandos suportados](docs/COMPATIBILITY.md)

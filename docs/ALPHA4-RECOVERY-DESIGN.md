@@ -82,3 +82,13 @@ timeout without inventing a probe, and a terminal evaluation rejects further
 observations. Persisted evaluation data is recomputed during load; mismatch or
 corruption fails closed. No result currently triggers an operation transition
 or runtime action.
+
+## Post-verification decision
+
+A pure decision combines the persisted terminal health evaluation with a fresh
+resource observation. Non-terminal health returns `WAIT`. Only `HEALTHY` plus
+exactly matching managed and external resource evidence permits `COMPLETE`.
+Any other terminal health result permits only `RECOVERY_REQUIRED`, with
+intervention still required. Missing, unknown, duplicate or changed ownership,
+identity or scope returns `BLOCKED`. The decision does not persist its target
+state and cannot execute runtime actions.

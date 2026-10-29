@@ -23,26 +23,27 @@ const (
 )
 
 type HealthPolicy struct {
-	Timeout                 time.Duration
-	MaxConsecutiveUnhealthy int
+	Timeout                 time.Duration `json:"timeout"`
+	MaxConsecutiveUnhealthy int           `json:"maxConsecutiveUnhealthy"`
 }
 
 type HealthObservation struct {
-	At                 time.Time
-	RuntimeAvailable   bool
-	Running            bool
-	HealthcheckPresent bool
-	Status             string
+	At                 time.Time `json:"at"`
+	RuntimeAvailable   bool      `json:"runtimeAvailable"`
+	Running            bool      `json:"running"`
+	HealthcheckPresent bool      `json:"healthcheckPresent"`
+	Status             string    `json:"status"`
 }
 
 type HealthEvaluation struct {
-	Status               HealthStatus
-	Succeeded            bool
-	Terminal             bool
-	InterventionRequired bool
-	ConsecutiveUnhealthy int
-	Deadline             time.Time
-	Reason               string
+	EvaluatedAt          time.Time    `json:"evaluatedAt"`
+	Status               HealthStatus `json:"status"`
+	Succeeded            bool         `json:"succeeded"`
+	Terminal             bool         `json:"terminal"`
+	InterventionRequired bool         `json:"interventionRequired"`
+	ConsecutiveUnhealthy int          `json:"consecutiveUnhealthy"`
+	Deadline             time.Time    `json:"deadline"`
+	Reason               string       `json:"reason"`
 }
 
 // EvaluateHealth deterministically evaluates supplied observations. It never
@@ -59,7 +60,7 @@ func EvaluateHealth(startedAt, now time.Time, policy HealthPolicy, observations 
 	}
 	startedAt, now = startedAt.UTC(), now.UTC()
 	deadline := startedAt.Add(policy.Timeout)
-	result := HealthEvaluation{Status: HealthPending, Deadline: deadline, Reason: "waiting for a conclusive configured healthcheck observation"}
+	result := HealthEvaluation{EvaluatedAt: now, Status: HealthPending, Deadline: deadline, Reason: "waiting for a conclusive configured healthcheck observation"}
 	previous := startedAt
 	considered := false
 	for i, observation := range observations {

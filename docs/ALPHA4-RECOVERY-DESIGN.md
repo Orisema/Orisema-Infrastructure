@@ -73,3 +73,12 @@ Missing healthchecks, stopped containers, unknown results and unavailable
 runtime never imply success. Consecutive `unhealthy` observations fail at the
 configured threshold; `starting` may remain pending only until the deterministic
 timeout. The evaluator does not poll, sleep, retry or mutate anything.
+
+The journal can atomically move an operation from `APPLYING` to `VERIFYING`
+while persisting the policy and initial deadline. Supplied observations and each
+deterministic evaluation are then written into the same operation snapshot.
+Reopening the store preserves the complete sequence. A refresh can record a
+timeout without inventing a probe, and a terminal evaluation rejects further
+observations. Persisted evaluation data is recomputed during load; mismatch or
+corruption fails closed. No result currently triggers an operation transition
+or runtime action.

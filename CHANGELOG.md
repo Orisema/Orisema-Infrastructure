@@ -4,6 +4,19 @@ Todas as mudanças relevantes deste projeto são registradas neste arquivo. O
 formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento usa SemVer com identificadores de pré-lançamento.
 
+## [0.1.0-alpha.4] - Unreleased
+
+### Adicionado
+
+- Primeiro contrato durável para operações multi-etapa, com snapshots
+  atômicos, máquina de estados validada e avaliação conservadora de
+  interrupções.
+
+### Limitações
+
+- Ainda não há comando público de update, retomada ou rollback; a avaliação é
+  somente leitura e sempre exige intervenção para operações incompletas.
+
 ## [0.1.0-alpha.3] - 2026-10-29
 
 ### Adicionado

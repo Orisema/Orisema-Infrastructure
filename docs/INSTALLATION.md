@@ -4,7 +4,7 @@ Orisema Infrastructure is **experimental software and is not recommended for
 production environments**.
 
 Release archives let Linux users run Orisema without installing Go. The first
-experimental release, [`v0.1.0-alpha.1`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.1),
+experimental release, [`v0.1.0-alpha.3`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.3),
 was published on 2026-10-28 and remains unsuitable for production.
 
 ## Supported distribution targets
@@ -25,7 +25,7 @@ distribution, kernel, Podman version or ARM64 machine has been tested.
 Select the release version and your architecture (`amd64` or `arm64`):
 
 ```sh
-version=v0.1.0-alpha.1
+version=v0.1.0-alpha.3
 arch=amd64
 curl -fLO "https://github.com/Orisema/Orisema-Infrastructure/releases/download/${version}/orisema_linux_${arch}.tar.gz"
 curl -fLO "https://github.com/Orisema/Orisema-Infrastructure/releases/download/${version}/checksums.txt"

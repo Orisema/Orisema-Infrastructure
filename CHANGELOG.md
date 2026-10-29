@@ -11,6 +11,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 - Primeiro contrato durável para operações multi-etapa, com snapshots
   atômicos, máquina de estados validada e avaliação conservadora de
   interrupções.
+- Exclusão de operações ativas por aplicação e listagem determinística,
+  falhando fechado diante de qualquer snapshot inválido.
 
 ### Limitações
 

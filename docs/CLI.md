@@ -16,6 +16,7 @@ go run ./cmd/orisema version
 go run ./cmd/orisema operation diagnose --journal /secure/path/orisema-operations
 go run ./cmd/orisema update plan examples/nginx-health.yaml
 go run ./cmd/orisema update prepare examples/nginx-health.yaml web --journal /secure/path/orisema-operations
+go run ./cmd/orisema update authorize examples/nginx-health.yaml web --journal /secure/path/orisema-operations --operation <id>
 go mod tidy
 go test ./...
 go run ./cmd/orisema validate examples/nginx.yaml
@@ -84,6 +85,11 @@ update; see [ALPHA5-UPDATE-PLAN.md](ALPHA5-UPDATE-PLAN.md).
 persists an exact `PENDING` intent in the Alpha 4 journal. It records container
 identity, previous/target image and a deterministic plan fingerprint. It does
 not ask for execution confirmation, pull an image or change Podman.
+
+`update authorize` requires exact textual confirmation and repeats the complete
+read-only plan within five minutes of preparation. Matching fresh evidence
+atomically advances the journal to `PREPARING`; failure leaves it untouched.
+The command still performs no runtime mutation.
 
 ## Scope and limits
 

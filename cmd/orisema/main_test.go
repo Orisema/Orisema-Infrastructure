@@ -77,7 +77,7 @@ func TestUpdatePlanReportsImageOnlyCandidateWithoutMutation(t *testing.T) {
 printf '%%s\n' "$*" >> %q
 case "$1" in
   ps) printf '%%s\n' '[{"Names":["orisema-demo-web"],"State":"running","Image":"nginx:old"}]' ;;
-  inspect) printf '%%s\n' '[{"Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:old","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}}}]' ;;
+  inspect) printf '%%s\n' '[{"Id":"container-123","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:old","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}}}]' ;;
   *) exit 91 ;;
 esac
 `, logPath)
@@ -97,6 +97,26 @@ esac
 	lines := strings.Split(strings.TrimSpace(string(calls)), "\n")
 	if len(lines) != 2 || !strings.HasPrefix(lines[0], "ps ") || !strings.HasPrefix(lines[1], "inspect ") {
 		t.Fatalf("unexpected Podman calls: %q", calls)
+	}
+	stdout.Reset()
+	journal := filepath.Join(dir, "operations")
+	code = run([]string{"update", "prepare", manifestPath, "web", "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "Update intent persisted") || !strings.Contains(stdout.String(), "No confirmation requested") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	store, err := operation.OpenExistingStore(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operations, err := store.Incomplete()
+	if err != nil || len(operations) != 1 || operations[0].Intent == nil || operations[0].Intent.Service != "web" || operations[0].Resources[0].ID != "container-123" {
+		t.Fatalf("operations=%#v err=%v", operations, err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"operation", "diagnose", "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "update intent: service=web image=nginx:old -> nginx:new") || !strings.Contains(stdout.String(), operations[0].Intent.PlanFingerprint) {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
 

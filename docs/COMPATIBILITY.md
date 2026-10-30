@@ -48,6 +48,7 @@ minimum-version guarantee.
 | `update prepare` | Yes | Journal only | Persists one plan-bound intent; never changes Podman |
 | `update authorize` | Yes | Journal only | Confirms and revalidates intent; never changes Podman |
 | `update apply` | Yes | Yes | Revalidates, preserves the stopped previous container and creates one unverified candidate |
+| `update verify` | Yes | Journal only | Records one observation and durably decides only terminal health evidence |
 | `status`, `diagnose` | Yes | No | Present distinct runtime and health observations |
 | `logs` | Yes | No | Returns the last 100 lines; does not follow |
 | `deploy` | Yes | Yes | Creates only `CREATE` services after confirmation |
@@ -56,8 +57,8 @@ minimum-version guarantee.
 | `recover prepare` | Yes | Journal only | Reserves an eligible START; does not start it |
 | `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |
 
-The public Alpha 5 flow now reaches preserved candidate creation, but health
-decision and rollback remain unavailable commands. The Alpha 3 laboratory
+The public Alpha 5 flow now reaches a durable post-update health decision, but
+rollback remains unavailable as a command. The Alpha 3 laboratory
 preserves the old container as the rollback unit and proves that an unrelated
 container and named volume retain their identity. It does not promise data
 rollback or restoration.

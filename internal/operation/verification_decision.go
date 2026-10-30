@@ -64,11 +64,15 @@ func decideAfterValidatedVerification(op Operation, observedResources []Resource
 	if !op.Health.Evaluation.Terminal {
 		return VerificationDecision{Action: VerificationWait, Reason: "health verification has not reached a terminal evaluation"}
 	}
-	complete, _, _ := ResourceEvidenceComplete(op.Resources)
+	verificationResources := op.Resources
+	if op.Execution != nil {
+		verificationResources = op.Health.VerificationResources
+	}
+	complete, _, _ := ResourceEvidenceComplete(verificationResources)
 	if !complete {
 		return blocked("recorded resource ownership evidence is incomplete or ambiguous", ResourceEvidence{})
 	}
-	evidence := RevalidateResources(op.Resources, observedResources)
+	evidence := RevalidateResources(verificationResources, observedResources)
 	if !evidence.Safe {
 		reason := "fresh resource evidence does not match the journal"
 		if len(evidence.Issues) != 0 {

@@ -104,7 +104,7 @@ Ainda não existe executor público de update ou rollback.
 - [x] Registrar plano e intenção imutáveis antes da execução (#50).
 - [x] Revalidar identidade e ownership sob exclusão por aplicação (#52).
 - [x] Executar update de um serviço com confirmação explícita (#54).
-- [ ] Verificar saúde e decidir `COMPLETE` ou `RECOVERY_REQUIRED`.
+- [x] Verificar saúde e decidir `COMPLETE` ou `RECOVERY_REQUIRED` (#56).
 - [ ] Expor rollback manual revalidado, sem prometer restauração de dados.
 
 **Gate:** nenhuma mutação sem journal, confirmação, ownership exato e caminho

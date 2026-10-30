@@ -11,15 +11,26 @@ import (
 )
 
 type HealthVerification struct {
-	StartedAt    time.Time           `json:"startedAt"`
-	Policy       HealthPolicy        `json:"policy"`
-	Observations []HealthObservation `json:"observations,omitempty"`
-	Evaluation   HealthEvaluation    `json:"evaluation"`
+	StartedAt             time.Time           `json:"startedAt"`
+	Policy                HealthPolicy        `json:"policy"`
+	VerificationResources []Resource          `json:"verificationResources"`
+	Observations          []HealthObservation `json:"observations,omitempty"`
+	Evaluation            HealthEvaluation    `json:"evaluation"`
 }
 
 // StartHealthVerification atomically records intent and moves APPLYING to
 // VERIFYING. It does not inspect a runtime or execute a probe.
 func (s *Store) StartHealthVerification(id string, policy HealthPolicy, at time.Time) (Operation, error) {
+	return s.startHealthVerification(id, policy, nil, false, at)
+}
+
+// StartUpdateHealthVerification binds post-update health evidence to the exact
+// candidate and preserved previous container before entering VERIFYING.
+func (s *Store) StartUpdateHealthVerification(id string, policy HealthPolicy, observed []Resource, at time.Time) (Operation, error) {
+	return s.startHealthVerification(id, policy, observed, true, at)
+}
+
+func (s *Store) startHealthVerification(id string, policy HealthPolicy, observed []Resource, update bool, at time.Time) (Operation, error) {
 	var result Operation
 	err := s.withLock("."+id+".lock", func() error {
 		op, err := s.Load(id)
@@ -28,6 +39,20 @@ func (s *Store) StartHealthVerification(id string, policy HealthPolicy, at time.
 		}
 		if op.Health != nil {
 			return errors.New("health verification has already been started")
+		}
+		var verificationResources []Resource
+		if update {
+			if op.Type != "UPDATE" || op.Execution == nil || op.Intent == nil || op.Execution.PendingStep != "" || !op.Execution.PreviousStopped || !op.Execution.PreviousRenamed || op.Execution.CandidateID == "" {
+				return errors.New("update execution is not ready for health verification")
+			}
+			verificationResources = []Resource{
+				{Kind: "container", Name: op.IntentResourceName(), ID: op.Execution.CandidateID, Ownership: OwnershipManaged, Application: op.Application, Service: op.Intent.Service},
+				{Kind: "container", Name: op.Execution.BackupName, ID: op.Execution.PreviousID, Ownership: OwnershipManaged, Application: op.Application, Service: op.Intent.Service},
+			}
+			evidence := RevalidateResources(verificationResources, observed)
+			if !evidence.Safe {
+				return fmt.Errorf("update verification resource evidence changed: %s", firstResourceIssue(evidence))
+			}
 		}
 		if err := ValidateTransition(op.State, Verifying); err != nil {
 			return err
@@ -45,7 +70,7 @@ func (s *Store) StartHealthVerification(id string, policy HealthPolicy, at time.
 		}
 		op.Events = append(op.Events, Event{At: at, From: op.State, To: Verifying, Step: "health-verification", Detail: "verification policy persisted"})
 		op.State, op.UpdatedAt = Verifying, at
-		op.Health = &HealthVerification{StartedAt: at, Policy: policy, Evaluation: evaluation}
+		op.Health = &HealthVerification{StartedAt: at, Policy: policy, VerificationResources: verificationResources, Evaluation: evaluation}
 		path, _ := s.path(id)
 		if err := s.atomicWrite(path, op); err != nil {
 			return err
@@ -133,6 +158,19 @@ func validateHealthVerification(op Operation) error {
 	}
 	if op.Health.StartedAt.IsZero() || op.Health.StartedAt.Before(op.CreatedAt) {
 		return errors.New("health verification start is invalid")
+	}
+	if op.Execution != nil {
+		complete, _, _ := ResourceEvidenceComplete(op.Health.VerificationResources)
+		if !complete {
+			return errors.New("health verification resources are incomplete or ambiguous")
+		}
+		want := []Resource{
+			{Kind: "container", Name: op.IntentResourceName(), ID: op.Execution.CandidateID, Ownership: OwnershipManaged, Application: op.Application, Service: op.Intent.Service},
+			{Kind: "container", Name: op.Execution.BackupName, ID: op.Execution.PreviousID, Ownership: OwnershipManaged, Application: op.Application, Service: op.Intent.Service},
+		}
+		if evidence := RevalidateResources(want, op.Health.VerificationResources); !evidence.Safe {
+			return errors.New("persisted update verification resources do not match execution evidence")
+		}
 	}
 	if op.Health.Evaluation.EvaluatedAt.IsZero() || op.Health.Evaluation.EvaluatedAt.Before(op.Health.StartedAt) {
 		return errors.New("health verification evaluation timestamp is invalid")

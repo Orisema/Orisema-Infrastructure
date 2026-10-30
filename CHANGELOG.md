@@ -18,6 +18,9 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 - `update apply`, que revalida a intenção autorizada, persiste cada fronteira
   antes da mutação, preserva o contêiner anterior e cria um candidato ainda não
   verificado, sem limpeza ou rollback automáticos.
+- `update verify`, que revalida candidato e unidade anterior, persiste
+  observações explícitas e decide durablemente `COMPLETED` ou
+  `RECOVERY_REQUIRED` somente diante de evidência terminal.
 
 ### Documentação
 

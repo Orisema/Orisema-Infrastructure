@@ -83,5 +83,31 @@ step diagnostic in the journal; this slice deliberately performs no automatic
 cleanup, retry, resume or rollback.
 
 Candidate creation is not update success. The operation remains `APPLYING` and
-no health conclusion is inferred. Health verification and the durable decision
-to complete or require recovery belong to the next Alpha 5 slice.
+no health conclusion is inferred.
+
+## Post-update health decision
+
+Each explicit verification command records one fresh observation:
+
+```sh
+orisema update verify manifest.yaml service \
+  --journal /secure/path/operations --operation update-...
+```
+
+The command revalidates the exact candidate ID, preserved previous ID,
+ownership, image intent and stopped state of the previous container before it
+atomically starts `VERIFYING`. Its bounded policy derives from the declared
+healthcheck interval, timeout and retry count. A `starting`, unknown or
+non-terminal unhealthy observation remains `VERIFYING` with decision `WAIT`;
+the operator may invoke the command again to record another observation.
+
+A configured `healthy` result is not committed until both containers are
+reinspected. It produces the durable state `COMPLETED`. A stopped candidate,
+missing healthcheck, timeout or the declared bounded sequence of unhealthy
+results produces `RECOVERY_REQUIRED`. Missing resources, changed identity,
+ownership drift, image drift, concurrent decisions or journal inconsistency
+fail closed.
+
+Verification never polls, sleeps, changes Podman, removes the previous
+container, retries the update or executes rollback. `RECOVERY_REQUIRED` is a
+diagnostic state requiring explicit intervention.

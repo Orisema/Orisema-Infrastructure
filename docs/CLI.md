@@ -1,4 +1,4 @@
-# CLI prototype (Alpha 2 development)
+# CLI prototype (Alpha 5 development)
 
 This is an **experimental laboratory CLI**, not production-ready. `validate` works offline; `plan`, `status` and lifecycle commands query local Podman.
 
@@ -14,6 +14,7 @@ do not query Podman.
 ```sh
 go run ./cmd/orisema version
 go run ./cmd/orisema operation diagnose --journal /secure/path/orisema-operations
+go run ./cmd/orisema update plan examples/nginx-health.yaml
 go mod tidy
 go test ./...
 go run ./cmd/orisema validate examples/nginx.yaml
@@ -72,6 +73,11 @@ not infer outcomes or mutate Podman.
 does not infer causality.
 
 The `plan` command inspects Podman and compares selected declared fields only. It does not reserve ports or provide full configuration equivalence; see [PLANNING.md](PLANNING.md).
+
+`update plan` is also read-only. It reports `UPDATE_CANDIDATE` only for exact
+managed ownership plus image-only drift and a declared healthcheck. Every other
+difference is blocked. It does not create an operation journal or authorize an
+update; see [ALPHA5-UPDATE-PLAN.md](ALPHA5-UPDATE-PLAN.md).
 
 ## Scope and limits
 

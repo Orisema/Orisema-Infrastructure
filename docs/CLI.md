@@ -147,6 +147,16 @@ confirmation. It publishes fixed filenames atomically without replacement and
 verifies them again. Imported journals are inert history and cannot resume an
 operation. Existing destinations are always rejected.
 
+## SSH connectivity
+
+`host check <registry.yaml> <alias>` validates a private local host registry and
+performs a fixed, non-mutating SSH `true` probe. It requires external key files,
+strict known-hosts verification, key-only batch authentication and bounded
+timeouts. Results are typed and SSH stderr is not exposed. See [SSH.md](SSH.md).
+
+There is no arbitrary remote command facility. Remote runtime inspection and
+logs are not part of this transport-only increment.
+
 ## Experimental deployment
 
 **Use only on a disposable test host.** Run `validate` and inspect the manifest first.

@@ -14,6 +14,8 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 ## Fora do escopo
 
 - Produção, alta disponibilidade, múltiplos nós ou operação remota.
+- O transporte SSH possui somente probe fixo de conectividade. Inspeção remota,
+  logs e qualquer mutação remota ainda não estão disponíveis.
 - Docker, Windows e macOS.
 - O fluxo experimental Alpha 5 atualiza apenas um serviço elegível por vez;
   `deploy` continua bloqueando `DRIFT` e `REVIEW`.

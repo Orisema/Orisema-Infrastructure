@@ -50,9 +50,9 @@ versionados por escrita temporária, `fsync`, rename atômico e sincronização 
 diretório. Sua máquina de estados rejeita transições inválidas e a avaliação de
 operações incompletas é somente leitura. O fluxo Alpha 5 autoriza e executa a
 substituição de um serviço, preserva a unidade anterior e liga o candidato à
-verificação e decisão duráveis. Ele não executa rollback, limpeza nem retomada
-automática; consulte
-[ALPHA4-RECOVERY-DESIGN.md](ALPHA4-RECOVERY-DESIGN.md).
+verificação e decisão duráveis. O rollback manual revalida e restaura somente o
+container anterior; não limpa automaticamente nem restaura dados. Consulte
+[ALPHA5-UPDATE-PLAN.md](ALPHA5-UPDATE-PLAN.md).
 
 ## Fora do escopo inicial
 
@@ -76,3 +76,13 @@ migração e guardrails estão definidos em
 formato de saída estruturado permanecem deliberadamente fora do contrato. A
 matriz entre artefatos produzidos e ambientes realmente executados está em
 [COMPATIBILITY.md](COMPATIBILITY.md).
+
+## Backup e restauração
+
+A fronteira aceita em [ADR 0003](adr/0003-safe-backup-boundary.md) separa
+configuração, estado operacional e dados persistentes. A primeira implementação
+protegerá apenas manifesto validado e exportação opcional de histórico do
+journal em artefato privado, versionado, limitado e verificado por SHA-256.
+Restore publicará somente em destino ausente e journals importados nunca serão
+ativados. Volumes, bancos, secrets e credenciais permanecem excluídos. O fluxo
+e seus gates estão em [BACKUP-RESTORE-DESIGN.md](BACKUP-RESTORE-DESIGN.md).

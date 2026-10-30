@@ -19,6 +19,8 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   `deploy` continua bloqueando `DRIFT` e `REVIEW`.
 - Rollback de dados, backup/restore e migrações de volume. O rollback público
   existente restaura somente o container da aplicação preservado pelo update.
+- A arquitetura de backup de configuração está definida, mas os comandos ainda
+  não estão implementados; nenhum dado persistente é protegido atualmente.
 - Gerenciamento de secrets, variáveis de ambiente, volumes, limites de
   recursos, redes personalizadas e permissões avançadas no manifesto.
 - Identidade autenticada do operador ou journal resistente a adulteração.

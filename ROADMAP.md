@@ -46,7 +46,7 @@ incompletas sempre exigem intervenção.
 - [x] Persistir intenção de update vinculada ao plano e à evidência observada.
 - [x] Exigir confirmação explícita e revalidar ownership imediatamente antes
   de qualquer mutação.
-- [ ] Executar substituição de um serviço preservando a unidade anterior.
+- [x] Executar substituição de um serviço preservando a unidade anterior (#54).
 - [ ] Integrar verificação de saúde e decisão durável da Alpha 4.
 - [ ] Expor rollback manual somente com evidência revalidada.
 

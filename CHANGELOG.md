@@ -15,6 +15,9 @@ versionamento usa SemVer com identificadores de pré-lançamento.
   sem modificar o runtime.
 - `update authorize`, com confirmação textual exata, validade de cinco minutos
   e revalidação integral antes da transição atômica para `PREPARING`.
+- `update apply`, que revalida a intenção autorizada, persiste cada fronteira
+  antes da mutação, preserva o contêiner anterior e cria um candidato ainda não
+  verificado, sem limpeza ou rollback automáticos.
 
 ### Documentação
 

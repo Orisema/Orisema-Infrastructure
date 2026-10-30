@@ -147,6 +147,14 @@ jobs:
             ORISEMA_EVIDENCE_DIR="$PWD/work/alpha3-update" \
             scripts/alpha3-update-lab.sh
           sudo chown -R "$USER":"$(id -gn)" work/alpha3-update
+      - name: Exercise Alpha 5 preserved update application
+        run: |
+          set -euo pipefail
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/alpha5-update-apply" \
+            scripts/alpha5-update-apply-lab.sh
+          sudo chown -R "$USER":"$(id -gn)" work/alpha5-update-apply
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -160,6 +168,8 @@ jobs:
             work/alpha2-contract/*.txt
             work/alpha3-update/*.json
             work/alpha3-update/*.txt
+            work/alpha5-update-apply/*.json
+            work/alpha5-update-apply/*.txt
   quickstart-matrix:
     name: quickstart (${{ matrix.os }})
     strategy:

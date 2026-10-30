@@ -57,6 +57,7 @@ type Operation struct {
 	Decision      *PersistedVerificationDecision `json:"decision,omitempty"`
 	Intent        *UpdateIntent                  `json:"intent,omitempty"`
 	Authorization *UpdateAuthorization           `json:"authorization,omitempty"`
+	Execution     *UpdateExecution               `json:"execution,omitempty"`
 	Events        []Event                        `json:"events"`
 }
 
@@ -436,6 +437,9 @@ func validate(op Operation) error {
 		return err
 	}
 	if err := validateUpdateAuthorization(op); err != nil {
+		return err
+	}
+	if err := validateUpdateExecution(op); err != nil {
 		return err
 	}
 	return nil

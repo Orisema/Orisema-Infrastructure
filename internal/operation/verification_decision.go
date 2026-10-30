@@ -156,23 +156,30 @@ func validatePersistedVerificationDecision(op Operation) error {
 		return nil
 	}
 	d := op.Decision
-	if d.At.IsZero() || d.At.Before(op.CreatedAt) || d.At != op.UpdatedAt {
+	if d.At.IsZero() || d.At.Before(op.CreatedAt) || d.At.After(op.UpdatedAt) {
 		return errors.New("persisted verification decision timestamp is invalid")
 	}
 	if d.Action != VerificationComplete && d.Action != VerificationRecoveryRequired {
 		return errors.New("persisted verification decision action is not terminal")
 	}
-	if d.TargetState != op.State || len(op.Events) < 2 {
+	if len(op.Events) < 2 || (d.TargetState != op.State && !(d.TargetState == RecoveryRequired && (op.State == RollingBack || op.State == RolledBack))) {
 		return errors.New("persisted verification decision does not describe the current state")
 	}
-	last := op.Events[len(op.Events)-1]
-	if last.At != d.At || last.From != Verifying || last.To != d.TargetState || last.Step != "verification-decision" || strings.TrimSpace(last.Detail) != d.Reason {
+	decisionIndex := -1
+	for i, event := range op.Events {
+		if event.At == d.At && event.From == Verifying && event.To == d.TargetState && event.Step == "verification-decision" && strings.TrimSpace(event.Detail) == d.Reason {
+			decisionIndex = i
+			break
+		}
+	}
+	if decisionIndex < 1 {
 		return errors.New("persisted verification decision has no matching transition event")
 	}
 	base := op
 	base.Decision = nil
+	base.Rollback = nil
 	base.State = Verifying
-	base.Events = append([]Event(nil), op.Events[:len(op.Events)-1]...)
+	base.Events = append([]Event(nil), op.Events[:decisionIndex]...)
 	base.UpdatedAt = base.Events[len(base.Events)-1].At
 	decision := decideAfterValidatedVerification(base, d.ObservedResources)
 	if !decision.TransitionAllowed || decision.Action != d.Action || decision.TargetState != d.TargetState || decision.Reason != d.Reason || !reflect.DeepEqual(decision.ResourceEvidence, d.ResourceEvidence) {

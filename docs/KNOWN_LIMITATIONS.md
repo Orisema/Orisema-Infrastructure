@@ -17,7 +17,8 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 - Docker, Windows e macOS.
 - O fluxo experimental Alpha 5 atualiza apenas um serviço elegível por vez;
   `deploy` continua bloqueando `DRIFT` e `REVIEW`.
-- Rollback público, rollback de dados, backup/restore e migrações de volume.
+- Rollback de dados, backup/restore e migrações de volume. O rollback público
+  existente restaura somente o container da aplicação preservado pelo update.
 - Gerenciamento de secrets, variáveis de ambiente, volumes, limites de
   recursos, redes personalizadas e permissões avançadas no manifesto.
 - Identidade autenticada do operador ou journal resistente a adulteração.

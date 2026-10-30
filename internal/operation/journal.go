@@ -41,22 +41,23 @@ type Event struct {
 }
 
 type Operation struct {
-	Version      int                            `json:"version"`
-	ID           string                         `json:"id"`
-	Application  string                         `json:"application"`
-	Services     []string                       `json:"services"`
-	Type         string                         `json:"type"`
-	State        State                          `json:"state"`
-	CreatedAt    time.Time                      `json:"createdAt"`
-	UpdatedAt    time.Time                      `json:"updatedAt"`
-	Resources    []Resource                     `json:"resources,omitempty"`
-	Previous     string                         `json:"previous,omitempty"`
-	Failure      string                         `json:"failure,omitempty"`
-	RecoveryData string                         `json:"recoveryData,omitempty"`
-	Health       *HealthVerification            `json:"health,omitempty"`
-	Decision     *PersistedVerificationDecision `json:"decision,omitempty"`
-	Intent       *UpdateIntent                  `json:"intent,omitempty"`
-	Events       []Event                        `json:"events"`
+	Version       int                            `json:"version"`
+	ID            string                         `json:"id"`
+	Application   string                         `json:"application"`
+	Services      []string                       `json:"services"`
+	Type          string                         `json:"type"`
+	State         State                          `json:"state"`
+	CreatedAt     time.Time                      `json:"createdAt"`
+	UpdatedAt     time.Time                      `json:"updatedAt"`
+	Resources     []Resource                     `json:"resources,omitempty"`
+	Previous      string                         `json:"previous,omitempty"`
+	Failure       string                         `json:"failure,omitempty"`
+	RecoveryData  string                         `json:"recoveryData,omitempty"`
+	Health        *HealthVerification            `json:"health,omitempty"`
+	Decision      *PersistedVerificationDecision `json:"decision,omitempty"`
+	Intent        *UpdateIntent                  `json:"intent,omitempty"`
+	Authorization *UpdateAuthorization           `json:"authorization,omitempty"`
+	Events        []Event                        `json:"events"`
 }
 
 type Store struct{ root string }
@@ -432,6 +433,9 @@ func validate(op Operation) error {
 		return err
 	}
 	if err := validateUpdateIntent(op); err != nil {
+		return err
+	}
+	if err := validateUpdateAuthorization(op); err != nil {
 		return err
 	}
 	return nil

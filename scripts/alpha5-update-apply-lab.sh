@@ -10,11 +10,14 @@ old_image="${ORISEMA_OLD_IMAGE:-docker.io/library/nginx:1.26-alpine}"
 new_image="${ORISEMA_NEW_IMAGE:-docker.io/library/nginx:1.27-alpine}"
 health_command="${ORISEMA_HEALTH_COMMAND:-nginx -t}"
 expected_decision="${ORISEMA_EXPECT_DECISION:-COMPLETE}"
+force_candidate_stop="${ORISEMA_FORCE_CANDIDATE_STOP:-false}"
+rollback_after_failure="${ORISEMA_ROLLBACK_AFTER_FAILURE:-false}"
 target=orisema-alpha5-apply-web
 external=orisema-alpha5-apply-external
 external_volume=orisema-alpha5-apply-data
 port=18089
 backup=""
+failed=""
 
 mkdir -p "$evidence"
 manifest="$evidence/manifest.yaml"
@@ -24,6 +27,9 @@ cleanup() {
 	podman rm --force --time 0 "$target" >/dev/null 2>&1 || true
 	if [ -n "$backup" ]; then
 		podman rm --force --time 0 "$backup" >/dev/null 2>&1 || true
+	fi
+	if [ -n "$failed" ]; then
+		podman rm --force --time 0 "$failed" >/dev/null 2>&1 || true
 	fi
 	podman rm --force --time 0 "$external" >/dev/null 2>&1 || true
   podman volume rm "$external_volume" >/dev/null 2>&1 || true
@@ -92,21 +98,45 @@ if [ "$expected_decision" = COMPLETE ]; then
   expected_state=COMPLETED
 else
   test "$expected_decision" = RECOVERY_REQUIRED
-  for probe in 1 2 3; do
-    if podman healthcheck run "$target" >> "$evidence/candidate-health.txt" 2>&1; then
-      echo 'unhealthy laboratory probe unexpectedly succeeded' >&2
-      exit 1
-    fi
-  done
-  for attempt in 1 2 3; do
+  if [ "$force_candidate_stop" = true ]; then
+    podman stop --time 0 "$target" > "$evidence/candidate-stop.txt"
     "$binary" update verify "$manifest" web --journal "$journal" \
-      --operation "$operation_id" | tee -a "$evidence/verify.txt"
-  done
+      --operation "$operation_id" | tee "$evidence/verify.txt"
+  else
+    for probe in 1 2 3; do
+      if podman healthcheck run "$target" >> "$evidence/candidate-health.txt" 2>&1; then
+        echo 'unhealthy laboratory probe unexpectedly succeeded' >&2
+        exit 1
+      fi
+    done
+    for attempt in 1 2 3; do
+      "$binary" update verify "$manifest" web --journal "$journal" \
+        --operation "$operation_id" | tee -a "$evidence/verify.txt"
+    done
+  fi
   expected_state=RECOVERY_REQUIRED
 fi
 grep -Fq "decision: $expected_decision" "$evidence/verify.txt"
 grep -Fq "state=$expected_state" "$evidence/verify.txt"
 grep -Fq "\"state\": \"$expected_state\"" "$journal/$operation_id.json"
+
+if [ "$rollback_after_failure" = true ]; then
+  test "$expected_state" = RECOVERY_REQUIRED
+  failed="orisema-failed-${operation_id#update-}"
+  printf 'ROLLBACK UPDATE alpha5-apply/web %s\n' "$operation_id" | \
+    "$binary" update rollback "$manifest" web --journal "$journal" \
+      --operation "$operation_id" | tee "$evidence/rollback.txt"
+  test "$(podman inspect --format '{{.Id}}' "$target")" = "$old_id"
+  test "$(podman inspect --format '{{.State.Running}}' "$target")" = true
+  test "$(podman inspect --format '{{.Id}}' "$failed")" = "$new_id"
+  test "$(podman inspect --format '{{.State.Running}}' "$failed")" = false
+  podman healthcheck run "$target" > "$evidence/rollback-health.txt"
+  "$binary" update rollback-verify "$manifest" web --journal "$journal" \
+    --operation "$operation_id" | tee "$evidence/rollback-verify.txt"
+  grep -Fq 'decision=ROLLED_BACK' "$evidence/rollback-verify.txt"
+  grep -Fq '"state": "ROLLED_BACK"' "$journal/$operation_id.json"
+  expected_state=ROLLED_BACK
+fi
 
 test "$(podman inspect --format '{{.Id}}' "$external")" = "$external_id"
 test "$(podman inspect --format '{{.State.Running}}' "$external")" = true
@@ -114,7 +144,7 @@ podman volume inspect "$external_volume" > "$evidence/external-volume-after.json
 cmp "$evidence/external-volume-before.json" "$evidence/external-volume-after.json"
 
 "$binary" operation diagnose --journal "$journal" | tee "$evidence/diagnosis.txt"
-if [ "$expected_state" = COMPLETED ]; then
+if [ "$expected_state" = COMPLETED ] || [ "$expected_state" = ROLLED_BACK ]; then
   grep -Fq '  none' "$evidence/diagnosis.txt"
 else
   grep -Fq 'state=RECOVERY_REQUIRED' "$evidence/diagnosis.txt"

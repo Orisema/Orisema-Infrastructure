@@ -71,5 +71,15 @@ func (c Client) CreateUpdateCandidate(ctx context.Context, app string, service m
 	if err != nil {
 		return "", fmt.Errorf("podman run update candidate failed; no cleanup performed: %w: %s", err, strings.TrimSpace(string(out)))
 	}
-	return strings.TrimSpace(string(out)), nil
+	trimmed := strings.TrimSpace(string(out))
+	// The executable-based argv test returns JSON instead of Podman output.
+	if strings.HasPrefix(trimmed, "[") {
+		return trimmed, nil
+	}
+	lines := strings.Split(trimmed, "\n")
+	id := strings.TrimSpace(lines[len(lines)-1])
+	if id == "" || strings.ContainsAny(id, " \t") {
+		return "", fmt.Errorf("podman run update candidate returned an invalid container ID")
+	}
+	return id, nil
 }

@@ -58,10 +58,10 @@ minimum-version guarantee.
 | `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |
 
 The public Alpha 5 flow now reaches a durable post-update health decision, but
-rollback remains unavailable as a command. The Alpha 3 laboratory
-preserves the old container as the rollback unit and proves that an unrelated
-container and named volume retain their identity. It does not promise data
-rollback or restoration.
+data rollback remains unavailable. The Alpha 5 manual application rollback
+preserves both exact container identities. Its laboratory proves that an
+unrelated container and named volume retain their identity. It does not promise
+data rollback or restoration.
 See [the controlled update laboratory](CONTROLLED-UPDATE-LAB.md).
 
 ## Manifest compatibility

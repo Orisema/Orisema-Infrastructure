@@ -218,7 +218,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify> ... OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
 func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -227,7 +227,9 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	authorize := len(args) == 8 && args[1] == "authorize" && args[4] == "--journal" && args[6] == "--operation"
 	apply := len(args) == 8 && args[1] == "apply" && args[4] == "--journal" && args[6] == "--operation"
 	verify := len(args) == 8 && args[1] == "verify" && args[4] == "--journal" && args[6] == "--operation"
-	if !planOnly && !prepare && !authorize && !apply && !verify {
+	rollback := len(args) == 8 && args[1] == "rollback" && args[4] == "--journal" && args[6] == "--operation"
+	rollbackVerify := len(args) == 8 && args[1] == "rollback-verify" && args[4] == "--journal" && args[6] == "--operation"
+	if !planOnly && !prepare && !authorize && !apply && !verify && !rollback && !rollbackVerify {
 		printUsage(stderr)
 		return 2
 	}
@@ -238,6 +240,12 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	}
 	if verify {
 		return runUpdateVerify(*m, args[3], args[5], args[7], stdout, stderr)
+	}
+	if rollback {
+		return runUpdateRollback(*m, args[3], args[5], args[7], stdin, stdout, stderr)
+	}
+	if rollbackVerify {
+		return runUpdateRollbackVerify(*m, args[3], args[5], args[7], stdout, stderr)
 	}
 	if authorize {
 		service, journal, id := args[3], args[5], args[7]
@@ -574,6 +582,203 @@ func inspectUpdateVerificationResources(ctx context.Context, client runtime.Clie
 	return []operation.Resource{resource(op.IntentResourceName(), candidate), resource(op.Execution.BackupName, previous)}, candidate, nil
 }
 
+func runUpdateRollback(m manifest.Manifest, service, journal, id string, stdin io.Reader, stdout, stderr io.Writer) int {
+	store, err := operation.OpenStore(journal)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	op, err := store.Load(id)
+	if err != nil || op.Intent == nil || op.Execution == nil || op.Decision == nil || op.State != operation.RecoveryRequired || op.Application != m.Name || op.Intent.Service != service {
+		fmt.Fprintln(stderr, "rollback blocked: operation is not an intact RECOVERY_REQUIRED update for this manifest and service")
+		return 1
+	}
+	confirmation := "ROLLBACK UPDATE " + m.Name + "/" + service + " " + id
+	fmt.Fprintf(stdout, "Type %s to restore the preserved application container: ", confirmation)
+	answer, readErr := bufio.NewReader(stdin).ReadString('\n')
+	if readErr != nil || strings.TrimSpace(answer) != confirmation {
+		fmt.Fprintln(stderr, "cancelled; journal and runtime unchanged")
+		return 1
+	}
+	client := runtime.Client{}
+	containers, err := client.List(context.Background())
+	if err != nil {
+		fmt.Fprintf(stderr, "rollback blocked: list runtime containers: %v\n", err)
+		return 1
+	}
+	configurationMatches := false
+	for _, step := range planner.BuildInspected(context.Background(), &m, containers, client) {
+		if step.Name == op.IntentResourceName() && step.Action == planner.Noop {
+			configurationMatches = true
+			break
+		}
+	}
+	if !configurationMatches {
+		fmt.Fprintln(stderr, "rollback blocked: candidate no longer matches the declared supported configuration")
+		return 1
+	}
+	failedName := "orisema-failed-" + strings.TrimPrefix(id, "update-")
+	if _, exists := runtime.Find(containers, failedName); exists {
+		fmt.Fprintln(stderr, "rollback blocked: failed-candidate diagnostic slot already exists")
+		return 1
+	}
+	observed, _, err := inspectRollbackResources(context.Background(), client, op, false)
+	if err != nil {
+		fmt.Fprintf(stderr, "rollback blocked: %v\n", err)
+		return 1
+	}
+	if _, err = store.BeginUpdateRollback(id, failedName, observed, time.Time{}); err != nil {
+		fmt.Fprintf(stderr, "rollback blocked: %v\n", err)
+		return 1
+	}
+	if err = client.Control(context.Background(), m.Name, service, "stop"); err != nil {
+		fmt.Fprintf(stderr, "rollback stopped before candidate preservation: %v; inspect operation %s\n", err, id)
+		return 1
+	}
+	if _, err = store.RecordUpdateRollbackStep(id, "candidate-stopped", time.Time{}); err != nil {
+		fmt.Fprintf(stderr, "journal failed after candidate stop: %v\n", err)
+		return 1
+	}
+	if _, err = store.PrepareUpdateRollbackStep(id, "rename-candidate", time.Time{}); err != nil {
+		fmt.Fprintf(stderr, "journal failed before candidate rename: %v\n", err)
+		return 1
+	}
+	if err = client.RenameContainer(context.Background(), op.IntentResourceName(), failedName); err != nil {
+		fmt.Fprintf(stderr, "rollback stopped while preserving failed candidate: %v; inspect operation %s\n", err, id)
+		return 1
+	}
+	if _, err = store.RecordUpdateRollbackStep(id, "candidate-renamed", time.Time{}); err != nil {
+		fmt.Fprintf(stderr, "journal failed after candidate rename: %v\n", err)
+		return 1
+	}
+	if _, err = store.PrepareUpdateRollbackStep(id, "rename-previous", time.Time{}); err != nil {
+		fmt.Fprintf(stderr, "journal failed before previous rename: %v\n", err)
+		return 1
+	}
+	if err = client.RenameContainer(context.Background(), op.Execution.BackupName, op.IntentResourceName()); err != nil {
+		fmt.Fprintf(stderr, "rollback stopped before restored start: %v; inspect operation %s\n", err, id)
+		return 1
+	}
+	if _, err = store.RecordUpdateRollbackStep(id, "previous-renamed", time.Time{}); err != nil {
+		fmt.Fprintf(stderr, "journal failed after previous rename: %v\n", err)
+		return 1
+	}
+	if _, err = store.PrepareUpdateRollbackStep(id, "start-previous", time.Time{}); err != nil {
+		fmt.Fprintf(stderr, "journal failed before restored start: %v\n", err)
+		return 1
+	}
+	if err = client.Control(context.Background(), m.Name, service, "start"); err != nil {
+		fmt.Fprintf(stderr, "rollback restored the previous name but start failed: %v; inspect operation %s\n", err, id)
+		return 1
+	}
+	op, err = store.RecordUpdateRollbackStep(id, "previous-started", time.Time{})
+	if err != nil {
+		fmt.Fprintf(stderr, "journal failed after restored start: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Previous application container restored; failed candidate preserved as %s; state=%s\n", failedName, op.State)
+	fmt.Fprintln(stdout, "Run update rollback-verify explicitly. No data restore, cleanup, retry, or external-resource mutation was performed.")
+	return 0
+}
+
+func runUpdateRollbackVerify(m manifest.Manifest, service, journal, id string, stdout, stderr io.Writer) int {
+	store, err := operation.OpenStore(journal)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	op, err := store.Load(id)
+	if err != nil || op.Intent == nil || op.Rollback == nil || op.Application != m.Name || op.Intent.Service != service || op.State != operation.RollingBack || !op.Rollback.PreviousStarted || op.Rollback.PendingStep != "" {
+		fmt.Fprintln(stderr, "rollback verification blocked: rollback is not ready for verification")
+		return 1
+	}
+	client := runtime.Client{}
+	containers, err := client.List(context.Background())
+	if err != nil {
+		fmt.Fprintf(stderr, "rollback verification blocked: list runtime containers: %v\n", err)
+		return 1
+	}
+	oldManifest := m
+	oldManifest.Services = append([]manifest.Service(nil), m.Services...)
+	matchedOldConfiguration := false
+	for i := range oldManifest.Services {
+		if oldManifest.Services[i].Name == service {
+			oldManifest.Services[i].Image = op.Intent.CurrentImage
+		}
+	}
+	for _, step := range planner.BuildInspected(context.Background(), &oldManifest, containers, client) {
+		if step.Name == op.IntentResourceName() && step.Action == planner.Noop {
+			matchedOldConfiguration = true
+			break
+		}
+	}
+	if !matchedOldConfiguration {
+		fmt.Fprintln(stderr, "rollback verification blocked: restored container no longer matches its supported previous configuration")
+		return 1
+	}
+	observed, restored, err := inspectRollbackResources(context.Background(), client, op, true)
+	if err != nil {
+		fmt.Fprintf(stderr, "rollback verification blocked: %v\n", err)
+		return 1
+	}
+	present, status := restored.HealthEvidence()
+	if !restored.State.Running || restored.State.Status != "running" {
+		status = "not-running"
+	}
+	if !present {
+		status = "no-healthcheck"
+	}
+	op, err = store.RecordUpdateRollbackHealth(id, observed, status, time.Time{})
+	if err != nil {
+		fmt.Fprintf(stderr, "rollback verification blocked: %v\n", err)
+		return 1
+	}
+	decision := "WAIT"
+	if op.State == operation.RolledBack {
+		decision = "ROLLED_BACK"
+	}
+	fmt.Fprintf(stdout, "Rollback health observation: %s state=%s decision=%s\n", status, op.State, decision)
+	fmt.Fprintln(stdout, "No cleanup, data restore, retry, or external-resource mutation was performed.")
+	return 0
+}
+
+func inspectRollbackResources(ctx context.Context, client runtime.Client, op operation.Operation, restored bool) ([]operation.Resource, runtime.Inspection, error) {
+	if op.Intent == nil || op.Execution == nil {
+		return nil, runtime.Inspection{}, errors.New("rollback evidence is incomplete")
+	}
+	candidateName, previousName := op.IntentResourceName(), op.Execution.BackupName
+	if restored {
+		if op.Rollback == nil {
+			return nil, runtime.Inspection{}, errors.New("rollback boundary is missing")
+		}
+		candidateName, previousName = op.Rollback.FailedName, op.IntentResourceName()
+	}
+	candidate, err := client.Inspect(ctx, candidateName)
+	if err != nil {
+		return nil, runtime.Inspection{}, fmt.Errorf("inspect candidate: %w", err)
+	}
+	previous, err := client.Inspect(ctx, previousName)
+	if err != nil {
+		return nil, runtime.Inspection{}, fmt.Errorf("inspect preserved previous container: %w", err)
+	}
+	if candidate.ID != op.Execution.CandidateID || candidate.Config.Image != op.Intent.TargetImage || !runtime.Owned(candidate, op.Application, op.Intent.Service) {
+		return nil, runtime.Inspection{}, errors.New("candidate identity, image, or ownership changed")
+	}
+	if previous.ID != op.Execution.PreviousID || previous.Config.Image != op.Intent.CurrentImage || !runtime.Owned(previous, op.Application, op.Intent.Service) {
+		return nil, runtime.Inspection{}, errors.New("previous identity, image, or ownership changed")
+	}
+	if !restored && previous.State.Running {
+		return nil, runtime.Inspection{}, errors.New("preserved previous container is no longer stopped")
+	}
+	if restored && candidate.State.Running {
+		return nil, runtime.Inspection{}, errors.New("failed candidate is no longer stopped")
+	}
+	resource := func(name string, item runtime.Inspection) operation.Resource {
+		return operation.Resource{Kind: "container", Name: name, ID: item.ID, Ownership: operation.OwnershipManaged, Application: op.Application, Service: op.Intent.Service}
+	}
+	return []operation.Resource{resource(candidateName, candidate), resource(previousName, previous)}, previous, nil
+}
+
 func updateHealthPolicy(service manifest.Service) (operation.HealthPolicy, error) {
 	interval, err := time.ParseDuration(service.Healthcheck.Interval)
 	if err != nil {
@@ -660,6 +865,13 @@ func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {
 		}
 		if op.Decision != nil {
 			fmt.Fprintf(stdout, "    verification decision: %s -> %s\n", op.Decision.Action, op.Decision.TargetState)
+		}
+		if op.Rollback != nil {
+			pending := op.Rollback.PendingStep
+			if pending == "" {
+				pending = "none"
+			}
+			fmt.Fprintf(stdout, "    rollback: failed=%s pending=%s restored-started=%t health=%s\n", op.Rollback.FailedName, pending, op.Rollback.PreviousStarted, op.Rollback.HealthStatus)
 		}
 		fmt.Fprintf(stdout, "    reason: %s\n", assessment.Reason)
 	}

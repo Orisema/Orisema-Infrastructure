@@ -108,6 +108,17 @@ commits `COMPLETED`; terminal non-success commits `RECOVERY_REQUIRED`; an
 inconclusive observation reports `WAIT`. It performs no polling, retry, cleanup
 or rollback, and altered identities or ownership block the decision.
 
+`update rollback` accepts only a durable `RECOVERY_REQUIRED` update and requires
+the exact confirmation `ROLLBACK UPDATE application/service operation-id`. It
+revalidates the two exact containers, preserves the failed candidate under a
+diagnostic name and restores and starts the stopped previous container. Each
+mutation boundary is persisted first. It does not restore data or remove any
+container.
+
+`update rollback-verify` reinspects both exact containers and records the
+restored container's configured health. Only `healthy` commits `ROLLED_BACK`;
+other results remain `ROLLING_BACK` for explicit operator intervention.
+
 ## Scope and limits
 
 - YAML schemas: legacy `orisema.dev/v1alpha1` and current

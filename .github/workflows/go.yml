@@ -160,8 +160,16 @@ jobs:
             ORISEMA_HEALTH_COMMAND=false \
             ORISEMA_EXPECT_DECISION=RECOVERY_REQUIRED \
             scripts/alpha5-update-apply-lab.sh
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/alpha5-manual-rollback" \
+            ORISEMA_EXPECT_DECISION=RECOVERY_REQUIRED \
+            ORISEMA_FORCE_CANDIDATE_STOP=true \
+            ORISEMA_ROLLBACK_AFTER_FAILURE=true \
+            scripts/alpha5-update-apply-lab.sh
           sudo chown -R "$USER":"$(id -gn)" work/alpha5-update-apply
           sudo chown -R "$USER":"$(id -gn)" work/alpha5-update-health-failure
+          sudo chown -R "$USER":"$(id -gn)" work/alpha5-manual-rollback
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -179,6 +187,8 @@ jobs:
             work/alpha5-update-apply/*.txt
             work/alpha5-update-health-failure/*.json
             work/alpha5-update-health-failure/*.txt
+            work/alpha5-manual-rollback/*.json
+            work/alpha5-manual-rollback/*.txt
   quickstart-matrix:
     name: quickstart (${{ matrix.os }})
     strategy:

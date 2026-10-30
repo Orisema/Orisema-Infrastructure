@@ -109,5 +109,23 @@ ownership drift, image drift, concurrent decisions or journal inconsistency
 fail closed.
 
 Verification never polls, sleeps, changes Podman, removes the previous
-container, retries the update or executes rollback. `RECOVERY_REQUIRED` is a
-diagnostic state requiring explicit intervention.
+container, retries the update or executes rollback. `RECOVERY_REQUIRED` is the
+only state accepted by the explicit manual rollback.
+
+## Manual application rollback
+
+`update rollback` requires the exact confirmation `ROLLBACK UPDATE
+application/service operation-id`. It freshly validates both container IDs,
+images and ownership, persists `ROLLING_BACK` and every next mutation before
+stopping and renaming the failed candidate, restoring the preserved container
+to its original name and starting it. The failed candidate remains stopped
+under a unique diagnostic name; nothing is deleted.
+
+`update rollback-verify` is a separate, Podman-read-only step. It revalidates
+the restored and failed containers and records one health observation. Only a
+configured `healthy` result commits `ROLLED_BACK`; every other supported result
+remains `ROLLING_BACK`. Replay, changed identity, ownership or image, occupied
+diagnostic slots, incomplete steps and journal inconsistency fail closed.
+
+This is application-container rollback only. It never restores data, volumes,
+secrets or external resources and performs no automatic cleanup or resume.

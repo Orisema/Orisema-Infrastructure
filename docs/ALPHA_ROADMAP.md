@@ -105,7 +105,7 @@ Ainda não existe executor público de update ou rollback.
 - [x] Revalidar identidade e ownership sob exclusão por aplicação (#52).
 - [x] Executar update de um serviço com confirmação explícita (#54).
 - [x] Verificar saúde e decidir `COMPLETE` ou `RECOVERY_REQUIRED` (#56).
-- [ ] Expor rollback manual revalidado, sem prometer restauração de dados.
+- [x] Expor rollback manual revalidado, sem prometer restauração de dados (#60).
 
 **Gate:** nenhuma mutação sem journal, confirmação, ownership exato e caminho
 de recuperação; interrupções continuam diagnosticáveis e falham fechado.

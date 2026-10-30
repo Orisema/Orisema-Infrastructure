@@ -13,6 +13,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 - `update prepare`, que repete a inspeção e persiste uma intenção `PENDING`
   vinculada à identidade do contêiner e ao fingerprint determinístico do plano,
   sem modificar o runtime.
+- `update authorize`, com confirmação textual exata, validade de cinco minutos
+  e revalidação integral antes da transição atômica para `PREPARING`.
 
 ### Documentação
 

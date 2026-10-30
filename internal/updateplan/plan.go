@@ -24,6 +24,7 @@ type Step struct {
 	Service      string
 	Name         string
 	CurrentImage string
+	CurrentID    string
 	TargetImage  string
 	Action       Action
 	Reason       string
@@ -43,6 +44,7 @@ func Build(m *manifest.Manifest, inspected []planner.Step) []Step {
 		}
 		evidence := inspected[i]
 		step.CurrentImage = evidence.CurrentImage
+		step.CurrentID = evidence.CurrentID
 		switch evidence.Action {
 		case planner.Noop:
 			step.Action = Noop
@@ -50,7 +52,7 @@ func Build(m *manifest.Manifest, inspected []planner.Step) []Step {
 		case planner.Drift:
 			if len(evidence.Differences) != 1 || evidence.Differences[0] != "configured image differs" {
 				step.Reason = "update requires image-only drift; observed: " + evidence.Reason
-			} else if evidence.CurrentImage == "" || evidence.CurrentImage == service.Image {
+			} else if evidence.CurrentImage == "" || evidence.CurrentImage == service.Image || evidence.CurrentID == "" {
 				step.Reason = "current image evidence is missing or inconsistent"
 			} else if service.Healthcheck == nil {
 				step.Reason = "a declared healthcheck is required before update can be considered"

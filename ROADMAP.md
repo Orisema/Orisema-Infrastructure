@@ -50,6 +50,16 @@ incompletas sempre exigem intervenção.
 - [ ] Integrar verificação de saúde e decisão durável da Alpha 4.
 - [ ] Expor rollback manual somente com evidência revalidada.
 
+### Conectividade remota independente (decisão arquitetural)
+
+- [ ] Implementar SSH remoto seguro com autenticação por chave, verificação estrita da identidade do host, menor privilégio e auditoria.
+- [ ] Aceitar hosts alcançáveis por redes privadas/VPN já existentes, sem exigir contas ou serviços da comunidade Orisema.
+- [ ] Suportar bastion SSH/ProxyJump configurado pelo operador, sem provisionar infraestrutura central.
+- [ ] Validar inspeção remota somente leitura antes de permitir mutações, com testes para perda de conexão, CGNAT via rede previamente configurada e falha segura.
+- [ ] Manter integrações com WireGuard, Tailscale, Headscale ou equivalentes estritamente opcionais e administradas pelo usuário.
+
+**Princípio:** o Orisema Infrastructure funciona de maneira autônoma, sem dependência obrigatória de infraestrutura central, contas externas ou serviços hospedados pelo projeto. O Orisema não operará relay, VPN ou serviço de coordenação oficial. Atravessar NAT/CGNAT requer conectividade previamente estabelecida pelo operador (por VPN, proxy/bastion ou outro intermediário acessível); SSH isolado não garante esse acesso. Consulte [ADR 0002](docs/adr/0002-independent-connectivity.md).
+
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.
 - [ ] Integração opcional com monitoramento.

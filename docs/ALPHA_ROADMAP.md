@@ -101,7 +101,7 @@ Ainda não existe executor público de update ou rollback.
 ## Alpha 5 — Atualização pública conservadora
 
 - [x] Classificar candidatos a update sem modificar o runtime (#48).
-- [ ] Registrar plano e intenção imutáveis antes da execução.
+- [x] Registrar plano e intenção imutáveis antes da execução (#50).
 - [ ] Revalidar identidade e ownership sob exclusão por aplicação.
 - [ ] Executar update de um serviço com confirmação explícita.
 - [ ] Verificar saúde e decidir `COMPLETE` ou `RECOVERY_REQUIRED`.

@@ -44,6 +44,13 @@ type UpdateAuthorization struct {
 	ResourceEvidence  ResourceEvidence `json:"resourceEvidence"`
 }
 
+func (op Operation) IntentResourceName() string {
+	if len(op.Resources) == 0 {
+		return ""
+	}
+	return op.Resources[0].Name
+}
+
 func UpdatePlanFingerprint(application, service, resourceName, resourceID, currentImage, targetImage string) string {
 	payload := struct {
 		Contract       string   `json:"contract"`

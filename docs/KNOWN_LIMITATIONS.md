@@ -15,9 +15,9 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 
 - Produção, alta disponibilidade, múltiplos nós ou operação remota.
 - Docker, Windows e macOS.
-- Atualização ou substituição de contêiner existente. `DRIFT` e `REVIEW`
-  bloqueiam o deploy e exigem investigação manual.
-- Rollback de aplicação ou dados, backup/restore e migrações de volume.
+- O fluxo experimental Alpha 5 atualiza apenas um serviço elegível por vez;
+  `deploy` continua bloqueando `DRIFT` e `REVIEW`.
+- Rollback público, rollback de dados, backup/restore e migrações de volume.
 - Gerenciamento de secrets, variáveis de ambiente, volumes, limites de
   recursos, redes personalizadas e permissões avançadas no manifesto.
 - Identidade autenticada do operador ou journal resistente a adulteração.

@@ -48,8 +48,10 @@ Um plano de recuperação pode recomendar `START`, mas não executa a recomenda�
 O journal de operações da Alpha 4, em `internal/operation`, persiste snapshots
 versionados por escrita temporária, `fsync`, rename atômico e sincronização do
 diretório. Sua máquina de estados rejeita transições inválidas e a avaliação de
-operações incompletas é somente leitura. O componente ainda não executa nem
-autoriza update ou rollback; consulte
+operações incompletas é somente leitura. O fluxo Alpha 5 autoriza e executa a
+substituição de um serviço, preserva a unidade anterior e liga o candidato à
+verificação e decisão duráveis. Ele não executa rollback, limpeza nem retomada
+automática; consulte
 [ALPHA4-RECOVERY-DESIGN.md](ALPHA4-RECOVERY-DESIGN.md).
 
 ## Fora do escopo inicial

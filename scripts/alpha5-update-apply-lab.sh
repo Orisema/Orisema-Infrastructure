@@ -9,6 +9,7 @@ evidence="${ORISEMA_EVIDENCE_DIR:-$PWD/work/alpha5-update-apply}"
 old_image="${ORISEMA_OLD_IMAGE:-docker.io/library/nginx:1.26-alpine}"
 new_image="${ORISEMA_NEW_IMAGE:-docker.io/library/nginx:1.27-alpine}"
 health_command="${ORISEMA_HEALTH_COMMAND:-nginx -t}"
+expected_decision="${ORISEMA_EXPECT_DECISION:-COMPLETE}"
 target=orisema-alpha5-apply-web
 external=orisema-alpha5-apply-external
 external_volume=orisema-alpha5-apply-data
@@ -84,6 +85,28 @@ test "$(podman inspect --format '{{.Config.Image}}' "$backup")" = "$old_image"
 test "$(podman inspect --format '{{.State.Running}}' "$backup")" = false
 podman inspect "$target" > "$evidence/candidate.json"
 podman inspect "$backup" > "$evidence/preserved-previous.json"
+if [ "$expected_decision" = COMPLETE ]; then
+  podman healthcheck run "$target" > "$evidence/candidate-health.txt"
+  "$binary" update verify "$manifest" web --journal "$journal" \
+    --operation "$operation_id" | tee "$evidence/verify.txt"
+  expected_state=COMPLETED
+else
+  test "$expected_decision" = RECOVERY_REQUIRED
+  for probe in 1 2 3; do
+    if podman healthcheck run "$target" >> "$evidence/candidate-health.txt" 2>&1; then
+      echo 'unhealthy laboratory probe unexpectedly succeeded' >&2
+      exit 1
+    fi
+  done
+  for attempt in 1 2 3; do
+    "$binary" update verify "$manifest" web --journal "$journal" \
+      --operation "$operation_id" | tee -a "$evidence/verify.txt"
+  done
+  expected_state=RECOVERY_REQUIRED
+fi
+grep -Fq "decision: $expected_decision" "$evidence/verify.txt"
+grep -Fq "state=$expected_state" "$evidence/verify.txt"
+grep -Fq "\"state\": \"$expected_state\"" "$journal/$operation_id.json"
 
 test "$(podman inspect --format '{{.Id}}' "$external")" = "$external_id"
 test "$(podman inspect --format '{{.State.Running}}' "$external")" = true
@@ -91,5 +114,11 @@ podman volume inspect "$external_volume" > "$evidence/external-volume-after.json
 cmp "$evidence/external-volume-before.json" "$evidence/external-volume-after.json"
 
 "$binary" operation diagnose --journal "$journal" | tee "$evidence/diagnosis.txt"
-grep -Fq 'state=APPLYING' "$evidence/diagnosis.txt"
-printf 'Alpha 5 preserved update application passed.\n' | tee "$evidence/result.txt"
+if [ "$expected_state" = COMPLETED ]; then
+  grep -Fq '  none' "$evidence/diagnosis.txt"
+else
+  grep -Fq 'state=RECOVERY_REQUIRED' "$evidence/diagnosis.txt"
+  grep -Fq 'verification decision: RECOVERY_REQUIRED -> RECOVERY_REQUIRED' "$evidence/diagnosis.txt"
+fi
+printf 'Alpha 5 preserved update and %s health decision passed.\n' \
+  "$expected_decision" | tee "$evidence/result.txt"

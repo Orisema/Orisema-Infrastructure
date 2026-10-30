@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -217,7 +218,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply> ... OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify> ... OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
 func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -225,7 +226,8 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	prepare := len(args) == 6 && args[1] == "prepare" && args[4] == "--journal"
 	authorize := len(args) == 8 && args[1] == "authorize" && args[4] == "--journal" && args[6] == "--operation"
 	apply := len(args) == 8 && args[1] == "apply" && args[4] == "--journal" && args[6] == "--operation"
-	if !planOnly && !prepare && !authorize && !apply {
+	verify := len(args) == 8 && args[1] == "verify" && args[4] == "--journal" && args[6] == "--operation"
+	if !planOnly && !prepare && !authorize && !apply && !verify {
 		printUsage(stderr)
 		return 2
 	}
@@ -233,6 +235,9 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	if err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
+	}
+	if verify {
+		return runUpdateVerify(*m, args[3], args[5], args[7], stdout, stderr)
 	}
 	if authorize {
 		service, journal, id := args[3], args[5], args[7]
@@ -440,6 +445,166 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	return 0
 }
 
+func runUpdateVerify(m manifest.Manifest, service, journal, id string, stdout, stderr io.Writer) int {
+	store, err := operation.OpenStore(journal)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	op, err := store.Load(id)
+	if err != nil {
+		fmt.Fprintf(stderr, "update verification blocked: load operation journal: %v\n", err)
+		return 1
+	}
+	if op.Intent == nil || op.Execution == nil || op.Application != m.Name || op.Intent.Service != service || (op.State != operation.Applying && op.State != operation.Verifying) {
+		fmt.Fprintln(stderr, "update verification blocked: operation is not an APPLYING or VERIFYING update for this manifest and service")
+		return 1
+	}
+	var declared *manifest.Service
+	for i := range m.Services {
+		if m.Services[i].Name == service {
+			declared = &m.Services[i]
+			break
+		}
+	}
+	if declared == nil || declared.Healthcheck == nil {
+		fmt.Fprintln(stderr, "update verification blocked: declared service healthcheck is required")
+		return 1
+	}
+	client := runtime.Client{}
+	containers, err := client.List(context.Background())
+	if err != nil {
+		fmt.Fprintf(stderr, "update verification blocked: list runtime containers: %v\n", err)
+		return 1
+	}
+	configurationMatches := false
+	for _, step := range planner.BuildInspected(context.Background(), &m, containers, client) {
+		if step.Name == op.IntentResourceName() && step.Action == planner.Noop {
+			configurationMatches = true
+			break
+		}
+	}
+	if !configurationMatches || declared.Image != op.Intent.TargetImage {
+		fmt.Fprintln(stderr, "update verification blocked: candidate no longer matches the declared supported configuration and update intent")
+		return 1
+	}
+	observed, candidate, err := inspectUpdateVerificationResources(context.Background(), client, op)
+	if err != nil {
+		fmt.Fprintf(stderr, "update verification blocked: %v\n", err)
+		return 1
+	}
+	if op.State == operation.Applying {
+		policy, err := updateHealthPolicy(*declared)
+		if err != nil {
+			fmt.Fprintf(stderr, "update verification blocked: %v\n", err)
+			return 1
+		}
+		op, err = store.StartUpdateHealthVerification(id, policy, observed, time.Time{})
+		if err != nil {
+			fmt.Fprintf(stderr, "update verification blocked: %v\n", err)
+			return 1
+		}
+	} else if evidence := operation.RevalidateResources(op.Health.VerificationResources, observed); !evidence.Safe {
+		fmt.Fprintf(stderr, "update verification blocked: %s\n", firstEvidenceIssue(evidence))
+		return 1
+	}
+	if op.Health != nil && op.Health.Evaluation.Terminal {
+		return commitUpdateVerificationDecision(store, client, op, stdout, stderr)
+	}
+	present, status := candidate.HealthEvidence()
+	now := time.Now().UTC()
+	observation := operation.HealthObservation{At: now, RuntimeAvailable: true, Running: candidate.State.Running && candidate.State.Status == "running", HealthcheckPresent: present, Status: status}
+	op, err = store.RecordHealthObservation(id, observation, now)
+	if err != nil {
+		fmt.Fprintf(stderr, "update verification blocked: %v\n", err)
+		return 1
+	}
+	evaluation := op.Health.Evaluation
+	if !evaluation.Terminal {
+		fmt.Fprintf(stdout, "Update health observation: %s state=%s decision=WAIT\n", evaluation.Status, op.State)
+		fmt.Fprintf(stdout, "Reason: %s\n", evaluation.Reason)
+		fmt.Fprintln(stdout, "No runtime changes, retry, cleanup, or rollback performed.")
+		return 0
+	}
+	return commitUpdateVerificationDecision(store, client, op, stdout, stderr)
+}
+
+func commitUpdateVerificationDecision(store *operation.Store, client runtime.Client, op operation.Operation, stdout, stderr io.Writer) int {
+	fresh, _, err := inspectUpdateVerificationResources(context.Background(), client, op)
+	if err != nil {
+		fmt.Fprintf(stderr, "terminal health observed but decision blocked by fresh resource inspection: %v\n", err)
+		return 1
+	}
+	op, err = store.CommitVerificationDecision(op.ID, fresh, time.Time{})
+	if err != nil {
+		fmt.Fprintf(stderr, "update verification decision blocked: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Update health decision: %s state=%s health=%s\n", op.Decision.Action, op.State, op.Health.Evaluation.Status)
+	fmt.Fprintf(stdout, "Reason: %s\n", op.Decision.Reason)
+	fmt.Fprintln(stdout, "No runtime changes, cleanup, or rollback performed.")
+	return 0
+}
+
+func inspectUpdateVerificationResources(ctx context.Context, client runtime.Client, op operation.Operation) ([]operation.Resource, runtime.Inspection, error) {
+	if op.Execution == nil || op.Intent == nil || op.IntentResourceName() == "" || op.Execution.CandidateID == "" || op.Execution.PreviousID == "" || op.Execution.BackupName == "" {
+		return nil, runtime.Inspection{}, errors.New("update execution evidence is incomplete")
+	}
+	candidate, err := client.Inspect(ctx, op.IntentResourceName())
+	if err != nil {
+		return nil, runtime.Inspection{}, fmt.Errorf("inspect candidate: %w", err)
+	}
+	previous, err := client.Inspect(ctx, op.Execution.BackupName)
+	if err != nil {
+		return nil, runtime.Inspection{}, fmt.Errorf("inspect preserved previous container: %w", err)
+	}
+	if candidate.Config.Image != op.Intent.TargetImage {
+		return nil, runtime.Inspection{}, errors.New("candidate image no longer matches the update intent")
+	}
+	if previous.Config.Image != op.Intent.CurrentImage || previous.State.Running {
+		return nil, runtime.Inspection{}, errors.New("preserved previous container image or stopped state changed")
+	}
+	resource := func(name string, item runtime.Inspection) operation.Resource {
+		ownership := operation.OwnershipUnknown
+		if runtime.Owned(item, op.Application, op.Intent.Service) {
+			ownership = operation.OwnershipManaged
+		}
+		return operation.Resource{Kind: "container", Name: name, ID: item.ID, Ownership: ownership, Application: op.Application, Service: op.Intent.Service}
+	}
+	return []operation.Resource{resource(op.IntentResourceName(), candidate), resource(op.Execution.BackupName, previous)}, candidate, nil
+}
+
+func updateHealthPolicy(service manifest.Service) (operation.HealthPolicy, error) {
+	interval, err := time.ParseDuration(service.Healthcheck.Interval)
+	if err != nil {
+		return operation.HealthPolicy{}, err
+	}
+	probeTimeout, err := time.ParseDuration(service.Healthcheck.Timeout)
+	if err != nil {
+		return operation.HealthPolicy{}, err
+	}
+	window := probeTimeout
+	for range service.Healthcheck.Retries {
+		if window >= 30*time.Minute-interval {
+			window = 30 * time.Minute
+			break
+		}
+		window += interval
+	}
+	failures := service.Healthcheck.Retries
+	if failures > 10 {
+		failures = 10
+	}
+	return operation.HealthPolicy{Timeout: window, MaxConsecutiveUnhealthy: failures}, nil
+}
+
+func firstEvidenceIssue(evidence operation.ResourceEvidence) string {
+	if len(evidence.Issues) == 0 {
+		return "resource evidence changed"
+	}
+	return evidence.Issues[0]
+}
+
 func newOperationID() (string, error) {
 	random := make([]byte, 12)
 	if _, err := rand.Read(random); err != nil {
@@ -488,6 +653,13 @@ func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {
 				pending = "none"
 			}
 			fmt.Fprintf(stdout, "    pending runtime step: %s\n", pending)
+		}
+		if op.Health != nil {
+			fmt.Fprintf(stdout, "    health verification: status=%s terminal=%t observations=%d\n", op.Health.Evaluation.Status, op.Health.Evaluation.Terminal, len(op.Health.Observations))
+			fmt.Fprintf(stdout, "    health reason: %s\n", op.Health.Evaluation.Reason)
+		}
+		if op.Decision != nil {
+			fmt.Fprintf(stdout, "    verification decision: %s -> %s\n", op.Decision.Action, op.Decision.TargetState)
 		}
 		fmt.Fprintf(stdout, "    reason: %s\n", assessment.Reason)
 	}

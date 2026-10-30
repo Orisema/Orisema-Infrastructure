@@ -72,17 +72,25 @@ func TestUpdatePlanReportsImageOnlyCandidateWithoutMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 	logPath := filepath.Join(dir, "calls")
+	updateState := filepath.Join(dir, "candidate-created")
 	podmanPath := filepath.Join(dir, "podman")
 	script := fmt.Sprintf(`#!/bin/sh
 printf '%%s\n' "$*" >> %q
 case "$1" in
   ps) printf '%%s\n' '[{"Names":["orisema-demo-web"],"State":"running","Image":"nginx:old"}]' ;;
-  inspect) printf '%%s\n' '[{"Id":"container-123","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:old","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}}}]' ;;
+  inspect)
+    if [ -f %q ] && [ "$4" = "orisema-demo-web" ]; then
+      printf '%%s\n' '[{"Id":"candidate-456","Name":"orisema-demo-web","State":{"Status":"running","Running":true,"Healthcheck":{"Status":"healthy"}},"Config":{"Image":"nginx:new","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}}}]'
+    elif [ -f %q ]; then
+      printf '%%s\n' "[{\"Id\":\"container-123\",\"Name\":\"$4\",\"State\":{\"Status\":\"exited\",\"Running\":false},\"Config\":{\"Image\":\"nginx:old\",\"Labels\":{\"dev.orisema.managed\":\"true\",\"dev.orisema.app\":\"demo\",\"dev.orisema.service\":\"web\"},\"Healthcheck\":{\"Test\":[\"CMD-SHELL\",\"nginx -t\"],\"Interval\":30000000000,\"Timeout\":5000000000,\"Retries\":3}},\"HostConfig\":{\"PortBindings\":{},\"RestartPolicy\":{\"Name\":\"no\",\"MaximumRetryCount\":0}}}]"
+    else
+      printf '%%s\n' '[{"Id":"container-123","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:old","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}}}]'
+    fi ;;
   stop|rename) ;;
-  run) printf '%%s\n' 'candidate-456' ;;
+  run) touch %q; printf '%%s\n' 'candidate-456' ;;
   *) exit 91 ;;
 esac
-`, logPath)
+`, logPath, updateState, updateState, updateState)
 	if err := os.WriteFile(podmanPath, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -151,8 +159,18 @@ esac
 	}
 	stdout.Reset()
 	stderr.Reset()
+	code = run([]string{"update", "verify", manifestPath, "web", "--journal", journal, "--operation", operations[0].ID}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "decision: COMPLETE") || !strings.Contains(stdout.String(), "state=COMPLETED") || !strings.Contains(stdout.String(), "health=HEALTHY") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	verified, err := store.Load(operations[0].ID)
+	if err != nil || verified.State != operation.Completed || verified.Decision == nil || len(verified.Health.VerificationResources) != 2 {
+		t.Fatalf("verified=%#v err=%v", verified, err)
+	}
+	stdout.Reset()
+	stderr.Reset()
 	code = run([]string{"operation", "diagnose", "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
-	if code != 0 || !strings.Contains(stdout.String(), "update intent: service=web image=nginx:old -> nginx:new") || !strings.Contains(stdout.String(), operations[0].Intent.PlanFingerprint) || !strings.Contains(stdout.String(), "authorization: revalidated") {
+	if code != 0 || !strings.Contains(stdout.String(), "none") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }

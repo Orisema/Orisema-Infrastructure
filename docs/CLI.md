@@ -18,6 +18,7 @@ go run ./cmd/orisema update plan examples/nginx-health.yaml
 go run ./cmd/orisema update prepare examples/nginx-health.yaml web --journal /secure/path/orisema-operations
 go run ./cmd/orisema update authorize examples/nginx-health.yaml web --journal /secure/path/orisema-operations --operation <id>
 go run ./cmd/orisema update apply examples/nginx-health.yaml web --journal /secure/path/orisema-operations --operation <id>
+go run ./cmd/orisema update verify examples/nginx-health.yaml web --journal /secure/path/orisema-operations --operation <id>
 go mod tidy
 go test ./...
 go run ./cmd/orisema validate examples/nginx.yaml
@@ -99,6 +100,13 @@ container to a unique rollback name, then creates the declared candidate. The
 old container is preserved and failures receive no automatic cleanup, retry or
 rollback. A created candidate remains unverified; this command does not claim
 health or completion.
+
+`update verify` is read-only with respect to Podman and records one explicit
+post-update observation per invocation. It freshly revalidates the candidate
+and preserved previous container, then persists `VERIFYING`. Healthy evidence
+commits `COMPLETED`; terminal non-success commits `RECOVERY_REQUIRED`; an
+inconclusive observation reports `WAIT`. It performs no polling, retry, cleanup
+or rollback, and altered identities or ownership block the decision.
 
 ## Scope and limits
 

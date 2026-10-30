@@ -34,8 +34,9 @@ a Alpha 5 começa pela exposição somente leitura do plano de atualização.
 - [x] Definir verificação objetiva de saúde com timeout e falhas consecutivas.
 - [x] Persistir política, observações e avaliações de saúde em `VERIFYING`.
 - [x] Definir e persistir atomicamente a decisão pós-verificação elegível.
-- [ ] Conectar update/rollback somente após revalidação de ownership, journal
-  de intenção e confirmação explícita.
+- [x] Conectar update à verificação e decisão durável após revalidação de
+  ownership, journal de intenção e confirmação explícita (#56).
+- [ ] Conectar rollback manual somente após nova autorização e revalidação.
 
 Esta infraestrutura não executa retomada, update ou rollback. Operações
 incompletas sempre exigem intervenção.
@@ -47,7 +48,7 @@ incompletas sempre exigem intervenção.
 - [x] Exigir confirmação explícita e revalidar ownership imediatamente antes
   de qualquer mutação.
 - [x] Executar substituição de um serviço preservando a unidade anterior (#54).
-- [ ] Integrar verificação de saúde e decisão durável da Alpha 4.
+- [x] Integrar verificação de saúde e decisão durável da Alpha 4 (#56).
 - [ ] Expor rollback manual somente com evidência revalidada.
 
 ### Conectividade remota independente (decisão arquitetural)

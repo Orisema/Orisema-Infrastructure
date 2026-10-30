@@ -1,0 +1,28 @@
+name: Supply chain audit
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  sbom:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Generate CycloneDX SBOM
+        run: |
+          mkdir -p dist
+          go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1.9.0 mod -json -output dist/orisema-sbom.cdx.json .
+          test -s dist/orisema-sbom.cdx.json
+          python3 -m json.tool dist/orisema-sbom.cdx.json >/dev/null
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: orisema-cyclonedx-sbom
+          path: dist/orisema-sbom.cdx.json
+      - name: Advisory vulnerability scan (non-blocking)
+        continue-on-error: true
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

@@ -3,9 +3,8 @@
 Etapas propostas, sem datas prometidas.
 
 O plano verificável para as versões experimentais está em
-[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Issues #12 e #13 concluíram
-versionamento/distribuição e documentação/compatibilidade; regressão e segurança
-do release permanecem na Issue #14.
+[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–4 foram publicadas;
+a Alpha 5 começa pela exposição somente leitura do plano de atualização.
 
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.
@@ -40,6 +39,16 @@ do release permanecem na Issue #14.
 
 Esta infraestrutura não executa retomada, update ou rollback. Operações
 incompletas sempre exigem intervenção.
+
+### Alpha 5 — atualização pública conservadora
+
+- [x] Expor plano de update somente leitura e fail-closed.
+- [ ] Persistir intenção de update vinculada ao plano e à evidência observada.
+- [ ] Exigir confirmação explícita e revalidar ownership imediatamente antes
+  de qualquer mutação.
+- [ ] Executar substituição de um serviço preservando a unidade anterior.
+- [ ] Integrar verificação de saúde e decisão durável da Alpha 4.
+- [ ] Expor rollback manual somente com evidência revalidada.
 
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.

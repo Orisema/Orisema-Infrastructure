@@ -69,6 +69,12 @@ incompletas sempre exigem intervenção.
 
 **Princípio:** o Orisema Infrastructure funciona de maneira autônoma, sem dependência obrigatória de infraestrutura central, contas externas ou serviços hospedados pelo projeto. O Orisema não operará relay, VPN ou serviço de coordenação oficial. Atravessar NAT/CGNAT requer conectividade previamente estabelecida pelo operador (por VPN, proxy/bastion ou outro intermediário acessível); SSH isolado não garante esse acesso. Consulte [ADR 0002](docs/adr/0002-independent-connectivity.md).
 
+### Transparência da cadeia de suprimentos
+
+- [x] Adicionar geração de SBOM CycloneDX como artefato de CI.
+- [x] Adicionar verificação informativa de vulnerabilidades Go.
+- [ ] Publicar SBOM e checksum como ativos de cada release, com verificação automatizada.
+
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.
 - [ ] Integração opcional com monitoramento.

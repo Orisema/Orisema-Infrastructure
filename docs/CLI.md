@@ -17,6 +17,7 @@ go run ./cmd/orisema operation diagnose --journal /secure/path/orisema-operation
 go run ./cmd/orisema update plan examples/nginx-health.yaml
 go run ./cmd/orisema update prepare examples/nginx-health.yaml web --journal /secure/path/orisema-operations
 go run ./cmd/orisema update authorize examples/nginx-health.yaml web --journal /secure/path/orisema-operations --operation <id>
+go run ./cmd/orisema update apply examples/nginx-health.yaml web --journal /secure/path/orisema-operations --operation <id>
 go mod tidy
 go test ./...
 go run ./cmd/orisema validate examples/nginx.yaml
@@ -90,6 +91,14 @@ not ask for execution confirmation, pull an image or change Podman.
 read-only plan within five minutes of preparation. Matching fresh evidence
 atomically advances the journal to `PREPARING`; failure leaves it untouched.
 The command still performs no runtime mutation.
+
+`update apply` requires a fresh authorized `PREPARING` intent and the exact
+confirmation `APPLY UPDATE application/service`. It revalidates the complete
+plan, persists `APPLYING` and each pending mutation, stops and renames the old
+container to a unique rollback name, then creates the declared candidate. The
+old container is preserved and failures receive no automatic cleanup, retry or
+rollback. A created candidate remains unverified; this command does not claim
+health or completion.
 
 ## Scope and limits
 

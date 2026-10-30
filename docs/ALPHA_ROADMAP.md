@@ -103,7 +103,7 @@ Ainda não existe executor público de update ou rollback.
 - [x] Classificar candidatos a update sem modificar o runtime (#48).
 - [x] Registrar plano e intenção imutáveis antes da execução (#50).
 - [x] Revalidar identidade e ownership sob exclusão por aplicação (#52).
-- [ ] Executar update de um serviço com confirmação explícita.
+- [x] Executar update de um serviço com confirmação explícita (#54).
 - [ ] Verificar saúde e decidir `COMPLETE` ou `RECOVERY_REQUIRED`.
 - [ ] Expor rollback manual revalidado, sem prometer restauração de dados.
 

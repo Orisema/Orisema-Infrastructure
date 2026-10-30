@@ -34,6 +34,8 @@ func TestMain(m *testing.M) {
 				os.Exit(125)
 			}
 			json.NewEncoder(os.Stdout).Encode(os.Args[1:])
+		case "rename":
+			json.NewEncoder(os.Stdout).Encode(os.Args[1:])
 		case "inspect":
 			if os.Getenv("ORISEMA_INSPECT_UNOWNED") == "1" {
 				os.Stdout.WriteString(`[{"Name":"orisema-health-lab-web","Config":{"Image":"nginx:1.27","Labels":{}}}]`)
@@ -151,5 +153,54 @@ func TestDeployExplicitHostIPArguments(t *testing.T) {
 				t.Fatalf("argv = %#v; want publish %q", args, tc.want)
 			}
 		})
+	}
+}
+
+func TestUpdateRuntimeCommandsPreserveArgumentBoundaries(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ORISEMA_ARGV_HELPER", "1")
+	client := Client{Binary: binary}
+	if err := client.RenameContainer(context.Background(), "orisema-app-web", "orisema-rollback-id"); err != nil {
+		t.Fatal(err)
+	}
+	svc := manifest.Service{
+		Name: "web", Image: "nginx:1.27",
+		Ports:       []manifest.Port{{Host: 8080, Container: 80, HostIP: "127.0.0.1"}},
+		Healthcheck: &manifest.Healthcheck{Command: "nginx -t", Interval: "30s", Timeout: "5s", Retries: 3},
+		Restart:     &manifest.Restart{Policy: "on-failure", MaxRetries: 2},
+	}
+	out, err := client.CreateUpdateCandidate(context.Background(), "app", svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(out), &args); err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := json.Marshal([]string{"CMD-SHELL", "nginx -t"})
+	want := []string{"run", "--detach", "--name", "orisema-app-web", "--label", "dev.orisema.managed=true", "--label", "dev.orisema.app=app", "--label", "dev.orisema.service=web", "--security-opt", "no-new-privileges", "--health-cmd", string(encoded), "--health-interval", "30s", "--health-timeout", "5s", "--health-retries", "3", "--restart", "on-failure:2", "--publish", "127.0.0.1:8080:80/tcp", "nginx:1.27"}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("argv = %#v; want %#v", args, want)
+	}
+}
+
+func TestUpdateCandidateFailurePerformsNoCleanup(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker := t.TempDir() + "/removed"
+	t.Setenv("ORISEMA_ARGV_HELPER", "1")
+	t.Setenv("ORISEMA_RUN_FAIL", "1")
+	t.Setenv("ORISEMA_RM_MARKER", marker)
+	_, err = (Client{Binary: binary}).CreateUpdateCandidate(context.Background(), "health-lab", manifest.Service{Name: "web", Image: "nginx:1.27"})
+	if err == nil || !strings.Contains(err.Error(), "no cleanup performed") {
+		t.Fatalf("CreateUpdateCandidate() error = %v", err)
+	}
+	if _, statErr := os.Stat(marker); !os.IsNotExist(statErr) {
+		t.Fatalf("unexpected cleanup marker: %v", statErr)
 	}
 }

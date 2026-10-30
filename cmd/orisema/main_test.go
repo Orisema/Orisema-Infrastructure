@@ -78,6 +78,8 @@ printf '%%s\n' "$*" >> %q
 case "$1" in
   ps) printf '%%s\n' '[{"Names":["orisema-demo-web"],"State":"running","Image":"nginx:old"}]' ;;
   inspect) printf '%%s\n' '[{"Id":"container-123","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:old","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}}}]' ;;
+  stop|rename) ;;
+  run) printf '%%s\n' 'candidate-456' ;;
   *) exit 91 ;;
 esac
 `, logPath)
@@ -136,6 +138,16 @@ esac
 	authorized, err := store.Load(operations[0].ID)
 	if err != nil || authorized.State != operation.Preparing || authorized.Authorization == nil {
 		t.Fatalf("authorized=%#v err=%v", authorized, err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "apply", manifestPath, "web", "--journal", journal, "--operation", operations[0].ID}, strings.NewReader("APPLY UPDATE demo/web\n"), &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "candidate-456") || !strings.Contains(stdout.String(), "Previous container preserved") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	applied, err := store.Load(operations[0].ID)
+	if err != nil || applied.State != operation.Applying || applied.Execution == nil || applied.Execution.CandidateID != "candidate-456" || !applied.Execution.PreviousRenamed {
+		t.Fatalf("applied=%#v err=%v", applied, err)
 	}
 	stdout.Reset()
 	stderr.Reset()

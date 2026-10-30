@@ -1,4 +1,4 @@
-# Alpha 5 read-only update planning
+# Alpha 5 conservative update flow
 
 The first Alpha 5 slice exposes only conservative guidance:
 
@@ -58,3 +58,30 @@ drift leaves the snapshot unchanged.
 
 `PREPARING` means revalidated authorization, not execution. This command still
 cannot pull an image, stop, rename, create or remove a container.
+
+## Preserving replacement execution
+
+An authorized intent can execute its first runtime-changing slice:
+
+```sh
+orisema update apply manifest.yaml service \
+  --journal /secure/path/operations --operation update-...
+```
+
+The operator must type `APPLY UPDATE application/service` exactly. The command
+rebuilds the plan and requires the same container ID, ownership, image,
+configuration and fingerprint while the authorization is still fresh. Before
+the first mutation the journal enters `APPLYING`; it also persists each pending
+runtime step before stopping the old container, renaming it to the operation's
+unique rollback name, and creating the candidate under the declared service
+name. Successful step evidence records both container identities and names.
+
+The previous container is stopped and preserved, never removed. Candidate
+creation uses the declared managed labels, ports, restart policy and
+healthcheck. Any interruption or failure leaves the partial state and pending
+step diagnostic in the journal; this slice deliberately performs no automatic
+cleanup, retry, resume or rollback.
+
+Candidate creation is not update success. The operation remains `APPLYING` and
+no health conclusion is inferred. Health verification and the durable decision
+to complete or require recovery belong to the next Alpha 5 slice.

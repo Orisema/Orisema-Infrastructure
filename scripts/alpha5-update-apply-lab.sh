@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Copyright 2026 Orisema contributors
+# SPDX-License-Identifier: Apache-2.0
+
+set -euo pipefail
+
+binary="${ORISEMA_BINARY:-$PWD/work/orisema}"
+evidence="${ORISEMA_EVIDENCE_DIR:-$PWD/work/alpha5-update-apply}"
+old_image="${ORISEMA_OLD_IMAGE:-docker.io/library/nginx:1.26-alpine}"
+new_image="${ORISEMA_NEW_IMAGE:-docker.io/library/nginx:1.27-alpine}"
+health_command="${ORISEMA_HEALTH_COMMAND:-nginx -t}"
+target=orisema-alpha5-apply-web
+external=orisema-alpha5-apply-external
+external_volume=orisema-alpha5-apply-data
+port=18089
+backup=""
+
+mkdir -p "$evidence"
+manifest="$evidence/manifest.yaml"
+journal="$evidence/journal"
+
+cleanup() {
+	podman rm --force --time 0 "$target" >/dev/null 2>&1 || true
+	if [ -n "$backup" ]; then
+		podman rm --force --time 0 "$backup" >/dev/null 2>&1 || true
+	fi
+	podman rm --force --time 0 "$external" >/dev/null 2>&1 || true
+  podman volume rm "$external_volume" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+cleanup
+
+sed -e "s|NEW_IMAGE|$new_image|" -e "s|HEALTH_COMMAND|$health_command|" > "$manifest" <<'YAML'
+apiVersion: orisema.dev/v1alpha2
+kind: Application
+name: alpha5-apply
+services:
+  - name: web
+    image: NEW_IMAGE
+    ports:
+      - host: 18089
+        container: 80
+        hostIP: 127.0.0.1
+    healthcheck:
+      command: "HEALTH_COMMAND"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+YAML
+
+podman volume create "$external_volume" > "$evidence/external-volume-create.txt"
+podman run --detach --name "$external" --volume "$external_volume:/external" \
+  "$old_image" > "$evidence/external-create.txt"
+external_id="$(podman inspect --format '{{.Id}}' "$external")"
+podman volume inspect "$external_volume" > "$evidence/external-volume-before.json"
+
+podman run --detach --name "$target" \
+  --label dev.orisema.managed=true \
+  --label dev.orisema.app=alpha5-apply \
+  --label dev.orisema.service=web \
+  --security-opt no-new-privileges \
+  --publish "127.0.0.1:$port:80/tcp" \
+  --health-cmd "[\"CMD-SHELL\",\"$health_command\"]" \
+  --health-interval 30s --health-timeout 5s --health-retries 3 \
+  "$old_image" > "$evidence/old-create.txt"
+old_id="$(podman inspect --format '{{.Id}}' "$target")"
+podman inspect "$target" > "$evidence/state-before.json"
+
+"$binary" update prepare "$manifest" web --journal "$journal" | tee "$evidence/prepare.txt"
+operation_id="$(awk '/^Update intent persisted:/ {print $4}' "$evidence/prepare.txt")"
+test -n "$operation_id"
+printf 'AUTHORIZE UPDATE alpha5-apply/web\n' | \
+  "$binary" update authorize "$manifest" web --journal "$journal" --operation "$operation_id" | tee "$evidence/authorize.txt"
+printf 'APPLY UPDATE alpha5-apply/web\n' | \
+  "$binary" update apply "$manifest" web --journal "$journal" --operation "$operation_id" | tee "$evidence/apply.txt"
+
+backup="orisema-rollback-${operation_id#update-}"
+new_id="$(podman inspect --format '{{.Id}}' "$target")"
+test "$new_id" != "$old_id"
+test "$(podman inspect --format '{{.Config.Image}}' "$target")" = "$new_image"
+test "$(podman inspect --format '{{.State.Running}}' "$target")" = true
+test "$(podman inspect --format '{{.Id}}' "$backup")" = "$old_id"
+test "$(podman inspect --format '{{.Config.Image}}' "$backup")" = "$old_image"
+test "$(podman inspect --format '{{.State.Running}}' "$backup")" = false
+podman inspect "$target" > "$evidence/candidate.json"
+podman inspect "$backup" > "$evidence/preserved-previous.json"
+
+test "$(podman inspect --format '{{.Id}}' "$external")" = "$external_id"
+test "$(podman inspect --format '{{.State.Running}}' "$external")" = true
+podman volume inspect "$external_volume" > "$evidence/external-volume-after.json"
+cmp "$evidence/external-volume-before.json" "$evidence/external-volume-after.json"
+
+"$binary" operation diagnose --journal "$journal" | tee "$evidence/diagnosis.txt"
+grep -Fq 'state=APPLYING' "$evidence/diagnosis.txt"
+printf 'Alpha 5 preserved update application passed.\n' | tee "$evidence/result.txt"

@@ -217,14 +217,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update plan <manifest.yaml> OR orisema update prepare <manifest.yaml> <service> --journal <directory> OR orisema update authorize <manifest.yaml> <service> --journal <directory> --operation <id> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply> ... OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
 func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	planOnly := len(args) == 3 && args[1] == "plan"
 	prepare := len(args) == 6 && args[1] == "prepare" && args[4] == "--journal"
 	authorize := len(args) == 8 && args[1] == "authorize" && args[4] == "--journal" && args[6] == "--operation"
-	if !planOnly && !prepare && !authorize {
+	apply := len(args) == 8 && args[1] == "apply" && args[4] == "--journal" && args[6] == "--operation"
+	if !planOnly && !prepare && !authorize && !apply {
 		printUsage(stderr)
 		return 2
 	}
@@ -257,6 +258,26 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			return 1
 		}
 	}
+	if apply {
+		service, journal, id := args[3], args[5], args[7]
+		readStore, err := operation.OpenExistingStore(journal)
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		op, err := readStore.Load(id)
+		if err != nil || op.Intent == nil || op.Authorization == nil || op.State != operation.Preparing || op.Application != m.Name || op.Intent.Service != service {
+			fmt.Fprintln(stderr, "error: operation is not an authorized PREPARING intent for this manifest and service")
+			return 1
+		}
+		confirmation := "APPLY UPDATE " + m.Name + "/" + service
+		fmt.Fprintf(stdout, "Type %s to start runtime mutation: ", confirmation)
+		answer, readErr := bufio.NewReader(stdin).ReadString('\n')
+		if readErr != nil || strings.TrimSpace(answer) != confirmation {
+			fmt.Fprintln(stderr, "cancelled; journal and runtime unchanged")
+			return 1
+		}
+	}
 	client := runtime.Client{}
 	containers, err := client.List(context.Background())
 	if err != nil {
@@ -265,6 +286,76 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	}
 	evidence := planner.BuildInspected(context.Background(), m, containers, client)
 	steps := updateplan.Build(m, evidence)
+	if apply {
+		service, journal, id := args[3], args[5], args[7]
+		var candidate *updateplan.Step
+		var declared *manifest.Service
+		for i := range steps {
+			if steps[i].Service == service {
+				candidate = &steps[i]
+				declared = &m.Services[i]
+				break
+			}
+		}
+		if candidate == nil || candidate.Action != updateplan.Candidate {
+			fmt.Fprintln(stderr, "update execution blocked: fresh plan is no longer an update candidate")
+			return 1
+		}
+		backupName := "orisema-rollback-" + strings.TrimPrefix(id, "update-")
+		if _, exists := runtime.Find(containers, backupName); exists {
+			fmt.Fprintln(stderr, "update execution blocked: rollback slot already exists")
+			return 1
+		}
+		fingerprint := operation.UpdatePlanFingerprint(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.TargetImage)
+		observed := []operation.Resource{{Kind: "container", Name: candidate.Name, ID: candidate.CurrentID, Ownership: operation.OwnershipManaged, Application: m.Name, Service: candidate.Service}}
+		store, err := operation.OpenStore(journal)
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		if _, err := store.BeginUpdateExecution(id, fingerprint, backupName, observed, time.Time{}); err != nil {
+			fmt.Fprintf(stderr, "update execution blocked: %v\n", err)
+			return 1
+		}
+		if err := client.Control(context.Background(), m.Name, service, "stop"); err != nil {
+			fmt.Fprintf(stderr, "update stopped before rename: %v; inspect operation %s\n", err, id)
+			return 1
+		}
+		if _, err := store.RecordUpdateExecutionStep(id, "previous-stopped", "", time.Time{}); err != nil {
+			fmt.Fprintf(stderr, "journal failed after stopping previous container: %v\n", err)
+			return 1
+		}
+		if _, err := store.PrepareUpdateExecutionStep(id, "rename-previous", time.Time{}); err != nil {
+			fmt.Fprintf(stderr, "journal failed before renaming previous container: %v\n", err)
+			return 1
+		}
+		if err := client.RenameContainer(context.Background(), candidate.Name, backupName); err != nil {
+			fmt.Fprintf(stderr, "update stopped after preserving previous container state: %v; inspect operation %s\n", err, id)
+			return 1
+		}
+		if _, err := store.RecordUpdateExecutionStep(id, "previous-renamed", "", time.Time{}); err != nil {
+			fmt.Fprintf(stderr, "journal failed after renaming previous container: %v\n", err)
+			return 1
+		}
+		if _, err := store.PrepareUpdateExecutionStep(id, "create-candidate", time.Time{}); err != nil {
+			fmt.Fprintf(stderr, "journal failed before candidate creation: %v\n", err)
+			return 1
+		}
+		candidateID, err := client.CreateUpdateCandidate(context.Background(), m.Name, *declared)
+		if err != nil {
+			fmt.Fprintf(stderr, "candidate creation failed; previous container remains preserved as %s: %v\n", backupName, err)
+			return 1
+		}
+		op, err := store.RecordUpdateExecutionStep(id, "candidate-created", candidateID, time.Time{})
+		if err != nil {
+			fmt.Fprintf(stderr, "journal failed after candidate creation: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Update candidate created: %s state=%s\n", candidateID, op.State)
+		fmt.Fprintf(stdout, "Previous container preserved as: %s\n", backupName)
+		fmt.Fprintln(stdout, "No health success, cleanup, or rollback has been inferred or executed.")
+		return 0
+	}
 	if authorize {
 		service, journal, id := args[3], args[5], args[7]
 		var candidate *updateplan.Step
@@ -389,6 +480,14 @@ func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "    update intent: service=%s image=%s -> %s\n", op.Intent.Service, op.Intent.CurrentImage, op.Intent.TargetImage)
 			fmt.Fprintf(stdout, "    plan fingerprint: %s\n", op.Intent.PlanFingerprint)
 			fmt.Fprintf(stdout, "    authorization: %s\n", map[bool]string{true: "revalidated", false: "pending"}[op.Authorization != nil])
+		}
+		if op.Execution != nil {
+			fmt.Fprintf(stdout, "    update execution: previous=%s backup=%s candidate=%s\n", op.Execution.PreviousID, op.Execution.BackupName, op.Execution.CandidateID)
+			pending := op.Execution.PendingStep
+			if pending == "" {
+				pending = "none"
+			}
+			fmt.Fprintf(stdout, "    pending runtime step: %s\n", pending)
 		}
 		fmt.Fprintf(stdout, "    reason: %s\n", assessment.Reason)
 	}

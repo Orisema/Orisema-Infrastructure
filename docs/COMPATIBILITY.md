@@ -47,6 +47,7 @@ minimum-version guarantee.
 | `update plan` | Yes | No | Image-only candidate guidance; never authorizes execution |
 | `update prepare` | Yes | Journal only | Persists one plan-bound intent; never changes Podman |
 | `update authorize` | Yes | Journal only | Confirms and revalidates intent; never changes Podman |
+| `update apply` | Yes | Yes | Revalidates, preserves the stopped previous container and creates one unverified candidate |
 | `status`, `diagnose` | Yes | No | Present distinct runtime and health observations |
 | `logs` | Yes | No | Returns the last 100 lines; does not follow |
 | `deploy` | Yes | Yes | Creates only `CREATE` services after confirmation |
@@ -55,10 +56,11 @@ minimum-version guarantee.
 | `recover prepare` | Yes | Journal only | Reserves an eligible START; does not start it |
 | `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |
 
-Controlled update and application rollback are exercised only by the Alpha 3
-laboratory; they are not public CLI commands. The laboratory preserves the old
-container as the rollback unit and proves that an unrelated container and named
-volume retain their identity. It does not promise data rollback or restoration.
+The public Alpha 5 flow now reaches preserved candidate creation, but health
+decision and rollback remain unavailable commands. The Alpha 3 laboratory
+preserves the old container as the rollback unit and proves that an unrelated
+container and named volume retain their identity. It does not promise data
+rollback or restoration.
 See [the controlled update laboratory](CONTROLLED-UPDATE-LAB.md).
 
 ## Manifest compatibility

@@ -55,6 +55,7 @@ type Operation struct {
 	RecoveryData string                         `json:"recoveryData,omitempty"`
 	Health       *HealthVerification            `json:"health,omitempty"`
 	Decision     *PersistedVerificationDecision `json:"decision,omitempty"`
+	Intent       *UpdateIntent                  `json:"intent,omitempty"`
 	Events       []Event                        `json:"events"`
 }
 
@@ -428,6 +429,9 @@ func validate(op Operation) error {
 		return err
 	}
 	if err := validatePersistedVerificationDecision(op); err != nil {
+		return err
+	}
+	if err := validateUpdateIntent(op); err != nil {
 		return err
 	}
 	return nil

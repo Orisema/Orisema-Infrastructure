@@ -45,6 +45,7 @@ minimum-version guarantee.
 | `validate` | No | No | Validates the current manifest contract |
 | `plan` | Yes | No | Compares only supported declared fields |
 | `update plan` | Yes | No | Image-only candidate guidance; never authorizes execution |
+| `update prepare` | Yes | Journal only | Persists one plan-bound intent; never changes Podman |
 | `status`, `diagnose` | Yes | No | Present distinct runtime and health observations |
 | `logs` | Yes | No | Returns the last 100 lines; does not follow |
 | `deploy` | Yes | Yes | Creates only `CREATE` services after confirmation |

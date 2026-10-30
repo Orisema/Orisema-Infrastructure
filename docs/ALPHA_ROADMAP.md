@@ -113,7 +113,7 @@ de recuperação; interrupções continuam diagnosticáveis e falham fechado.
 ## Fase 2 após Alpha 5 — Backup e operação remota
 
 - [x] Definir fronteira segura, formato e integridade de backup (#62).
-- [ ] Implementar e testar backup/restore de configuração e histórico.
+- [x] Implementar e testar backup/restore de configuração e histórico (#64).
 - [ ] Implementar SSH estrito e inspeção remota somente leitura.
 
 Backup de dados persistentes permanece fora do escopo até existir um contrato

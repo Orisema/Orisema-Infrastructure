@@ -57,10 +57,11 @@ minimum-version guarantee.
 | `recover prepare` | Yes | Journal only | Reserves an eligible START; does not start it |
 | `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |
 
-Backup/restore executable commands are not available yet. The accepted
-[architecture](BACKUP-RESTORE-DESIGN.md) initially covers only validated
-configuration and optional read-only operation history. It explicitly excludes
-volumes, application data, secrets and credentials.
+Backup/restore commands are available experimentally on Linux and cover only
+validated configuration plus optional read-only operation history. Atomic
+no-replace publication uses the Linux kernel. The commands explicitly exclude
+volumes, application data, secrets and credentials; see the
+[design](BACKUP-RESTORE-DESIGN.md).
 
 The public Alpha 5 flow now reaches a durable post-update health decision, but
 data rollback remains unavailable. The Alpha 5 manual application rollback

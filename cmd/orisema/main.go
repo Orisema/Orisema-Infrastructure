@@ -36,7 +36,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runOperationDiagnosis(args, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "update" {
-		return runUpdateCommand(args, stdout, stderr)
+		return runUpdateCommand(args, stdin, stdout, stderr)
 	}
 	if len(args) < 2 {
 		printUsage(stderr)
@@ -217,13 +217,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update plan <manifest.yaml> OR orisema update prepare <manifest.yaml> <service> --journal <directory> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update plan <manifest.yaml> OR orisema update prepare <manifest.yaml> <service> --journal <directory> OR orisema update authorize <manifest.yaml> <service> --journal <directory> --operation <id> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
-func runUpdateCommand(args []string, stdout, stderr io.Writer) int {
+func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	planOnly := len(args) == 3 && args[1] == "plan"
 	prepare := len(args) == 6 && args[1] == "prepare" && args[4] == "--journal"
-	if !planOnly && !prepare {
+	authorize := len(args) == 8 && args[1] == "authorize" && args[4] == "--journal" && args[6] == "--operation"
+	if !planOnly && !prepare && !authorize {
 		printUsage(stderr)
 		return 2
 	}
@@ -231,6 +232,30 @@ func runUpdateCommand(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
+	}
+	if authorize {
+		service, journal, id := args[3], args[5], args[7]
+		readStore, err := operation.OpenExistingStore(journal)
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		op, err := readStore.Load(id)
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		if op.Intent == nil || op.Application != m.Name || op.Intent.Service != service {
+			fmt.Fprintln(stderr, "error: operation intent does not match the requested manifest and service")
+			return 1
+		}
+		confirmation := "AUTHORIZE UPDATE " + m.Name + "/" + service
+		fmt.Fprintf(stdout, "Type %s to authorize preparation: ", confirmation)
+		answer, readErr := bufio.NewReader(stdin).ReadString('\n')
+		if readErr != nil || strings.TrimSpace(answer) != confirmation {
+			fmt.Fprintln(stderr, "cancelled; journal and runtime unchanged")
+			return 1
+		}
 	}
 	client := runtime.Client{}
 	containers, err := client.List(context.Background())
@@ -240,6 +265,39 @@ func runUpdateCommand(args []string, stdout, stderr io.Writer) int {
 	}
 	evidence := planner.BuildInspected(context.Background(), m, containers, client)
 	steps := updateplan.Build(m, evidence)
+	if authorize {
+		service, journal, id := args[3], args[5], args[7]
+		var candidate *updateplan.Step
+		for i := range steps {
+			if steps[i].Service == service {
+				candidate = &steps[i]
+				break
+			}
+		}
+		if candidate == nil || candidate.Action != updateplan.Candidate {
+			reason := "service is not an update candidate"
+			if candidate != nil {
+				reason = candidate.Reason
+			}
+			fmt.Fprintf(stderr, "update authorization blocked: %s\n", reason)
+			return 1
+		}
+		fingerprint := operation.UpdatePlanFingerprint(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.TargetImage)
+		observed := []operation.Resource{{Kind: "container", Name: candidate.Name, ID: candidate.CurrentID, Ownership: operation.OwnershipManaged, Application: m.Name, Service: candidate.Service}}
+		store, err := operation.OpenStore(journal)
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		op, err := store.AuthorizeUpdateIntent(id, fingerprint, observed, time.Time{})
+		if err != nil {
+			fmt.Fprintf(stderr, "update authorization blocked: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Update intent authorized: %s state=%s\n", op.ID, op.State)
+		fmt.Fprintln(stdout, "No image pulled or runtime changes made.")
+		return 0
+	}
 	if prepare {
 		service := args[3]
 		var candidate *updateplan.Step
@@ -330,6 +388,7 @@ func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {
 		if op.Intent != nil {
 			fmt.Fprintf(stdout, "    update intent: service=%s image=%s -> %s\n", op.Intent.Service, op.Intent.CurrentImage, op.Intent.TargetImage)
 			fmt.Fprintf(stdout, "    plan fingerprint: %s\n", op.Intent.PlanFingerprint)
+			fmt.Fprintf(stdout, "    authorization: %s\n", map[bool]string{true: "revalidated", false: "pending"}[op.Authorization != nil])
 		}
 		fmt.Fprintf(stdout, "    reason: %s\n", assessment.Reason)
 	}

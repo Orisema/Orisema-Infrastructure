@@ -38,3 +38,23 @@ This is not a cryptographic signature or protection against an attacker who can
 rewrite the entire private journal. It does not request execution confirmation,
 pull an image or mutate Podman. A future executor must collect fresh evidence
 and must not treat the persisted fingerprint as sufficient authorization.
+
+## Explicit authorization
+
+A pending intent can be authorized for preparation during its five-minute
+validity window:
+
+```sh
+orisema update authorize manifest.yaml service \
+  --journal /secure/path/operations --operation update-...
+```
+
+The operator must type `AUTHORIZE UPDATE application/service` exactly. The
+command then rebuilds the live plan and requires the same container ID,
+ownership, current/target images, supported configuration and fingerprint. Only
+then does the journal atomically move from `PENDING` to `PREPARING`, preserving
+the fresh resource evidence. Wrong confirmation, expiry, concurrency or any
+drift leaves the snapshot unchanged.
+
+`PREPARING` means revalidated authorization, not execution. This command still
+cannot pull an image, stop, rename, create or remove a container.

@@ -44,7 +44,7 @@ incompletas sempre exigem intervenção.
 
 - [x] Expor plano de update somente leitura e fail-closed.
 - [x] Persistir intenção de update vinculada ao plano e à evidência observada.
-- [ ] Exigir confirmação explícita e revalidar ownership imediatamente antes
+- [x] Exigir confirmação explícita e revalidar ownership imediatamente antes
   de qualquer mutação.
 - [ ] Executar substituição de um serviço preservando a unidade anterior.
 - [ ] Integrar verificação de saúde e decisão durável da Alpha 4.

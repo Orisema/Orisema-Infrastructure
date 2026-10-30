@@ -112,10 +112,35 @@ esac
 	if err != nil || len(operations) != 1 || operations[0].Intent == nil || operations[0].Intent.Service != "web" || operations[0].Resources[0].ID != "container-123" {
 		t.Fatalf("operations=%#v err=%v", operations, err)
 	}
+	beforeCancel, err := directorySnapshot(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "authorize", manifestPath, "web", "--journal", journal, "--operation", operations[0].ID}, strings.NewReader("NO\n"), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "journal and runtime unchanged") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	afterCancel, _ := directorySnapshot(journal)
+	if beforeCancel != afterCancel {
+		t.Fatal("cancelled authorization changed journal")
+	}
+	stdout.Reset()
+	stderr.Reset()
+	confirmation := "AUTHORIZE UPDATE demo/web\n"
+	code = run([]string{"update", "authorize", manifestPath, "web", "--journal", journal, "--operation", operations[0].ID}, strings.NewReader(confirmation), &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "state=PREPARING") || !strings.Contains(stdout.String(), "No image pulled or runtime changes made") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	authorized, err := store.Load(operations[0].ID)
+	if err != nil || authorized.State != operation.Preparing || authorized.Authorization == nil {
+		t.Fatalf("authorized=%#v err=%v", authorized, err)
+	}
 	stdout.Reset()
 	stderr.Reset()
 	code = run([]string{"operation", "diagnose", "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
-	if code != 0 || !strings.Contains(stdout.String(), "update intent: service=web image=nginx:old -> nginx:new") || !strings.Contains(stdout.String(), operations[0].Intent.PlanFingerprint) {
+	if code != 0 || !strings.Contains(stdout.String(), "update intent: service=web image=nginx:old -> nginx:new") || !strings.Contains(stdout.String(), operations[0].Intent.PlanFingerprint) || !strings.Contains(stdout.String(), "authorization: revalidated") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }

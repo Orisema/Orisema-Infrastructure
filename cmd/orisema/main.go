@@ -6,6 +6,8 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -34,7 +36,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runOperationDiagnosis(args, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "update" {
-		return runUpdatePlan(args, stdout, stderr)
+		return runUpdateCommand(args, stdout, stderr)
 	}
 	if len(args) < 2 {
 		printUsage(stderr)
@@ -215,11 +217,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update plan <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update plan <manifest.yaml> OR orisema update prepare <manifest.yaml> <service> --journal <directory> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
-func runUpdatePlan(args []string, stdout, stderr io.Writer) int {
-	if len(args) != 3 || args[1] != "plan" {
+func runUpdateCommand(args []string, stdout, stderr io.Writer) int {
+	planOnly := len(args) == 3 && args[1] == "plan"
+	prepare := len(args) == 6 && args[1] == "prepare" && args[4] == "--journal"
+	if !planOnly && !prepare {
 		printUsage(stderr)
 		return 2
 	}
@@ -236,6 +240,46 @@ func runUpdatePlan(args []string, stdout, stderr io.Writer) int {
 	}
 	evidence := planner.BuildInspected(context.Background(), m, containers, client)
 	steps := updateplan.Build(m, evidence)
+	if prepare {
+		service := args[3]
+		var candidate *updateplan.Step
+		for i := range steps {
+			if steps[i].Service == service {
+				candidate = &steps[i]
+				break
+			}
+		}
+		if candidate == nil {
+			fmt.Fprintf(stderr, "error: service %q not declared in manifest\n", service)
+			return 1
+		}
+		if candidate.Action != updateplan.Candidate {
+			fmt.Fprintf(stderr, "update intent blocked for %s: %s\n", candidate.Name, candidate.Reason)
+			return 1
+		}
+		store, err := operation.OpenStore(args[5])
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		id, err := newOperationID()
+		if err != nil {
+			fmt.Fprintf(stderr, "error: generate operation ID: %v\n", err)
+			return 1
+		}
+		op, err := store.CreateUpdateIntent(operation.UpdateIntentRequest{
+			ID: id, Application: m.Name, Service: candidate.Service, ResourceName: candidate.Name,
+			ResourceID: candidate.CurrentID, CurrentImage: candidate.CurrentImage, TargetImage: candidate.TargetImage,
+		})
+		if err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Update intent persisted: %s\n", op.ID)
+		fmt.Fprintf(stdout, "Plan fingerprint: %s\n", op.Intent.PlanFingerprint)
+		fmt.Fprintln(stdout, "No confirmation requested, image pulled, or runtime changes made.")
+		return 0
+	}
 	fmt.Fprintf(stdout, "Read-only update plan for %q:\n", m.Name)
 	for _, step := range steps {
 		fmt.Fprintf(stdout, "  [%s] %s: %s\n", step.Action, step.Name, step.Reason)
@@ -245,6 +289,14 @@ func runUpdatePlan(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintln(stdout, "Candidates are guidance only. No journal created, confirmation requested, or runtime changes made.")
 	return 0
+}
+
+func newOperationID() (string, error) {
+	random := make([]byte, 12)
+	if _, err := rand.Read(random); err != nil {
+		return "", err
+	}
+	return "update-" + hex.EncodeToString(random), nil
 }
 
 func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {
@@ -275,6 +327,10 @@ func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "    automatic resume safe: %t\n", assessment.ResumeSafe)
 		fmt.Fprintf(stdout, "    rollback candidate: %t\n", assessment.RollbackCandidate)
 		fmt.Fprintf(stdout, "    ownership evidence complete: %t (managed=%d; external=%d)\n", assessment.OwnershipComplete, assessment.ManagedResources, assessment.ExternalResources)
+		if op.Intent != nil {
+			fmt.Fprintf(stdout, "    update intent: service=%s image=%s -> %s\n", op.Intent.Service, op.Intent.CurrentImage, op.Intent.TargetImage)
+			fmt.Fprintf(stdout, "    plan fingerprint: %s\n", op.Intent.PlanFingerprint)
+		}
 		fmt.Fprintf(stdout, "    reason: %s\n", assessment.Reason)
 	}
 	fmt.Fprintln(stdout, "No runtime inspection or changes made.")

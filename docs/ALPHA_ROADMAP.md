@@ -1,6 +1,6 @@
 # Orisema Infrastructure — Alpha release plan
 
-Status: **plano ativo, atualizado em 28/10/2026**. Não representa promessa de
+Status: **plano ativo, atualizado em 30/10/2026**. Não representa promessa de
 datas nem declara funcionalidade de produção.
 
 ## Base existente
@@ -86,6 +86,29 @@ de rollback documentados.
 **Estado:** gate concluído. As versões `v0.1.0-alpha.2` e
 `v0.1.0-alpha.3` são publicadas como pré-releases reproduzíveis, com binários
 Linux AMD64/ARM64, checksums e verificação de instalação no CI.
+
+## v0.1.0-alpha.4 — Recuperação confiável
+
+- [x] Journal atômico e máquina de estados de operações.
+- [x] Exclusão de operação concorrente por aplicação.
+- [x] Diagnóstico somente leitura e ownership estruturado.
+- [x] Avaliação e persistência determinística de saúde.
+- [x] Decisão pós-verificação persistida com evidência revalidada.
+
+**Estado:** gate concluído e pré-release publicada com instalação verificada.
+Ainda não existe executor público de update ou rollback.
+
+## Alpha 5 — Atualização pública conservadora
+
+- [x] Classificar candidatos a update sem modificar o runtime (#48).
+- [ ] Registrar plano e intenção imutáveis antes da execução.
+- [ ] Revalidar identidade e ownership sob exclusão por aplicação.
+- [ ] Executar update de um serviço com confirmação explícita.
+- [ ] Verificar saúde e decidir `COMPLETE` ou `RECOVERY_REQUIRED`.
+- [ ] Expor rollback manual revalidado, sem prometer restauração de dados.
+
+**Gate:** nenhuma mutação sem journal, confirmação, ownership exato e caminho
+de recuperação; interrupções continuam diagnosticáveis e falham fechado.
 
 ## Beta e futuro (fora do Alpha inicial)
 

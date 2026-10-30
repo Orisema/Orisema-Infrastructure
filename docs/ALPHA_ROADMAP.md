@@ -110,6 +110,10 @@ Ainda não existe executor público de update ou rollback.
 **Gate:** nenhuma mutação sem journal, confirmação, ownership exato e caminho
 de recuperação; interrupções continuam diagnosticáveis e falham fechado.
 
+## Integração opcional futura — Orisema Data
+
+O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integração será precedida por RFC e laboratório com serviço simulado. Não é requisito para as Alphas 1–5; Gera Base fica fora do escopo.
+
 ## Beta e futuro (fora do Alpha inicial)
 
 - Matriz ampliada de distribuições/Podman; adaptador Docker somente após testes.

@@ -15,6 +15,7 @@ do not query Podman.
 go run ./cmd/orisema version
 go run ./cmd/orisema operation diagnose --journal /secure/path/orisema-operations
 go run ./cmd/orisema update plan examples/nginx-health.yaml
+go run ./cmd/orisema update prepare examples/nginx-health.yaml web --journal /secure/path/orisema-operations
 go mod tidy
 go test ./...
 go run ./cmd/orisema validate examples/nginx.yaml
@@ -78,6 +79,11 @@ The `plan` command inspects Podman and compares selected declared fields only. I
 managed ownership plus image-only drift and a declared healthcheck. Every other
 difference is blocked. It does not create an operation journal or authorize an
 update; see [ALPHA5-UPDATE-PLAN.md](ALPHA5-UPDATE-PLAN.md).
+
+`update prepare` repeats that read-only inspection for one declared service and
+persists an exact `PENDING` intent in the Alpha 4 journal. It records container
+identity, previous/target image and a deterministic plan fingerprint. It does
+not ask for execution confirmation, pull an image or change Podman.
 
 ## Scope and limits
 

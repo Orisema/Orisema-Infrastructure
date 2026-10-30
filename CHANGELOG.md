@@ -10,6 +10,9 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 - `update plan` somente leitura, que reconhece como candidato apenas drift
   exclusivo de imagem com ownership válido e healthcheck declarado.
+- `update prepare`, que repete a inspeção e persiste uma intenção `PENDING`
+  vinculada à identidade do contêiner e ao fingerprint determinístico do plano,
+  sem modificar o runtime.
 
 ### Documentação
 

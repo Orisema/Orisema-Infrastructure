@@ -18,3 +18,23 @@ ownership ambiguity, absent healthchecks and compound drift are `BLOCKED`.
 Candidate status is not authorization to update. A later slice must persist the
 intent and previous resource evidence, acquire application exclusion, request
 explicit confirmation and revalidate immediately before any mutation.
+
+## Persisted intent
+
+An eligible service can now be recorded without executing it:
+
+```sh
+orisema update prepare manifest.yaml service --journal /secure/path/operations
+```
+
+The command repeats the live read-only plan, then creates one `PENDING` Alpha 4
+operation containing the exact container ID, current and target images,
+comparison contract, previous-resource evidence and a deterministic SHA-256
+plan fingerprint. The existing per-application exclusion prevents concurrent
+intents. Reopening the journal recomputes the fingerprint and rejects accidental
+or partial alteration.
+
+This is not a cryptographic signature or protection against an attacker who can
+rewrite the entire private journal. It does not request execution confirmation,
+pull an image or mutate Podman. A future executor must collect fresh evidence
+and must not treat the persisted fingerprint as sufficient authorization.

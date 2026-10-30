@@ -4,6 +4,18 @@ Todas as mudanças relevantes deste projeto são registradas neste arquivo. O
 formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o
 versionamento usa SemVer com identificadores de pré-lançamento.
 
+## [Unreleased]
+
+### Adicionado
+
+- `update plan` somente leitura, que reconhece como candidato apenas drift
+  exclusivo de imagem com ownership válido e healthcheck declarado.
+
+### Documentação
+
+- Estado da Alpha 4 reconciliado com a persistência de decisões publicada e
+  roadmap estendido para os gates conservadores da Alpha 5.
+
 ## [0.1.0-alpha.4] - 2026-10-29
 
 ### Adicionado

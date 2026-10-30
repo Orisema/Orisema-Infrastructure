@@ -19,6 +19,7 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
 	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
+	"github.com/Orisema/Orisema-Infrastructure/internal/updateplan"
 )
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -31,6 +32,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if len(args) > 0 && args[0] == "operation" {
 		return runOperationDiagnosis(args, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "update" {
+		return runUpdatePlan(args, stdout, stderr)
 	}
 	if len(args) < 2 {
 		printUsage(stderr)
@@ -211,7 +215,36 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update plan <manifest.yaml> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+}
+
+func runUpdatePlan(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 3 || args[1] != "plan" {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	client := runtime.Client{}
+	containers, err := client.List(context.Background())
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	evidence := planner.BuildInspected(context.Background(), m, containers, client)
+	steps := updateplan.Build(m, evidence)
+	fmt.Fprintf(stdout, "Read-only update plan for %q:\n", m.Name)
+	for _, step := range steps {
+		fmt.Fprintf(stdout, "  [%s] %s: %s\n", step.Action, step.Name, step.Reason)
+		if step.Action == updateplan.Candidate {
+			fmt.Fprintf(stdout, "    image: %s -> %s\n", step.CurrentImage, step.TargetImage)
+		}
+	}
+	fmt.Fprintln(stdout, "Candidates are guidance only. No journal created, confirmation requested, or runtime changes made.")
+	return 0
 }
 
 func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {

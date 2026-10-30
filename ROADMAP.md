@@ -10,7 +10,7 @@ a Alpha 5 começa pela exposição somente leitura do plano de atualização.
 - [x] Criar organização e repositório públicos.
 - [x] Publicar manifesto e documentação inicial.
 - [x] Escolher licença open source (Apache-2.0).
-- [ ] Definir mantenedores e decisões arquiteturais.
+- [x] Definir mantenedores e decisões arquiteturais (ver [GOVERNANCE.md](GOVERNANCE.md) e [ADR 0001](docs/adr/0001-initial-governance.md)).
 
 ## Fase 1 — MVP
 - [x] Definir esquema de manifesto YAML versionado.

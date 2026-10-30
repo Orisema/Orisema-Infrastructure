@@ -1,7 +1,7 @@
 # Alpha 4 reliable recovery design
 
-Status: first safe implementation slice. No update or rollback mutation is
-exposed by the CLI.
+Status: released in `v0.1.0-alpha.4`. No update or rollback mutation is exposed
+by the CLI.
 
 ## Audit of the existing recovery journal
 
@@ -80,8 +80,8 @@ deterministic evaluation are then written into the same operation snapshot.
 Reopening the store preserves the complete sequence. A refresh can record a
 timeout without inventing a probe, and a terminal evaluation rejects further
 observations. Persisted evaluation data is recomputed during load; mismatch or
-corruption fails closed. No result currently triggers an operation transition
-or runtime action.
+corruption fails closed. A result can inform the separately persisted decision
+below, but never triggers a runtime action.
 
 ## Post-verification decision
 
@@ -90,5 +90,11 @@ resource observation. Non-terminal health returns `WAIT`. Only `HEALTHY` plus
 exactly matching managed and external resource evidence permits `COMPLETE`.
 Any other terminal health result permits only `RECOVERY_REQUIRED`, with
 intervention still required. Missing, unknown, duplicate or changed ownership,
-identity or scope returns `BLOCKED`. The decision does not persist its target
-state and cannot execute runtime actions.
+identity or scope returns `BLOCKED`.
+
+Eligible `COMPLETE` and `RECOVERY_REQUIRED` decisions are re-evaluated after
+reloading the snapshot under the operation lock, then persisted atomically with
+their timestamp, supplied observation, evidence and reason. `WAIT` and
+`BLOCKED` never change the journal. Duplicate or concurrent commits and
+persisted evidence that no longer recomputes identically fail closed. This
+transition still cannot query or mutate Podman, retry or execute rollback.

@@ -64,6 +64,42 @@ func TestVersionRejectsExtraArguments(t *testing.T) {
 	}
 }
 
+func TestUpdatePlanReportsImageOnlyCandidateWithoutMutation(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	manifestData := "apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:new\n    healthcheck:\n      command: nginx -t\n      interval: 30s\n      timeout: 5s\n      retries: 3\n"
+	if err := os.WriteFile(manifestPath, []byte(manifestData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(dir, "calls")
+	podmanPath := filepath.Join(dir, "podman")
+	script := fmt.Sprintf(`#!/bin/sh
+printf '%%s\n' "$*" >> %q
+case "$1" in
+  ps) printf '%%s\n' '[{"Names":["orisema-demo-web"],"State":"running","Image":"nginx:old"}]' ;;
+  inspect) printf '%%s\n' '[{"Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:old","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}}}]' ;;
+  *) exit 91 ;;
+esac
+`, logPath)
+	if err := os.WriteFile(podmanPath, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"update", "plan", manifestPath}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "[UPDATE_CANDIDATE]") || !strings.Contains(stdout.String(), "nginx:old -> nginx:new") || !strings.Contains(stdout.String(), "No journal created") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	calls, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(calls)), "\n")
+	if len(lines) != 2 || !strings.HasPrefix(lines[0], "ps ") || !strings.HasPrefix(lines[1], "inspect ") {
+		t.Fatalf("unexpected Podman calls: %q", calls)
+	}
+}
+
 func TestOperationDiagnosisIsReadOnlyAndConservative(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "operations")
 	store, err := operation.OpenStore(root)

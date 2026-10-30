@@ -20,6 +20,7 @@ type Step struct {
 	Name         string
 	Image        string
 	CurrentImage string
+	CurrentID    string
 	State        string
 	Action       Action
 	Differences  []string

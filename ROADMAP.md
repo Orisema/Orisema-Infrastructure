@@ -54,3 +54,19 @@ incompletas sempre exigem intervenção.
 - [ ] Adaptadores para outros runtimes.
 - [ ] Integração opcional com monitoramento.
 - [ ] Guias de migração e contribuições comunitárias.
+
+## Integrações opcionais — planejamento futuro
+
+- [ ] Publicar RFC de contrato versionado para integrações, descoberta, autenticação, permissões e falha segura.
+- [ ] Validar o contrato com serviço simulado antes de integrar outros projetos.
+- [ ] Preservar a autonomia do Infrastructure: integrações não são requisito de instalação nem de release Alpha.
+
+### Orisema Data (antigo RustDB)
+
+- [ ] Avaliar o código atual do Orisema Data e definir contrato opcional de descoberta de instâncias e conexões.
+- [ ] Iniciar por PostgreSQL com leitura e diagnóstico, sem exposição pública automática.
+- [ ] Separar responsabilidades: Infrastructure gerencia o ciclo de vida de contêineres; Data gerencia conexões e lógica de banco.
+- [ ] Exigir proteção de credenciais, menor privilégio, auditoria e comportamento fail-closed.
+- [ ] Evoluir depois para outros bancos e editor SQL; backups somente após projeto e testes específicos.
+
+**Fora do escopo inicial:** Gera Base, integração obrigatória, editor SQL completo e provisionamento irrestrito.

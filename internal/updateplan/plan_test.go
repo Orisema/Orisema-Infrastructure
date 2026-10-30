@@ -20,7 +20,7 @@ func updateManifest() *manifest.Manifest {
 
 func TestBuildAllowsOnlyImageOnlyDriftWithHealthcheck(t *testing.T) {
 	m := updateManifest()
-	evidence := []planner.Step{{Name: "orisema-demo-web", Image: "nginx:new", CurrentImage: "nginx:old", Action: planner.Drift, Differences: []string{"configured image differs"}, Reason: "configured image differs"}}
+	evidence := []planner.Step{{Name: "orisema-demo-web", Image: "nginx:new", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, Differences: []string{"configured image differs"}, Reason: "configured image differs"}}
 	got := Build(m, evidence)
 	if len(got) != 1 || got[0].Action != Candidate || got[0].CurrentImage != "nginx:old" {
 		t.Fatalf("plan=%#v", got)
@@ -41,7 +41,7 @@ func TestBuildBlocksMissingReviewAndCompoundDrift(t *testing.T) {
 	}{
 		{"missing", planner.Step{Name: "orisema-demo-web", Action: planner.Create}, "deploy"},
 		{"review", planner.Step{Name: "orisema-demo-web", Action: planner.Review, Reason: "ownership labels missing"}, "ownership"},
-		{"compound", planner.Step{Name: "orisema-demo-web", CurrentImage: "nginx:old", Action: planner.Drift, Differences: []string{"configured image differs", "published port binding differs"}, Reason: "configured image differs, published port binding differs"}, "image-only"},
+		{"compound", planner.Step{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, Differences: []string{"configured image differs", "published port binding differs"}, Reason: "configured image differs, published port binding differs"}, "image-only"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

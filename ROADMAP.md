@@ -20,7 +20,7 @@ a Alpha 5 começa pela exposição somente leitura do plano de atualização.
 
 ## Fase 2 — Operação
 - [ ] Backup e restauração testados.
-- [ ] Atualização controlada e rollback.
+- [x] Atualização controlada e rollback.
 - [x] Diagnóstico e verificações de saúde.
 - [ ] Operação remota segura por SSH.
 
@@ -36,7 +36,7 @@ a Alpha 5 começa pela exposição somente leitura do plano de atualização.
 - [x] Definir e persistir atomicamente a decisão pós-verificação elegível.
 - [x] Conectar update à verificação e decisão durável após revalidação de
   ownership, journal de intenção e confirmação explícita (#56).
-- [ ] Conectar rollback manual somente após nova autorização e revalidação.
+- [x] Conectar rollback manual somente após nova autorização e revalidação (#60).
 
 Esta infraestrutura não executa retomada, update ou rollback. Operações
 incompletas sempre exigem intervenção.
@@ -49,7 +49,15 @@ incompletas sempre exigem intervenção.
   de qualquer mutação.
 - [x] Executar substituição de um serviço preservando a unidade anterior (#54).
 - [x] Integrar verificação de saúde e decisão durável da Alpha 4 (#56).
-- [ ] Expor rollback manual somente com evidência revalidada.
+- [x] Expor rollback manual somente com evidência revalidada (#60).
+
+### Backup e restauração
+
+- [x] Definir escopo, formato, integridade e modelo de segurança (#62).
+- [ ] Implementar backup journaled de configuração e histórico operacional.
+- [ ] Implementar restore verificado somente em destino ausente.
+- [ ] Validar corrupção, interrupção, concorrência e não sobrescrita em laboratório.
+- [ ] Definir contrato separado antes de qualquer backup de dados persistentes.
 
 ### Conectividade remota independente (decisão arquitetural)
 

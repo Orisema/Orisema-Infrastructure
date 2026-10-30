@@ -96,7 +96,7 @@ Linux AMD64/ARM64, checksums e verificação de instalação no CI.
 - [x] Decisão pós-verificação persistida com evidência revalidada.
 
 **Estado:** gate concluído e pré-release publicada com instalação verificada.
-Ainda não existe executor público de update ou rollback.
+Update e rollback foram conectados posteriormente pelo fluxo Alpha 5.
 
 ## Alpha 5 — Atualização pública conservadora
 
@@ -109,6 +109,15 @@ Ainda não existe executor público de update ou rollback.
 
 **Gate:** nenhuma mutação sem journal, confirmação, ownership exato e caminho
 de recuperação; interrupções continuam diagnosticáveis e falham fechado.
+
+## Fase 2 após Alpha 5 — Backup e operação remota
+
+- [x] Definir fronteira segura, formato e integridade de backup (#62).
+- [ ] Implementar e testar backup/restore de configuração e histórico.
+- [ ] Implementar SSH estrito e inspeção remota somente leitura.
+
+Backup de dados persistentes permanece fora do escopo até existir um contrato
+específico de ownership e consistência.
 
 ## Integração opcional futura — Orisema Data
 

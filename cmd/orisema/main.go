@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Orisema/Orisema-Infrastructure/internal/backup"
 	"github.com/Orisema/Orisema-Infrastructure/internal/buildinfo"
 	"github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
@@ -38,6 +39,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if len(args) > 0 && args[0] == "update" {
 		return runUpdateCommand(args, stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "backup" {
+		return runBackupCommand(args, stdin, stdout, stderr)
 	}
 	if len(args) < 2 {
 		printUsage(stderr)
@@ -218,7 +222,65 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+}
+
+func runBackupCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) == 3 && args[1] == "verify" {
+		verified, err := backup.Verify(args[2])
+		if err != nil {
+			fmt.Fprintf(stderr, "backup verification failed: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Backup verified: %s application=%s entries=%d\n", verified.Metadata.BackupID, verified.Metadata.Application, len(verified.Metadata.Entries))
+		fmt.Fprintln(stdout, "Integrity verified; authenticity and persistent application data are not covered.")
+		return 0
+	}
+	create := len(args) == 7 && args[1] == "create" && args[3] == "--output" && args[5] == "--journal"
+	createWithHistory := len(args) == 9 && createPrefix(args) && args[7] == "--operations"
+	restore := len(args) == 7 && args[1] == "restore" && args[3] == "--destination" && args[5] == "--journal"
+	if !create && !createWithHistory && !restore {
+		printUsage(stderr)
+		return 2
+	}
+	if create || createWithHistory {
+		request := backup.CreateRequest{ManifestPath: args[2], ArtifactPath: args[4], JournalPath: args[6]}
+		if createWithHistory {
+			request.OperationsPath = args[8]
+		}
+		meta, err := backup.Create(request)
+		if err != nil {
+			fmt.Fprintf(stderr, "backup creation failed: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Backup created and verified: %s application=%s path=%s\n", meta.BackupID, meta.Application, args[4])
+		fmt.Fprintln(stdout, "Persistent data, volumes, secrets, credentials, images and runtime state were not backed up.")
+		return 0
+	}
+	verified, err := backup.Verify(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "restore blocked: %v\n", err)
+		return 1
+	}
+	confirmation := "RESTORE BACKUP " + verified.Metadata.BackupID + " " + verified.Metadata.Application
+	fmt.Fprintf(stdout, "Type %s to restore into a new destination: ", confirmation)
+	answer, readErr := bufio.NewReader(stdin).ReadString('\n')
+	if readErr != nil || strings.TrimSpace(answer) != confirmation {
+		fmt.Fprintln(stderr, "cancelled; journal and destination unchanged")
+		return 1
+	}
+	meta, err := backup.Restore(backup.RestoreRequest{ArtifactPath: args[2], DestinationPath: args[4], JournalPath: args[6]})
+	if err != nil {
+		fmt.Fprintf(stderr, "restore failed: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Backup restored and verified: %s application=%s destination=%s\n", meta.BackupID, meta.Application, args[4])
+	fmt.Fprintln(stdout, "The destination is a configuration/history export only; no runtime operation was resumed.")
+	return 0
+}
+
+func createPrefix(args []string) bool {
+	return len(args) >= 7 && args[1] == "create" && args[3] == "--output" && args[5] == "--journal"
 }
 
 func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -872,6 +934,13 @@ func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {
 				pending = "none"
 			}
 			fmt.Fprintf(stdout, "    rollback: failed=%s pending=%s restored-started=%t health=%s\n", op.Rollback.FailedName, pending, op.Rollback.PreviousStarted, op.Rollback.HealthStatus)
+		}
+		if op.FileOperation != nil {
+			pending := op.FileOperation.PendingStep
+			if pending == "" {
+				pending = "none"
+			}
+			fmt.Fprintf(stdout, "    file operation: backup=%s artifact=%s destination=%s staging=%s pending=%s\n", op.FileOperation.BackupID, op.FileOperation.Artifact, op.FileOperation.Destination, op.FileOperation.Staging, pending)
 		}
 		fmt.Fprintf(stdout, "    reason: %s\n", assessment.Reason)
 	}

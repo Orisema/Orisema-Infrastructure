@@ -170,6 +170,14 @@ jobs:
           sudo chown -R "$USER":"$(id -gn)" work/alpha5-update-apply
           sudo chown -R "$USER":"$(id -gn)" work/alpha5-update-health-failure
           sudo chown -R "$USER":"$(id -gn)" work/alpha5-manual-rollback
+      - name: Exercise Phase 2 backup and restore laboratory
+        run: |
+          set -euo pipefail
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/phase2-backup-restore" \
+            scripts/phase2-backup-restore-lab.sh
+          sudo chown -R "$USER":"$(id -gn)" work/phase2-backup-restore
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -189,6 +197,8 @@ jobs:
             work/alpha5-update-health-failure/*.txt
             work/alpha5-manual-rollback/*.json
             work/alpha5-manual-rollback/*.txt
+            work/phase2-backup-restore/*.json
+            work/phase2-backup-restore/*.txt
   quickstart-matrix:
     name: quickstart (${{ matrix.os }})
     strategy:

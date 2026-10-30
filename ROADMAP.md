@@ -19,7 +19,7 @@ a Alpha 5 começa pela exposição somente leitura do plano de atualização.
 - [x] Adicionar testes automatizados e ambiente descartável de integração.
 
 ## Fase 2 — Operação
-- [ ] Backup e restauração testados.
+- [x] Backup e restauração de configuração testados (#64).
 - [x] Atualização controlada e rollback.
 - [x] Diagnóstico e verificações de saúde.
 - [ ] Operação remota segura por SSH.
@@ -54,9 +54,9 @@ incompletas sempre exigem intervenção.
 ### Backup e restauração
 
 - [x] Definir escopo, formato, integridade e modelo de segurança (#62).
-- [ ] Implementar backup journaled de configuração e histórico operacional.
-- [ ] Implementar restore verificado somente em destino ausente.
-- [ ] Validar corrupção, interrupção, concorrência e não sobrescrita em laboratório.
+- [x] Implementar backup journaled de configuração e histórico operacional (#64).
+- [x] Implementar restore verificado somente em destino ausente (#64).
+- [x] Validar corrupção, interrupção, concorrência e não sobrescrita em laboratório (#64).
 - [ ] Definir contrato separado antes de qualquer backup de dados persistentes.
 
 ### Conectividade remota independente (decisão arquitetural)

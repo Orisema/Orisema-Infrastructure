@@ -128,6 +128,25 @@ other results remain `ROLLING_BACK` for explicit operator intervention.
 - No support yet for secrets, persistent storage, custom networks, or full security context management.
 - Do not use this prototype to deploy production applications.
 
+## Configuration backup and restore
+
+`backup create <manifest> --output <new-directory> --journal <operations>`
+validates and snapshots the exact manifest into a private, versioned artifact.
+`--operations <existing-journal>` optionally adds canonical, read-only history
+for the same application. It never reads volumes, databases, secrets,
+credentials, images or container layers.
+
+`backup verify <artifact>` validates strict layout and permissions, canonical
+metadata, bounded sizes and SHA-256 for every payload. It rejects symlinks,
+special files, unknown or duplicate entries, unsupported versions and corrupt
+content. Hashes establish integrity, not authenticity.
+
+`backup restore <artifact> --destination <absent-directory> --journal
+<operations>` verifies before prompting for the exact backup/application-bound
+confirmation. It publishes fixed filenames atomically without replacement and
+verifies them again. Imported journals are inert history and cannot resume an
+operation. Existing destinations are always rejected.
+
 ## Experimental deployment
 
 **Use only on a disposable test host.** Run `validate` and inspect the manifest first.

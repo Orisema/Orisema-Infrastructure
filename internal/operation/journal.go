@@ -59,6 +59,7 @@ type Operation struct {
 	Authorization *UpdateAuthorization           `json:"authorization,omitempty"`
 	Execution     *UpdateExecution               `json:"execution,omitempty"`
 	Rollback      *UpdateRollback                `json:"rollback,omitempty"`
+	FileOperation *FileOperation                 `json:"fileOperation,omitempty"`
 	Events        []Event                        `json:"events"`
 }
 
@@ -327,6 +328,11 @@ func Assess(op Operation) Assessment {
 		return Assessment{Terminal: true, Reason: "operation reached a terminal state"}
 	}
 	a := Assessment{Intervention: true, Reason: "operation is incomplete; inspect journal and runtime evidence before any mutation"}
+	if op.FileOperation != nil {
+		a.OwnershipComplete = true
+		a.Reason = "file operation is incomplete; inspect its private staging path and pending step; automatic resume or cleanup is not allowed"
+		return a
+	}
 	a.OwnershipComplete, a.ManagedResources, a.ExternalResources = ResourceEvidenceComplete(op.Resources)
 	if !a.OwnershipComplete {
 		a.Reason = "operation resource ownership evidence is incomplete or ambiguous; recovery is blocked"
@@ -446,5 +452,12 @@ func validate(op Operation) error {
 	if err := validateUpdateRollback(op); err != nil {
 		return err
 	}
+	if err := validateFileOperation(op); err != nil {
+		return err
+	}
 	return nil
 }
+
+// ValidateSnapshot applies the complete journal contract without reading or
+// mutating a Store. It is used for inert operation-history imports.
+func ValidateSnapshot(op Operation) error { return validate(op) }

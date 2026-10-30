@@ -1,6 +1,7 @@
 # Backup and restore design
 
-Status: architecture accepted; executable commands are not implemented yet.
+Status: implemented experimentally for validated configuration and optional
+read-only operation history. Persistent application data remains excluded.
 
 ## Supported backup set
 
@@ -72,3 +73,32 @@ versions; one safe concurrency winner; no overwrite on a destination race; and
 diagnosable interruption at every persisted boundary.
 
 See [ADR 0003](adr/0003-safe-backup-boundary.md) for the binding decision.
+
+## CLI
+
+```sh
+orisema backup create manifest.yaml \
+  --output /private/backups/backup-directory \
+  --journal /private/operations
+
+# Optional inert history export from an existing operation store:
+orisema backup create manifest.yaml \
+  --output /private/backups/backup-directory \
+  --journal /private/operations \
+  --operations /private/source-operations
+
+orisema backup verify /private/backups/backup-directory
+
+orisema backup restore /private/backups/backup-directory \
+  --destination /private/restored-export \
+  --journal /private/restore-operations
+```
+
+Restore requires `RESTORE BACKUP <backup-id> <application>`. The destination
+must not exist and publication uses Linux `renameat2(RENAME_NOREPLACE)` so a
+concurrent creator is never overwritten. The restored directory contains
+`manifest.yaml` and optionally `operations.jsonl`; it does not deploy, start or
+resume anything.
+
+If interrupted, use `operation diagnose --journal ...`. Staging is intentionally
+retained for inspection and is never resumed or deleted automatically.

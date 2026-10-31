@@ -1,8 +1,9 @@
 # Phase 2 operation audit
 
-Status: implementation complete for the documented experimental scope. The
-release gate completes only when the `v0.1.0-alpha.5` workflow publishes and
-re-downloads verified artifacts from the exact merged commit.
+Status: complete for the documented experimental scope. The
+`v0.1.0-alpha.5` workflow published and re-downloaded verified artifacts from
+the exact merged commit `b6d8c7b`; an independent download repeated both
+checksum checks and the AMD64 embedded version/commit verification.
 
 This audit maps the Phase 2 completion request to durable code, automated tests
 and practical laboratories. It does not turn an Alpha into a production claim.

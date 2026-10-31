@@ -116,6 +116,7 @@ de recuperação; interrupções continuam diagnosticáveis e falham fechado.
 - [x] Implementar e testar backup/restore de configuração e histórico (#64).
 - [x] Implementar inspeção remota somente leitura sobre o transporte estrito (#68).
 - [x] Implementar registry e transporte SSH estrito sem comandos arbitrários (#66).
+- [x] Validar ProxyJump real e rota privada previamente disponível (#71).
 
 Backup de dados persistentes permanece fora do escopo até existir um contrato
 específico de ownership e consistência.

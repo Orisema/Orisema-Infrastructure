@@ -198,6 +198,16 @@ jobs:
             scripts/phase2-remote-inspection-lab.sh || status=$?
           sudo chown -R "$USER":"$(id -gn)" work/phase2-remote-inspection
           exit "$status"
+      - name: Exercise Phase 2 real ProxyJump laboratory
+        run: |
+          set -euo pipefail
+          status=0
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/phase2-proxyjump" \
+            scripts/phase2-proxyjump-lab.sh || status=$?
+          sudo chown -R "$USER":"$(id -gn)" work/phase2-proxyjump
+          exit "$status"
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -224,6 +234,8 @@ jobs:
             work/phase2-remote-inspection/*.txt
             work/phase2-remote-inspection/*.jsonl
             work/phase2-remote-inspection/*.log
+            work/phase2-proxyjump/*.txt
+            work/phase2-proxyjump/*.log
   quickstart-matrix:
     name: quickstart (${{ matrix.os }})
     strategy:

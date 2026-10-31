@@ -67,8 +67,10 @@ volumes, application data, secrets and credentials; see the
 laboratory validates key authentication and strict host-key rejection on Ubuntu
 24.04. A second real-`sshd` laboratory validates audited read-only status and
 bounded logs against a constrained Podman fixture. It does not claim a real
-remote Podman host. ProxyJump construction and failure modes are unit-tested; a
-real bastion topology is not yet claimed as validated.
+remote Podman host. A local two-`sshd` topology validates a real ProxyJump,
+distinct credentials and host keys for both hops, direct pre-existing private
+reachability, unknown-key rejection and target loss. Real CGNAT, external
+bastions and specific VPN products are not claimed as validated.
 
 The public Alpha 5 flow now reaches a durable post-update health decision, but
 data rollback remains unavailable. The Alpha 5 manual application rollback

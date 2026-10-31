@@ -101,6 +101,14 @@ health reporting, checks the 100-line log command, preserves an unrelated
 sentinel and proves that audit records contain no log text. Unit tests cover
 invalid ownership, injection-shaped identities and oversized output.
 
-Real remote networks, VPNs and a real ProxyJump topology are not yet claimed as
-validated. WireGuard, Tailscale, Headscale and other routing remain optional and
-operator-managed as required by [ADR 0002](adr/0002-independent-connectivity.md).
+A real local ProxyJump laboratory uses separate bastion and target `sshd`
+processes, users, client keys, host keys and known-hosts files. It verifies both
+hops, rejects unknown keys for either hop, observes bounded failure after target
+loss and preserves unrelated target evidence. The same target is also reached
+directly through an already available private loopback route, demonstrating
+that the registry has no dependency on how reachability was established.
+
+This laboratory does not claim validation over real CGNAT, an external bastion
+or a specific VPN product. WireGuard, Tailscale, Headscale and other routing
+remain optional and operator-managed as required by
+[ADR 0002](adr/0002-independent-connectivity.md).

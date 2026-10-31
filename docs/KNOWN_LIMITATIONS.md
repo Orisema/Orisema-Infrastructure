@@ -13,9 +13,9 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 
 ## Fora do escopo
 
-- Produção, alta disponibilidade, múltiplos nós ou operação remota.
-- O transporte SSH possui somente probe fixo de conectividade. Inspeção remota,
-  logs e qualquer mutação remota ainda não estão disponíveis.
+- Produção, alta disponibilidade ou orquestração de múltiplos nós.
+- A operação remota experimental é somente leitura: status e cauda fixa de 100
+  linhas de logs. Toda mutação remota continua indisponível.
 - Docker, Windows e macOS.
 - O fluxo experimental Alpha 5 atualiza apenas um serviço elegível por vez;
   `deploy` continua bloqueando `DRIFT` e `REVIEW`.
@@ -26,6 +26,8 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 - Gerenciamento de secrets, variáveis de ambiente, volumes, limites de
   recursos, redes personalizadas e permissões avançadas no manifesto.
 - Identidade autenticada do operador ou journal resistente a adulteração.
+- O audit local remoto é durável e privado, mas não é assinado nem resistente a
+  adulteração por um usuário com acesso ao arquivo.
 - Assinatura criptográfica e atestação de proveniência dos artefatos; há apenas
   checksums SHA-256.
 

@@ -47,6 +47,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "host" {
 		return runHostCommand(args, stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "remote" {
+		return runRemoteCommand(args, stdout, stderr)
+	}
 	if len(args) < 2 {
 		printUsage(stderr)
 		return 2
@@ -226,7 +229,106 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+}
+
+func runRemoteCommand(args []string, stdout, stderr io.Writer) int {
+	status := len(args) == 7 && args[1] == "status" && args[5] == "--audit"
+	logs := len(args) == 8 && args[1] == "logs" && args[6] == "--audit"
+	if !status && !logs {
+		printUsage(stderr)
+		return 2
+	}
+	registry, err := remote.LoadRegistry(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "remote inspection blocked: %v\n", err)
+		return 1
+	}
+	m, err := manifest.Load(args[4])
+	if err != nil {
+		fmt.Fprintf(stderr, "remote inspection blocked: %v\n", err)
+		return 1
+	}
+	auditPath := args[len(args)-1]
+	services := m.Services
+	if logs {
+		service := args[5]
+		services = nil
+		for _, candidate := range m.Services {
+			if candidate.Name == service {
+				services = append(services, candidate)
+				break
+			}
+		}
+		if len(services) != 1 {
+			fmt.Fprintf(stderr, "remote logs blocked: service %q not declared in manifest\n", service)
+			return 1
+		}
+	}
+	transport := remote.Transport{}
+	failed := false
+	if status {
+		fmt.Fprintf(stdout, "Remote Podman status on %q for %q (read-only):\n", args[3], m.Name)
+	}
+	for _, service := range services {
+		requestID, idErr := remote.NewRequestID()
+		if idErr != nil {
+			fmt.Fprintf(stderr, "remote inspection blocked: %v\n", idErr)
+			return 1
+		}
+		action := args[1]
+		base := remote.AuditRecord{RequestID: requestID, Host: args[3], Action: action, Application: m.Name, Service: service.Name}
+		start := base
+		start.Phase = "START"
+		if err := remote.AppendAudit(auditPath, start); err != nil {
+			fmt.Fprintf(stderr, "remote inspection blocked: audit START failed: %v\n", err)
+			return 1
+		}
+		if status {
+			item, result, queryErr := transport.Inspect(context.Background(), *registry, args[3], m.Name, service.Name)
+			if result.Outcome == "" {
+				result.Outcome = remote.OutcomeExecution
+			}
+			finish := base
+			finish.Phase = "RESULT"
+			finish.Outcome = result.Outcome
+			finish.DurationMS = result.Duration.Milliseconds()
+			if err := remote.AppendAudit(auditPath, finish); err != nil {
+				fmt.Fprintf(stderr, "remote inspection failed: audit RESULT failed: %v\n", err)
+				return 1
+			}
+			name := "orisema-" + m.Name + "-" + service.Name
+			if queryErr != nil {
+				fmt.Fprintf(stderr, "  %s: unavailable (outcome: %s)\n", name, result.Outcome)
+				failed = true
+				continue
+			}
+			fmt.Fprintf(stdout, "  %s: %s (image: %s; ownership: verified)\n", name, item.State.Status, item.Config.Image)
+			fmt.Fprintf(stdout, "    running: %t; exit code: %d; restarts: %d; health: %s\n", item.State.Running, item.State.ExitCode, item.RestartCount, item.HealthStatus())
+		} else {
+			out, result, queryErr := transport.Logs(context.Background(), *registry, args[3], m.Name, service.Name)
+			if result.Outcome == "" {
+				result.Outcome = remote.OutcomeExecution
+			}
+			finish := base
+			finish.Phase = "RESULT"
+			finish.Outcome = result.Outcome
+			finish.DurationMS = result.Duration.Milliseconds()
+			if err := remote.AppendAudit(auditPath, finish); err != nil {
+				fmt.Fprintf(stderr, "remote logs failed: audit RESULT failed: %v\n", err)
+				return 1
+			}
+			if queryErr != nil {
+				fmt.Fprintf(stderr, "remote logs failed: outcome=%s\n", result.Outcome)
+				return 1
+			}
+			_, _ = stdout.Write(out)
+		}
+	}
+	if failed {
+		return 1
+	}
+	return 0
 }
 
 func runHostCommand(args []string, stdout, stderr io.Writer) int {

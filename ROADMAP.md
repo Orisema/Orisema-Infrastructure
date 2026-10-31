@@ -64,7 +64,7 @@ incompletas sempre exigem intervenção.
 - [x] Implementar registry local e transporte SSH estrito com chaves externas (#66).
 - [x] Rejeitar host keys desconhecidas/alteradas e limitar timeout/cancelamento (#66).
 - [x] Construir ProxyJump validado, limitado e sem opções arbitrárias (#66).
-- [ ] Implementar SSH remoto seguro com autenticação por chave, verificação estrita da identidade do host, menor privilégio e auditoria.
+- [x] Implementar SSH remoto seguro com autenticação por chave, verificação estrita da identidade do host, menor privilégio e auditoria (#68).
 - [ ] Aceitar hosts alcançáveis por redes privadas/VPN já existentes, sem exigir contas ou serviços da comunidade Orisema.
 - [ ] Suportar bastion SSH/ProxyJump configurado pelo operador, sem provisionar infraestrutura central.
 - [ ] Validar inspeção remota somente leitura antes de permitir mutações, com testes para perda de conexão, CGNAT via rede previamente configurada e falha segura.

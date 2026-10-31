@@ -113,3 +113,58 @@ func TestTransportTimeoutCancelsProcess(t *testing.T) {
 		t.Fatalf("result=%#v elapsed=%s err=%v", result, time.Since(started), err)
 	}
 }
+
+func TestRemoteInspectAndLogsAreFixedBoundedAndOwnershipChecked(t *testing.T) {
+	registryPath, _, _ := registryFixture(t, directRegistry)
+	registry, err := LoadRegistry(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	t.Setenv("ORISEMA_SSH_ARGS", filepath.Join(root, "args"))
+	t.Setenv("ORISEMA_SSH_CONFIG", filepath.Join(root, "config"))
+	valid := `[{"Id":"abc","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:stable","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web"}}}]`
+	binary := fakeSSH(t, `
+case "$*" in
+  *"podman inspect --type container orisema-demo-web") printf '%s\n' '`+valid+`' ;;
+  *"podman logs --tail 100 orisema-demo-web") printf 'safe log\n' ;;
+  *) exit 90 ;;
+esac`)
+	item, result, err := (Transport{Binary: binary}).Inspect(context.Background(), *registry, "primary", "demo", "web")
+	if err != nil || result.Outcome != OutcomeOK || item.ID != "abc" {
+		t.Fatalf("item=%#v result=%#v err=%v", item, result, err)
+	}
+	out, result, err := (Transport{Binary: binary}).Logs(context.Background(), *registry, "primary", "demo", "web")
+	if err != nil || string(out) != "safe log\n" || result.Outcome != OutcomeOK {
+		t.Fatalf("out=%q result=%#v err=%v", out, result, err)
+	}
+	args, _ := os.ReadFile(filepath.Join(root, "args"))
+	if !strings.Contains(string(args), "podman logs --tail 100 orisema-demo-web") {
+		t.Fatalf("unexpected args %q", args)
+	}
+	if _, _, err := (Transport{Binary: binary}).Inspect(context.Background(), *registry, "primary", "demo;touch", "web"); err == nil {
+		t.Fatal("unsafe identity accepted")
+	}
+}
+
+func TestRemoteInspectRejectsWrongOwnershipAndOversizedOutput(t *testing.T) {
+	registryPath, _, _ := registryFixture(t, directRegistry)
+	registry, err := LoadRegistry(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ name, body string }{
+		{"ownership", `printf '%s\n' '[{"Id":"abc","Name":"orisema-demo-web","Config":{"Labels":{"dev.orisema.managed":"true","dev.orisema.app":"other","dev.orisema.service":"web"}}}]'`},
+		{"oversized", `dd if=/dev/zero bs=1048576 count=3 2>/dev/null`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Setenv("ORISEMA_SSH_ARGS", filepath.Join(root, "args"))
+			t.Setenv("ORISEMA_SSH_CONFIG", filepath.Join(root, "config"))
+			_, result, err := (Transport{Binary: fakeSSH(t, tc.body)}).Inspect(context.Background(), *registry, "primary", "demo", "web")
+			if err == nil || result.Outcome != OutcomeExecution {
+				t.Fatalf("result=%#v err=%v", result, err)
+			}
+		})
+	}
+}

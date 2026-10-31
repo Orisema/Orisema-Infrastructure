@@ -65,8 +65,10 @@ volumes, application data, secrets and credentials; see the
 
 `host check` uses the installed OpenSSH client on Linux. A real local `sshd`
 laboratory validates key authentication and strict host-key rejection on Ubuntu
-24.04. ProxyJump construction and failure modes are unit-tested; a real bastion
-topology and remote inspection are not yet claimed as validated.
+24.04. A second real-`sshd` laboratory validates audited read-only status and
+bounded logs against a constrained Podman fixture. It does not claim a real
+remote Podman host. ProxyJump construction and failure modes are unit-tested; a
+real bastion topology is not yet claimed as validated.
 
 The public Alpha 5 flow now reaches a durable post-update health decision, but
 data rollback remains unavailable. The Alpha 5 manual application rollback

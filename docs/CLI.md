@@ -154,8 +154,13 @@ performs a fixed, non-mutating SSH `true` probe. It requires external key files,
 strict known-hosts verification, key-only batch authentication and bounded
 timeouts. Results are typed and SSH stderr is not exposed. See [SSH.md](SSH.md).
 
-There is no arbitrary remote command facility. Remote runtime inspection and
-logs are not part of this transport-only increment.
+`remote status <registry.yaml> <alias> <manifest.yaml> --audit <absolute-path>`
+performs bounded `podman inspect` calls for manifest-derived container names.
+`remote logs <registry.yaml> <alias> <manifest.yaml> <service> --audit
+<absolute-path>` revalidates exact ownership and returns the fixed 100-line
+tail. Both require durable private local audit records and fail closed if
+audit, transport, decoding, size, identity or ownership checks fail. There is
+no arbitrary remote command facility and no remote mutation.
 
 ## Experimental deployment
 

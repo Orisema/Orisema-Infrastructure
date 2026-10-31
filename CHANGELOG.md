@@ -6,6 +6,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.5] - 2026-10-31
+
 ### Adicionado
 
 - `update plan` somente leitura, que reconhece como candidato apenas drift
@@ -21,11 +23,31 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 - `update verify`, que revalida candidato e unidade anterior, persiste
   observações explícitas e decide durablemente `COMPLETED` ou
   `RECOVERY_REQUIRED` somente diante de evidência terminal.
+- `update rollback` e `rollback-verify`, com nova confirmação, revalidação de
+  identidade/ownership e restauração apenas do contêiner anterior preservado.
+- Backup privado, limitado e verificado de manifesto e histórico operacional
+  opcional, com restore somente em destino ausente e sem ativar journals.
+- Registry SSH local privado, autenticação por chave externa, host keys
+  estritas, timeouts, cancelamento e ProxyJump de até três hops.
+- `remote status` e `remote logs` somente leitura, com comandos allowlisted,
+  ownership exato, limites de saída e audit local durável `START`/`RESULT`.
+
+### Validação
+
+- Laboratórios cobrem update saudável/falho, rollback manual, concorrência,
+  interrupção, corrupção e restore sem sobrescrita.
+- Topologias reais de `sshd` validam autenticação, host key inválida,
+  ProxyJump, rota previamente disponível, inspeção pelo salto e perda do alvo.
+- Fluxo local isolado passou com Podman 4.9.3 rootless; Ubuntu 22.04 e 24.04
+  permanecem na matriz automatizada. Fedora, CGNAT/VPN real e ARM64 nativo não
+  são declarados validados.
 
 ### Documentação
 
 - Estado da Alpha 4 reconciliado com a persistência de decisões publicada e
   roadmap estendido para os gates conservadores da Alpha 5.
+- Arquitetura, CLI, instalação, compatibilidade, limitações, backup e SSH
+  reconciliados com a conclusão da Fase 2.
 
 ## [0.1.0-alpha.4] - 2026-10-29
 
@@ -116,3 +138,4 @@ Primeira versão experimental instalável. **Não indicada para produção.**
 [0.1.0-alpha.2]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.2
 [0.1.0-alpha.3]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.3
 [0.1.0-alpha.4]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.4
+[0.1.0-alpha.5]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.5

@@ -1,6 +1,6 @@
 # Orisema Infrastructure — Alpha release plan
 
-Status: **plano ativo, atualizado em 30/10/2026**. Não representa promessa de
+Status: **plano ativo, atualizado em 31/10/2026**. Não representa promessa de
 datas nem declara funcionalidade de produção.
 
 ## Base existente
@@ -11,8 +11,9 @@ datas nem declara funcionalidade de produção.
   assistida com journal e verificação foram implementados.
 - Versionamento, empacotamento Linux e documentação de instalação/quick start
   foram entregues pelas Issues #12 e #13.
-- O protótipo **não é recomendado para produção**. Não há atualização/rollback
-  transacional, backup/restore, suporte Docker comprovado ou operação remota.
+- O protótipo **não é recomendado para produção**. Update/rollback de aplicação,
+  backup de configuração e inspeção SSH são conservadores e limitados; não há
+  transação de dados, backup de volumes, suporte Docker ou mutação remota.
 
 ## Princípios de lançamento
 
@@ -61,8 +62,8 @@ seu checksum e executaram `version`, `validate` e `plan` sem compilação local.
 - [x] Definir env/segredos/volumes/permissões como rejeitados até existir um
   modelo seguro.
 - [x] Definir exit codes; adiar saída JSON até existir envelope tipado e seguro.
-- [ ] Ampliar testes de concorrência, timeout, interrupção e recuperação.
-- [ ] Revisar política de auditoria: operador informado não é identidade
+- [x] Ampliar testes de concorrência, timeout, interrupção e recuperação.
+- [x] Revisar política de auditoria: operador informado não é identidade
   autenticada; journal local não é tamper-evident.
 
 **Gate:** contrato documentado, testes de falha e segurança passando; nenhuma
@@ -98,7 +99,7 @@ Linux AMD64/ARM64, checksums e verificação de instalação no CI.
 **Estado:** gate concluído e pré-release publicada com instalação verificada.
 Update e rollback foram conectados posteriormente pelo fluxo Alpha 5.
 
-## Alpha 5 — Atualização pública conservadora
+## v0.1.0-alpha.5 — Operação conservadora
 
 - [x] Classificar candidatos a update sem modificar o runtime (#48).
 - [x] Registrar plano e intenção imutáveis antes da execução (#50).
@@ -109,6 +110,9 @@ Update e rollback foram conectados posteriormente pelo fluxo Alpha 5.
 
 **Gate:** nenhuma mutação sem journal, confirmação, ownership exato e caminho
 de recuperação; interrupções continuam diagnosticáveis e falham fechado.
+
+**Estado:** implementação e laboratórios concluídos; a publicação permanece
+condicionada ao PR de hardening verde e à verificação dos artefatos instalados.
 
 ## Fase 2 após Alpha 5 — Backup e operação remota
 

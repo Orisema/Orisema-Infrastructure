@@ -22,7 +22,7 @@ a Alpha 5 começa pela exposição somente leitura do plano de atualização.
 - [x] Backup e restauração de configuração testados (#64).
 - [x] Atualização controlada e rollback.
 - [x] Diagnóstico e verificações de saúde.
-- [ ] Operação remota segura por SSH.
+- [x] Operação remota segura por SSH (#66, #68, #71).
 
 ### Alpha 4 — recuperação confiável
 
@@ -38,8 +38,8 @@ a Alpha 5 começa pela exposição somente leitura do plano de atualização.
   ownership, journal de intenção e confirmação explícita (#56).
 - [x] Conectar rollback manual somente após nova autorização e revalidação (#60).
 
-Esta infraestrutura não executa retomada, update ou rollback. Operações
-incompletas sempre exigem intervenção.
+Esta infraestrutura não retoma automaticamente update ou rollback. Operações
+incompletas sempre exigem diagnóstico e intervenção explícita.
 
 ### Alpha 5 — atualização pública conservadora
 
@@ -57,7 +57,8 @@ incompletas sempre exigem intervenção.
 - [x] Implementar backup journaled de configuração e histórico operacional (#64).
 - [x] Implementar restore verificado somente em destino ausente (#64).
 - [x] Validar corrupção, interrupção, concorrência e não sobrescrita em laboratório (#64).
-- [ ] Definir contrato separado antes de qualquer backup de dados persistentes.
+- Dados persistentes permanecem fora do escopo até existir contrato separado de
+  ownership, armazenamento e consistência.
 
 ### Conectividade remota independente (decisão arquitetural)
 
@@ -67,8 +68,8 @@ incompletas sempre exigem intervenção.
 - [x] Implementar SSH remoto seguro com autenticação por chave, verificação estrita da identidade do host, menor privilégio e auditoria (#68).
 - [x] Aceitar hosts alcançáveis por redes privadas/VPN já existentes, sem exigir contas ou serviços da comunidade Orisema (#71).
 - [x] Suportar bastion SSH/ProxyJump configurado pelo operador, sem provisionar infraestrutura central (#71).
-- [ ] Validar inspeção remota somente leitura antes de permitir mutações, com testes para perda de conexão, CGNAT via rede previamente configurada e falha segura.
-- [ ] Manter integrações com WireGuard, Tailscale, Headscale ou equivalentes estritamente opcionais e administradas pelo usuário.
+- [x] Validar inspeção remota somente leitura antes de permitir mutações, incluindo ProxyJump, rota previamente disponível, perda de conexão e falha segura (#68, #71, #73).
+- [x] Manter WireGuard, Tailscale, Headscale e equivalentes opcionais e administrados pelo usuário; nenhum produto específico ou CGNAT real é declarado validado (#71, #73).
 
 **Princípio:** o Orisema Infrastructure funciona de maneira autônoma, sem dependência obrigatória de infraestrutura central, contas externas ou serviços hospedados pelo projeto. O Orisema não operará relay, VPN ou serviço de coordenação oficial. Atravessar NAT/CGNAT requer conectividade previamente estabelecida pelo operador (por VPN, proxy/bastion ou outro intermediário acessível); SSH isolado não garante esse acesso. Consulte [ADR 0002](docs/adr/0002-independent-connectivity.md).
 

@@ -23,8 +23,10 @@ change; the workflow evidence for a commit is authoritative. These observations
 are not minimum-version guarantees.
 
 The local development laboratory has also exercised Ubuntu 24.04.5 LTS AMD64,
-Linux kernel 6.8 and Podman 4.9.3. This is evidence from one environment, not a
-minimum-version guarantee.
+Linux kernel 6.8 and rootless Podman 4.9.3. On 2026-10-31 an isolated rootless
+deploy, explicit health probe, status, `NOOP` plan and removal passed; an initial
+occupied-port attempt failed and removed its partial container safely. This is
+evidence from one environment, not a minimum-version guarantee.
 
 ## Runtime support
 
@@ -56,6 +58,11 @@ minimum-version guarantee.
 | `recover plan`, `history`, `verify` | Some | No | Journal commands can require local journal access |
 | `recover prepare` | Yes | Journal only | Reserves an eligible START; does not start it |
 | `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |
+| `backup create`, `verify` | No | Files only | Private, bounded configuration artifact with SHA-256 integrity |
+| `backup restore` | No | Files only | Exact confirmation; publishes only into an absent destination |
+| `host check` | Remote | No | Fixed SSH `true`; strict keys, host identity and timeouts |
+| `remote status` | Remote | No | Fixed, bounded inspect for manifest-derived container names |
+| `remote logs` | Remote | No | Revalidates ownership; fixed 100-line, 1 MiB-bounded tail |
 
 Backup/restore commands are available experimentally on Linux and cover only
 validated configuration plus optional read-only operation history. Atomic
@@ -69,7 +76,8 @@ laboratory validates key authentication and strict host-key rejection on Ubuntu
 bounded logs against a constrained Podman fixture. It does not claim a real
 remote Podman host. A local two-`sshd` topology validates a real ProxyJump,
 distinct credentials and host keys for both hops, direct pre-existing private
-reachability, unknown-key rejection and target loss. Real CGNAT, external
+reachability, read-only inspection through the jump, unknown/changed-key
+rejection and target loss. Real CGNAT, external
 bastions and specific VPN products are not claimed as validated.
 
 The public Alpha 5 flow now reaches a durable post-update health decision, but

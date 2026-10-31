@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   release:
-    if: github.event_name == 'push' || contains(fromJSON('[14, 27, 28, 46]'), github.event.issue.number)
+    if: github.event_name == 'push' || contains(fromJSON('[14, 27, 28, 46, 73]'), github.event.issue.number)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.issue.number == 27 && 'v0.1.0-alpha.2' || github.event.issue.number == 28 && 'v0.1.0-alpha.3' || github.event.issue.number == 46 && 'v0.1.0-alpha.4' || 'v0.1.0-alpha.1' }}
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.issue.number == 27 && 'v0.1.0-alpha.2' || github.event.issue.number == 28 && 'v0.1.0-alpha.3' || github.event.issue.number == 46 && 'v0.1.0-alpha.4' || github.event.issue.number == 73 && 'v0.1.0-alpha.5' || 'v0.1.0-alpha.1' }}
       COMMIT: ${{ github.event_name == 'push' && github.sha || github.event.issue.number == 27 && 'a33e930025247e801c2b57799a8c77aa821e8e3e' || github.sha }}
     steps:
       - name: Check out immutable release source
@@ -38,6 +38,7 @@ jobs:
             27) test "$VERSION" = v0.1.0-alpha.2 ;;
             28) test "$VERSION" = v0.1.0-alpha.3 ;;
             46) test "$VERSION" = v0.1.0-alpha.4 ;;
+            73) test "$VERSION" = v0.1.0-alpha.5 ;;
             *) exit 1 ;;
           esac
           existing="$(git ls-remote --refs origin "refs/tags/$VERSION" \

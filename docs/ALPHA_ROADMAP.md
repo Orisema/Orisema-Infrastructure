@@ -111,8 +111,10 @@ Update e rollback foram conectados posteriormente pelo fluxo Alpha 5.
 **Gate:** nenhuma mutação sem journal, confirmação, ownership exato e caminho
 de recuperação; interrupções continuam diagnosticáveis e falham fechado.
 
-**Estado:** implementação e laboratórios concluídos; a publicação permanece
-condicionada ao PR de hardening verde e à verificação dos artefatos instalados.
+**Gate concluído em 31/10/2026:** implementação e laboratórios passaram; a
+pré-release `v0.1.0-alpha.5` foi publicada no commit `b6d8c7b`, os checksums dos
+artefatos AMD64/ARM64 foram verificados e o binário AMD64 baixado confirmou
+versão e commit incorporados.
 
 ## Fase 2 após Alpha 5 — Backup e operação remota
 

@@ -18,7 +18,7 @@ a Alpha 5 começa pela exposição somente leitura do plano de atualização.
 - [x] Suportar Podman em um host Linux.
 - [x] Adicionar testes automatizados e ambiente descartável de integração.
 
-## Fase 2 — Operação
+## Fase 2 — Operação — concluída em v0.1.0-alpha.5
 - [x] Backup e restauração de configuração testados (#64).
 - [x] Atualização controlada e rollback.
 - [x] Diagnóstico e verificações de saúde.

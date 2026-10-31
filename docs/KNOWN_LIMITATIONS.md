@@ -16,6 +16,8 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 - Produção, alta disponibilidade ou orquestração de múltiplos nós.
 - A operação remota experimental é somente leitura: status e cauda fixa de 100
   linhas de logs. Toda mutação remota continua indisponível.
+- ProxyJump foi validado em topologia local com dois servidores SSH. CGNAT,
+  bastions externos e produtos VPN específicos ainda não foram testados.
 - Docker, Windows e macOS.
 - O fluxo experimental Alpha 5 atualiza apenas um serviço elegível por vez;
   `deploy` continua bloqueando `DRIFT` e `REVIEW`.

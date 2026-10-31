@@ -1,6 +1,6 @@
-# Limitações conhecidas — v0.1.0-alpha.1
+# Limitações conhecidas — v0.1.0-alpha.5
 
-A Alpha 1 é um laboratório local para hosts Linux descartáveis. **Não é
+A Alpha 5 é um protótipo operacional para hosts Linux descartáveis. **Não é
 indicada para produção** e não possui garantia de estabilidade ou continuidade.
 
 ## Escopo suportado
@@ -35,8 +35,8 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 
 ## Comportamentos intencionais
 
-- Portas publicadas usam o comportamento padrão do Podman e podem escutar em
-  todas as interfaces. Use somente laboratório isolado.
+- Manifestos legados `v1alpha1` preservam binds em todas as interfaces;
+  `v1alpha2` exige `hostIP` loopback explícito. Use somente laboratório isolado.
 - `NOOP` compara os campos declarados suportados; não prova saúde ao vivo nem
   equivalência completa da configuração.
 - Recovery executa somente `START`, requer reserva/confirmação fresca e não
@@ -45,4 +45,4 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   posterior falhar, serviços anteriores já criados não são revertidos.
 
 Veja o [plano Alpha](ALPHA_ROADMAP.md) para o que está proposto nas versões
-seguintes; itens futuros não são contratos da Alpha 1.
+seguintes; itens futuros não são contratos da Alpha 5.

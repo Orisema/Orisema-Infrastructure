@@ -14,7 +14,8 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - Implantação declarativa e verificável de aplicações em contêineres.
 - Podman como primeiro runtime, com arquitetura extensível.
 - Plano de mudanças antes da execução e segurança por padrão.
-- Evolução para backup, restauração, rollback e observabilidade.
+- Backup/restauração de configuração, rollback de aplicação e inspeção SSH
+  conservadores; observabilidade ampliada permanece futura.
 - Software livre, documentação acessível e governança comunitária.
 
 ## Documentação
@@ -26,7 +27,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Governança](GOVERNANCE.md)
 - [Segurança](SECURITY.md)
 - [Changelog](CHANGELOG.md)
-- [Limitações conhecidas da Alpha 1](docs/KNOWN_LIMITATIONS.md)
+- [Limitações conhecidas da Alpha 5](docs/KNOWN_LIMITATIONS.md)
 - [Contrato de manifesto da Alpha 2](docs/MANIFEST-V1ALPHA2.md)
 - [Laboratório de update e rollback da Alpha 3](docs/CONTROLLED-UPDATE-LAB.md)
 - [Backup e restauração de configuração](docs/BACKUP-RESTORE-DESIGN.md)
@@ -36,6 +37,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Instalação e verificação de releases](docs/INSTALLATION.md)
 - [Quick start em host Linux descartável](docs/QUICKSTART.md)
 - [Compatibilidade e comandos suportados](docs/COMPATIBILITY.md)
+- [Auditoria de conclusão da Fase 2](docs/PHASE2-AUDIT.md)
 
 ## Versão do binário
 
@@ -47,7 +49,7 @@ go build -o orisema ./cmd/orisema
 ./orisema version
 ```
 
-O [pré-release v0.1.0-alpha.4](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.4)
+O [pré-release v0.1.0-alpha.5](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.5)
 distribui binários para Linux AMD64 e Linux ARM64. Podman
 em Linux é o único runtime suportado inicialmente; Docker, Windows e macOS não
 têm suporte oficial nesta etapa. Consulte as diferenças entre alvos compilados

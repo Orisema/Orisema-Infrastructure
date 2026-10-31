@@ -39,6 +39,14 @@ Estado, verificações e logs
   riscos, sem possuir capacidade de mutação do runtime.
 - **Runtime:** lista e inspeciona contêineres e executa operações explicitamente
   solicitadas pela CLI.
+- **Host registry:** valida destinos SSH, caminhos de credenciais externas,
+  timeouts e cadeias ProxyJump em arquivo local privado.
+- **Remote transport/executor:** gera configuração OpenSSH efêmera, autentica
+  chaves e hosts estritamente e expõe somente inspect e logs limitados.
+- **Remote authorization:** deriva nomes do manifesto e exige ownership exato;
+  não existe API pública de comando remoto arbitrário ou mutação remota.
+- **Remote audit:** persiste pares locais `START`/`RESULT`, privados e
+  sincronizados, sem credenciais, stderr SSH ou conteúdo de logs.
 
 Saúde não altera o plano declarativo. Diagnóstico não executa recuperação. Essa
 separação permite que um contêiner parado, mas equivalente nos campos
@@ -80,9 +88,19 @@ matriz entre artefatos produzidos e ambientes realmente executados está em
 ## Backup e restauração
 
 A fronteira aceita em [ADR 0003](adr/0003-safe-backup-boundary.md) separa
-configuração, estado operacional e dados persistentes. A primeira implementação
-protegerá apenas manifesto validado e exportação opcional de histórico do
+configuração, estado operacional e dados persistentes. A implementação atual
+protege apenas manifesto validado e exportação opcional de histórico do
 journal em artefato privado, versionado, limitado e verificado por SHA-256.
 Restore publicará somente em destino ausente e journals importados nunca serão
 ativados. Volumes, bancos, secrets e credenciais permanecem excluídos. O fluxo
 e seus gates estão em [BACKUP-RESTORE-DESIGN.md](BACKUP-RESTORE-DESIGN.md).
+
+## Operação remota independente
+
+A fronteira aceita em [ADR 0002](adr/0002-independent-connectivity.md) separa
+registry, transporte SSH, autenticação externa, executor allowlisted,
+autorização por manifesto/ownership, adaptador Podman somente leitura e audit
+local. O operador fornece uma rota já funcional, direta ou via bastion. O
+Orisema não cria VPN, relay, conta externa nem plano de controle central.
+Mutações remotas continuam fora do contrato até existirem autorização,
+confirmação, journal no host remoto e recuperação conservadora próprios.

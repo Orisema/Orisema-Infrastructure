@@ -63,6 +63,11 @@ no-replace publication uses the Linux kernel. The commands explicitly exclude
 volumes, application data, secrets and credentials; see the
 [design](BACKUP-RESTORE-DESIGN.md).
 
+`host check` uses the installed OpenSSH client on Linux. A real local `sshd`
+laboratory validates key authentication and strict host-key rejection on Ubuntu
+24.04. ProxyJump construction and failure modes are unit-tested; a real bastion
+topology and remote inspection are not yet claimed as validated.
+
 The public Alpha 5 flow now reaches a durable post-update health decision, but
 data rollback remains unavailable. The Alpha 5 manual application rollback
 preserves both exact container identities. Its laboratory proves that an

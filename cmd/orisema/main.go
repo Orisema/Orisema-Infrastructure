@@ -22,6 +22,7 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/operation"
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
 	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
+	"github.com/Orisema/Orisema-Infrastructure/internal/remote"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
 	"github.com/Orisema/Orisema-Infrastructure/internal/updateplan"
 )
@@ -42,6 +43,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if len(args) > 0 && args[0] == "backup" {
 		return runBackupCommand(args, stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "host" {
+		return runHostCommand(args, stdout, stderr)
 	}
 	if len(args) < 2 {
 		printUsage(stderr)
@@ -222,7 +226,27 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+}
+
+func runHostCommand(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 4 || args[1] != "check" {
+		printUsage(stderr)
+		return 2
+	}
+	registry, err := remote.LoadRegistry(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "host check blocked: %v\n", err)
+		return 1
+	}
+	result, err := (remote.Transport{}).Check(context.Background(), *registry, args[3])
+	if err != nil {
+		fmt.Fprintf(stderr, "host check failed: alias=%s outcome=%s duration=%s\n", args[3], result.Outcome, result.Duration.Round(time.Millisecond))
+		return 1
+	}
+	fmt.Fprintf(stdout, "Host connectivity verified: alias=%s outcome=%s duration=%s\n", result.Host, result.Outcome, result.Duration.Round(time.Millisecond))
+	fmt.Fprintln(stdout, "Strict host-key checking and key-only batch authentication were enforced; no remote state was inspected or changed.")
+	return 0
 }
 
 func runBackupCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

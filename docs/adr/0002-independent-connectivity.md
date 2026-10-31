@@ -1,6 +1,6 @@
 # ADR 0002 — Conectividade remota independente
 
-- Status: Aceita para planejamento; implementação pendente
+- Status: Aceita; registry e transporte implementados, inspeção pendente
 - Contexto: Fase 2 — Operação
 
 ## Contexto

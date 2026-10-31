@@ -114,7 +114,8 @@ de recuperação; interrupções continuam diagnosticáveis e falham fechado.
 
 - [x] Definir fronteira segura, formato e integridade de backup (#62).
 - [x] Implementar e testar backup/restore de configuração e histórico (#64).
-- [ ] Implementar SSH estrito e inspeção remota somente leitura.
+- [ ] Implementar inspeção remota somente leitura sobre o transporte estrito.
+- [x] Implementar registry e transporte SSH estrito sem comandos arbitrários (#66).
 
 Backup de dados persistentes permanece fora do escopo até existir um contrato
 específico de ownership e consistência.

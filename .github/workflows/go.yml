@@ -39,7 +39,7 @@ jobs:
       - name: Install Podman
         run: |
           sudo apt-get update
-          sudo apt-get install -y podman
+          sudo apt-get install -y podman openssh-server
           sudo podman version
       - name: Build and check with Go 1.23
         run: |
@@ -178,6 +178,16 @@ jobs:
             ORISEMA_EVIDENCE_DIR="$PWD/work/phase2-backup-restore" \
             scripts/phase2-backup-restore-lab.sh
           sudo chown -R "$USER":"$(id -gn)" work/phase2-backup-restore
+      - name: Exercise Phase 2 strict SSH transport laboratory
+        run: |
+          set -euo pipefail
+          status=0
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/phase2-ssh-transport" \
+            scripts/phase2-ssh-transport-lab.sh || status=$?
+          sudo chown -R "$USER":"$(id -gn)" work/phase2-ssh-transport
+          exit "$status"
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -199,6 +209,8 @@ jobs:
             work/alpha5-manual-rollback/*.txt
             work/phase2-backup-restore/*.json
             work/phase2-backup-restore/*.txt
+            work/phase2-ssh-transport/*.txt
+            work/phase2-ssh-transport/*.log
   quickstart-matrix:
     name: quickstart (${{ matrix.os }})
     strategy:

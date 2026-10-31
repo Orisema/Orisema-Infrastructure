@@ -30,6 +30,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Contrato de manifesto da Alpha 2](docs/MANIFEST-V1ALPHA2.md)
 - [Laboratório de update e rollback da Alpha 3](docs/CONTROLLED-UPDATE-LAB.md)
 - [Backup e restauração de configuração](docs/BACKUP-RESTORE-DESIGN.md)
+- [Transporte SSH estrito](docs/SSH.md)
 - [Projeto de recuperação confiável da Alpha 4](docs/ALPHA4-RECOVERY-DESIGN.md)
 - [Plano somente leitura de update da Alpha 5](docs/ALPHA5-UPDATE-PLAN.md)
 - [Instalação e verificação de releases](docs/INSTALLATION.md)

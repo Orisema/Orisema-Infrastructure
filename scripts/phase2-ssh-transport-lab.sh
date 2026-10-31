@@ -6,15 +6,27 @@ set -euo pipefail
 
 binary="${ORISEMA_BINARY:-$PWD/work/orisema}"
 evidence="${ORISEMA_EVIDENCE_DIR:-$PWD/work/phase2-ssh-transport}"
-target_user="${ORISEMA_SSH_USER:?ORISEMA_SSH_USER is required}"
 port="${ORISEMA_SSH_PORT:-22229}"
+target_user="orisemalab$$"
+authorized="/tmp/orisema-ssh-authorized-$$"
+sshd_pid=""
+cleanup() {
+  if [ -n "$sshd_pid" ]; then
+    kill "$sshd_pid" >/dev/null 2>&1 || true
+    wait "$sshd_pid" >/dev/null 2>&1 || true
+  fi
+  userdel "$target_user" >/dev/null 2>&1 || true
+  unlink "$authorized" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+useradd --no-create-home --shell /bin/sh "$target_user"
+passwd -d "$target_user" >/dev/null
 mkdir -p "$evidence"
 chmod 711 "$evidence"
 
 client_key="$evidence/client"
 wrong_key="$evidence/wrong-client"
 host_key="$evidence/host"
-authorized="$evidence/authorized_keys"
 known="$evidence/known_hosts"
 registry="$evidence/hosts.yaml"
 sshd_config="$evidence/sshd_config"
@@ -48,8 +60,6 @@ mkdir -p /run/sshd
 chmod 755 /run/sshd
 /usr/sbin/sshd -D -f "$sshd_config" -E "$evidence/sshd.log" &
 sshd_pid=$!
-cleanup() { kill "$sshd_pid" >/dev/null 2>&1 || true; wait "$sshd_pid" >/dev/null 2>&1 || true; }
-trap cleanup EXIT
 for _ in $(seq 1 50); do
   if bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null; then break; fi
   sleep 0.1

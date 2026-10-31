@@ -181,12 +181,13 @@ jobs:
       - name: Exercise Phase 2 strict SSH transport laboratory
         run: |
           set -euo pipefail
+          status=0
           sudo env \
             ORISEMA_BINARY="$PWD/work/orisema" \
             ORISEMA_EVIDENCE_DIR="$PWD/work/phase2-ssh-transport" \
-            ORISEMA_SSH_USER="$USER" \
-            scripts/phase2-ssh-transport-lab.sh
+            scripts/phase2-ssh-transport-lab.sh || status=$?
           sudo chown -R "$USER":"$(id -gn)" work/phase2-ssh-transport
+          exit "$status"
       - name: Save laboratory evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

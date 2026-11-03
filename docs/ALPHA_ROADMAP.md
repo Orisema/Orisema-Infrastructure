@@ -1,6 +1,6 @@
 # Orisema Infrastructure — Alpha release plan
 
-Status: **plano ativo, atualizado em 31/10/2026**. Não representa promessa de
+Status: **plano ativo, atualizado em 03/11/2026**. Não representa promessa de
 datas nem declara funcionalidade de produção.
 
 ## Base existente
@@ -126,6 +126,24 @@ versão e commit incorporados.
 
 Backup de dados persistentes permanece fora do escopo até existir um contrato
 específico de ownership e consistência.
+
+## v0.1.0-alpha.6 — configuração segura
+
+- [x] Propor o contrato e modelo de ameaça para segredos externos por arquivo
+  ([RFC-0002](RFC-0002-secure-secrets.md), #77).
+- [ ] Versionar o manifesto sem ampliar `v1alpha1` ou `v1alpha2` em silêncio.
+- [ ] Implementar provider `podman` como padrão e `file` como compatibilidade.
+- [ ] Entregar somente em `/run/secrets/<target>`, sem valor inline ou ambiente.
+- [ ] Garantir não divulgação em plano, inspect, logs, erros, journal e backup.
+- [ ] Validar ausência, rotação, permissões, links, corrida, limites e cleanup
+  em Podman rootless.
+- [ ] Validar uma aplicação real em laboratório com segredos artificiais.
+
+**Gate:** os contratos antigos permanecem compatíveis; nenhum canário aparece
+nas evidências; toda identidade é revalidada antes de mutação; falhas deixam o
+runtime inalterado ou uma recuperação explícita e diagnosticável. Configuração
+não secreta e redes terão contrato próprio e não serão confundidas com esta
+entrega.
 
 ## Integração opcional futura — Orisema Data
 

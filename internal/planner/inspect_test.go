@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/networks"
+	"github.com/Orisema/Orisema-Infrastructure/internal/publicconfig"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
 	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 )
@@ -103,5 +105,46 @@ func TestBuildInspectedResolvedComparesSecretIdentityLabels(t *testing.T) {
 	got = BuildInspectedResolved(context.Background(), m, existing, fakeInspector{item: item}, mounts)
 	if got[0].Action != Drift || !strings.Contains(got[0].Reason, "secret binding metadata differs") {
 		t.Fatalf("changed secret plan = %#v; want DRIFT", got)
+	}
+}
+
+func TestBuildInspectedResolvedRuntimeComparesPublicConfigurationAndNetworks(t *testing.T) {
+	m := &manifest.Manifest{Name: "demo", Services: []manifest.Service{{
+		Name: "web", Image: "nginx:latest",
+		PublicEnvironment: []manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}},
+		Networks:          []manifest.NetworkBinding{{Name: "private"}},
+	}}}
+	binding := networks.ResolvedBinding{Name: "private", Provider: networks.ProviderPodman, Locator: "alpha7-private", Identity: strings.Repeat("a", 64), Driver: "bridge"}
+	resolved := map[string][]networks.ResolvedBinding{"web": {binding}}
+	got := BuildInspectedResolvedRuntime(context.Background(), m, nil, fakeInspector{}, nil, resolved)
+	if len(got) != 1 || got[0].Action != Create {
+		t.Fatalf("missing container plan = %#v; want CREATE", got)
+	}
+	names, hash := publicconfig.Metadata(m.Services[0].PublicEnvironment)
+	item := runtime.Inspection{}
+	item.Config.Image = "nginx:latest"
+	item.Config.Env = []string{"PATH=/usr/bin", "APP_MODE=laboratory"}
+	item.Config.Labels = map[string]string{
+		"dev.orisema.managed": "true", "dev.orisema.app": "demo", "dev.orisema.service": "web",
+		publicconfig.NamesLabel: names, publicconfig.HashLabel: hash,
+		"dev.orisema.network.private": "podman:" + binding.Identity + ":bridge",
+	}
+	item.HostConfig.RestartPolicy.Name = "no"
+	item.NetworkSettings.Networks = map[string]runtime.NetworkEndpoint{"alpha7-private": {NetworkID: binding.Identity}}
+	existing := []runtime.Container{{Names: []string{"orisema-demo-web"}}}
+	got = BuildInspectedResolvedRuntime(context.Background(), m, existing, fakeInspector{item: item}, nil, resolved)
+	if got[0].Action != Noop {
+		t.Fatalf("matching runtime plan = %#v; want NOOP", got)
+	}
+	item.Config.Env[1] = "APP_MODE=changed"
+	got = BuildInspectedResolvedRuntime(context.Background(), m, existing, fakeInspector{item: item}, nil, resolved)
+	if got[0].Action != Drift || strings.Contains(got[0].Reason, "laboratory") || strings.Contains(got[0].Reason, "changed") {
+		t.Fatalf("public configuration drift = %#v; want value-free DRIFT", got)
+	}
+	item.Config.Env[1] = "APP_MODE=laboratory"
+	item.NetworkSettings.Networks = map[string]runtime.NetworkEndpoint{"wrong-network": {}}
+	got = BuildInspectedResolvedRuntime(context.Background(), m, existing, fakeInspector{item: item}, nil, resolved)
+	if got[0].Action != Drift || !strings.Contains(got[0].Reason, "network attachment differs") {
+		t.Fatalf("network drift = %#v; want DRIFT", got)
 	}
 }

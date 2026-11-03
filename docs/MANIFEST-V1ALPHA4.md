@@ -4,11 +4,12 @@
 and references to pre-existing external Podman networks. It preserves every
 validated `v1alpha3` field, including file-delivered secrets.
 
-The current increment implements schema, validation and metadata-only network
-resolution. `validate` accepts a valid manifest, while `plan` still returns
-`REVIEW` and `deploy` makes no changes when `publicEnvironment` or service
-network bindings are present. Runtime delivery will be enabled only after the
-resolved identities are integrated into planning and deployment.
+The current increment implements schema, validation, metadata-only network
+resolution, conservative drift comparison and CREATE delivery. `plan` resolves
+every consumed network before inspecting containers. `deploy` revalidates each
+network immediately before creation and passes public environment entries and
+network IDs as separate Podman arguments. Existing containers with differences
+remain `DRIFT`; update and rollback with these fields remain blocked.
 
 ## Public environment
 
@@ -48,8 +49,9 @@ services:
 Application network names are logical references. Podman names identify
 external `bridge` networks that the operator creates separately. The first
 provider inspects exact names, accepts only 64-character immutable IDs and the
-`bridge` driver, and exposes a revalidation operation for the future mutation
-boundary. It never creates, adopts, changes or removes those networks.
+`bridge` driver, and revalidates that identity immediately before CREATE.
+Containers attach by ID. Orisema never creates, adopts, changes or removes
+those networks.
 
 At most 32 networks may be declared and each service may bind at most 8.
 Bindings must reference declarations, duplicates are rejected, every declared

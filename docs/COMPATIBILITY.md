@@ -99,10 +99,9 @@ See [the controlled update laboratory](CONTROLLED-UPDATE-LAB.md).
   update/rollback with bindings remains blocked. See
   [the Alpha 6 contract](MANIFEST-V1ALPHA3.md).
 - `orisema.dev/v1alpha4` additionally validates explicitly public environment
-  entries and references to pre-existing external Podman networks. Runtime
-  metadata resolution is implemented without lifecycle operations, but planner
-  and deploy integration are not: `plan` returns `REVIEW` and `deploy` remains
-  unchanged. See
+  entries and references to pre-existing external Podman networks. Planner and
+  CREATE deploy resolve, compare and revalidate network identities without
+  lifecycle operations; update/rollback with these fields remain blocked. See
   [the Alpha 7 contract](MANIFEST-V1ALPHA4.md).
 - Secret values in environment variables, volumes, custom permissions and JSON
   output are not supported and fail closed. See
@@ -111,14 +110,15 @@ See [the controlled update laboratory](CONTROLLED-UPDATE-LAB.md).
 ## Meaning of `NOOP`
 
 `NOOP` confirms only matching ownership labels, configured image reference, TCP
-port mappings, declared healthcheck command/timing/retries and restart policy.
+port mappings, declared healthcheck command/timing/retries, restart policy,
+resolved secret metadata, declared public configuration and network bindings.
 It does **not** confirm:
 
 - that the container is running or healthy;
 - image digest, freshness or registry identity;
 - undeclared or image-inherited settings outside the supported comparison;
-- volumes, undeclared or unsupported secrets, public environment entries,
-  networks or security context;
+- volumes, undeclared or unsupported secrets, undeclared environment entries,
+  undeclared networks or security context;
 - firewall exposure, dependencies or application-level reachability;
 - production readiness.
 

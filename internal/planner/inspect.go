@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/networks"
+	"github.com/Orisema/Orisema-Infrastructure/internal/publicconfig"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
 	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 )
@@ -28,22 +30,33 @@ type Inspector interface {
 // BuildInspected checks declared managed fields only. It never mutates Podman.
 // Inspection failures are REVIEW, not evidence of safe equivalence.
 func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtime.Container, inspector Inspector) []Step {
-	return buildInspected(ctx, m, existing, inspector, nil, false)
+	return buildInspected(ctx, m, existing, inspector, nil, nil, false, false)
 }
 
 // BuildInspectedResolved includes externally resolved secret identities in the
 // comparison without reading or transporting their values.
 func BuildInspectedResolved(ctx context.Context, m *manifest.Manifest, existing []runtime.Container, inspector Inspector, resolved map[string][]secrets.ResolvedMount) []Step {
-	return buildInspected(ctx, m, existing, inspector, resolved, true)
+	return buildInspected(ctx, m, existing, inspector, resolved, nil, true, false)
 }
 
-func buildInspected(ctx context.Context, m *manifest.Manifest, existing []runtime.Container, inspector Inspector, resolved map[string][]secrets.ResolvedMount, allowSecrets bool) []Step {
+// BuildInspectedResolvedRuntime includes secret and external-network identities
+// plus explicitly public environment configuration in conservative comparison.
+func BuildInspectedResolvedRuntime(ctx context.Context, m *manifest.Manifest, existing []runtime.Container, inspector Inspector, resolvedSecrets map[string][]secrets.ResolvedMount, resolvedNetworks map[string][]networks.ResolvedBinding) []Step {
+	return buildInspected(ctx, m, existing, inspector, resolvedSecrets, resolvedNetworks, true, true)
+}
+
+func buildInspected(ctx context.Context, m *manifest.Manifest, existing []runtime.Container, inspector Inspector, resolvedSecrets map[string][]secrets.ResolvedMount, resolvedNetworks map[string][]networks.ResolvedBinding, allowSecrets, allowAlpha4 bool) []Step {
 	steps := make([]Step, 0, len(m.Services))
 	for _, svc := range m.Services {
 		name := "orisema-" + m.Name + "-" + svc.Name
-		mounts := resolved[svc.Name]
-		if len(svc.PublicEnvironment) != 0 || len(svc.Networks) != 0 {
+		mounts := resolvedSecrets[svc.Name]
+		networkBindings := resolvedNetworks[svc.Name]
+		if (len(svc.PublicEnvironment) != 0 || len(svc.Networks) != 0) && !allowAlpha4 {
 			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Review, Reason: "public configuration or network delivery is declared but not implemented; no changes made"})
+			continue
+		}
+		if len(svc.Networks) != len(networkBindings) {
+			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Review, Reason: "network delivery metadata is incomplete; no changes made"})
 			continue
 		}
 		if len(svc.Secrets) != 0 && (!allowSecrets || len(mounts) != len(svc.Secrets)) {
@@ -66,6 +79,55 @@ func buildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 			continue
 		}
 		reasons := []string{}
+		expectedNames, expectedHash := publicconfig.Metadata(svc.PublicEnvironment)
+		if len(svc.PublicEnvironment) != 0 {
+			if labels[publicconfig.NamesLabel] != expectedNames || labels[publicconfig.HashLabel] != expectedHash {
+				reasons = append(reasons, "public configuration metadata differs")
+			}
+			actualEnvironment := publicconfig.EnvironmentMap(inspected.Config.Env)
+			for _, entry := range svc.PublicEnvironment {
+				actual, ok := actualEnvironment[entry.Name]
+				if !ok || actual != entry.Value {
+					reasons = append(reasons, "public configuration differs")
+					break
+				}
+			}
+		} else if labels[publicconfig.NamesLabel] != "" || labels[publicconfig.HashLabel] != "" {
+			reasons = append(reasons, "unexpected public configuration metadata")
+		}
+		expectedNetworkLabels := make(map[string]string, len(networkBindings))
+		expectedNetworkNames := make(map[string]bool, len(networkBindings))
+		for _, binding := range networkBindings {
+			expectedNetworkLabels["dev.orisema.network."+binding.Name] = string(binding.Provider) + ":" + binding.Identity + ":" + binding.Driver
+			expectedNetworkNames[binding.Locator] = true
+		}
+		for key, expected := range expectedNetworkLabels {
+			if labels[key] != expected {
+				reasons = append(reasons, "network binding metadata differs")
+				break
+			}
+		}
+		for key := range labels {
+			if strings.HasPrefix(key, "dev.orisema.network.") {
+				if _, ok := expectedNetworkLabels[key]; !ok {
+					reasons = append(reasons, "unexpected network binding metadata")
+					break
+				}
+			}
+		}
+		if len(networkBindings) != 0 {
+			actualNetworks := inspected.NetworkSettings.Networks
+			if len(actualNetworks) != len(expectedNetworkNames) {
+				reasons = append(reasons, "network attachment count differs")
+			} else {
+				for locator := range expectedNetworkNames {
+					if _, ok := actualNetworks[locator]; !ok {
+						reasons = append(reasons, "network attachment differs")
+						break
+					}
+				}
+			}
+		}
 		expectedSecretLabels := make(map[string]string, len(mounts))
 		for _, mount := range mounts {
 			expectedSecretLabels["dev.orisema.secret."+mount.Target] = string(mount.Provider) + ":" + mount.Identity
@@ -149,7 +211,7 @@ func buildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 		if len(reasons) > 0 {
 			steps = append(steps, Step{Name: name, Image: svc.Image, CurrentImage: inspected.Config.Image, CurrentID: inspected.ID, Action: Drift, Differences: append([]string(nil), reasons...), Reason: strings.Join(reasons, ", ")})
 		} else {
-			steps = append(steps, Step{Name: name, Image: svc.Image, CurrentImage: inspected.Config.Image, CurrentID: inspected.ID, Action: Noop, Reason: "managed image reference, ports, healthcheck, restart policy and secret binding metadata match; live health and other settings not verified"})
+			steps = append(steps, Step{Name: name, Image: svc.Image, CurrentImage: inspected.Config.Image, CurrentID: inspected.ID, Action: Noop, Reason: "managed image reference, ports, healthcheck, restart policy, secret metadata, public configuration and network bindings match; live health and other settings not verified"})
 		}
 	}
 	return steps

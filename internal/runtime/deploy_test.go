@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/networks"
+	"github.com/Orisema/Orisema-Infrastructure/internal/publicconfig"
 	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 )
 
@@ -181,19 +183,54 @@ func TestDeployPodmanSecretArgumentsContainIdentityNotLocator(t *testing.T) {
 	}
 }
 
-func TestDeployBlocksUnimplementedAlpha4DeliveryBeforeRuntime(t *testing.T) {
+func TestUpdateBlocksAlpha4DeliveryBeforeRuntime(t *testing.T) {
 	for _, svc := range []manifest.Service{
 		{Name: "web", Image: "nginx:1.27", PublicEnvironment: []manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}}},
 		{Name: "web", Image: "nginx:1.27", Networks: []manifest.NetworkBinding{{Name: "private"}}},
 	} {
-		_, err := (Client{Binary: "/does/not/exist"}).DeployWithSecrets(context.Background(), "alpha7", svc, nil)
-		if err == nil || !strings.Contains(err.Error(), "not implemented; no changes made") {
-			t.Fatalf("DeployWithSecrets() error = %v; want fail-closed rejection", err)
-		}
-		_, err = (Client{Binary: "/does/not/exist"}).CreateUpdateCandidate(context.Background(), "alpha7", svc)
+		_, err := (Client{Binary: "/does/not/exist"}).CreateUpdateCandidate(context.Background(), "alpha7", svc)
 		if err == nil || !strings.Contains(err.Error(), "not implemented for update; no changes made") {
 			t.Fatalf("CreateUpdateCandidate() error = %v; want fail-closed rejection", err)
 		}
+	}
+}
+
+func TestDeployResolvedPublicConfigurationAndNetworkArguments(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ORISEMA_ARGV_HELPER", "1")
+	svc := manifest.Service{
+		Name: "web", Image: "nginx:1.27",
+		PublicEnvironment: []manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}, {Name: "EMPTY_VALUE", Value: ""}},
+		Networks:          []manifest.NetworkBinding{{Name: "private"}},
+	}
+	binding := networks.ResolvedBinding{Name: "private", Provider: networks.ProviderPodman, Locator: "mutable-name", Identity: strings.Repeat("a", 64), Driver: "bridge"}
+	out, err := (Client{Binary: binary}).DeployWithResolved(context.Background(), "alpha7", svc, nil, []networks.ResolvedBinding{binding})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(out), &args); err != nil {
+		t.Fatal(err)
+	}
+	names, hash := publicconfig.Metadata(svc.PublicEnvironment)
+	wants := []string{
+		publicconfig.NamesLabel + "=" + names,
+		publicconfig.HashLabel + "=" + hash,
+		"APP_MODE=laboratory", "EMPTY_VALUE=",
+		"dev.orisema.network.private=podman:" + binding.Identity + ":bridge",
+		binding.Identity,
+	}
+	joined := strings.Join(args, " ")
+	for _, want := range wants {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("argv = %#v; missing %q", args, want)
+		}
+	}
+	if strings.Contains(joined, binding.Locator) {
+		t.Fatalf("argv unexpectedly contains mutable network locator: %#v", args)
 	}
 }
 

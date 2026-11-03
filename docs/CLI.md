@@ -1,11 +1,12 @@
-# CLI prototype (Alpha 6)
+# CLI prototype (Alpha 7 development)
 
 This is an **experimental laboratory CLI**, not production-ready. `validate` works offline; `plan`, `status` and lifecycle commands query local Podman.
 
 The Alpha 7 `v1alpha4` schema accepts bounded `publicEnvironment` and external
-network references in `validate`. Their runtime delivery is intentionally
-fail-closed until network identity resolution is implemented: `plan` reports
-`REVIEW`, and `deploy` performs no mutation.
+network references. `plan` resolves external network metadata and detects drift
+without printing public values. CREATE deploys environment entries and attaches
+pre-existing `bridge` networks by revalidated ID. Network lifecycle and
+update/rollback with these fields remain fail-closed.
 
 ## Requirements
 

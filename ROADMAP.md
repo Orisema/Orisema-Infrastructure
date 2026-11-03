@@ -104,9 +104,10 @@ no primeiro incremento.
   explicitamente não secreta e redes Podman externas ([RFC-0003](docs/RFC-0003-public-config-and-external-networks.md), #92).
 - [x] Implementar tipos e validação sem ampliar contratos antigos (#94).
 - [x] Resolver e revalidar redes externas por identidade, sem lifecycle (#96).
-- [ ] Comparar drift de configuração pública e associações de rede.
-- [ ] Entregar configuração e redes no deploy sem shell nem remoção de recurso
-  externo.
+- [x] Comparar drift de configuração pública e associações de rede sem revelar
+  valores (#98).
+- [x] Entregar configuração e redes no deploy por argumentos separados, com
+  revalidação de identidade e sem lifecycle de recurso externo (#98).
 - [ ] Validar em Podman rootless e repetir o laboratório MixIdentity completo
   com dependências e dados artificiais.
 

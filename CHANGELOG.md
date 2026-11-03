@@ -6,6 +6,19 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ## [Unreleased]
 
+### Adicionado
+
+- Planner e CREATE deploy para `v1alpha4`, com configuração explicitamente
+  pública e associação a redes Podman externas `bridge` por ID revalidado.
+- Labels sem valores para provar o conjunto de ambiente gerenciado e identidades
+  de rede, além de laboratório rootless de drift e preservação das redes.
+
+### Segurança
+
+- Valores públicos não entram em labels, planos ou evidências do laboratório;
+  argumentos são enviados ao Podman sem shell e redes externas não recebem
+  qualquer operação de lifecycle.
+
 ## [0.1.0-alpha.6] - 2026-11-03
 
 ### Adicionado

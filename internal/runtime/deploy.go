@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/networks"
+	"github.com/Orisema/Orisema-Infrastructure/internal/publicconfig"
 	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 )
 
@@ -27,8 +29,14 @@ func (c Client) Deploy(ctx context.Context, app string, s manifest.Service) (str
 // provider identities. The caller must revalidate these identities immediately
 // before invoking this method.
 func (c Client) DeployWithSecrets(ctx context.Context, app string, s manifest.Service, mounts []secrets.ResolvedMount) (string, error) {
-	if len(s.PublicEnvironment) != 0 || len(s.Networks) != 0 {
-		return "", fmt.Errorf("public configuration and network delivery are not implemented; no changes made")
+	return c.DeployWithResolved(ctx, app, s, mounts, nil)
+}
+
+// DeployWithResolved creates a container using already resolved secret and
+// network identities. The caller must revalidate them immediately beforehand.
+func (c Client) DeployWithResolved(ctx context.Context, app string, s manifest.Service, mounts []secrets.ResolvedMount, networkBindings []networks.ResolvedBinding) (string, error) {
+	if len(s.Networks) != len(networkBindings) {
+		return "", fmt.Errorf("network delivery metadata is incomplete; no changes made")
 	}
 	name := "orisema-" + app + "-" + s.Name
 	bin := c.Binary
@@ -52,6 +60,23 @@ func (c Client) DeployWithSecrets(ctx context.Context, app string, s manifest.Se
 		"--label", "dev.orisema.app=" + app,
 		"--label", "dev.orisema.service=" + s.Name,
 		"--security-opt", "no-new-privileges",
+	}
+	if len(s.PublicEnvironment) != 0 {
+		names, digest := publicconfig.Metadata(s.PublicEnvironment)
+		args = append(args,
+			"--label", publicconfig.NamesLabel+"="+names,
+			"--label", publicconfig.HashLabel+"="+digest)
+		for _, entry := range s.PublicEnvironment {
+			args = append(args, "--env", entry.Name+"="+entry.Value)
+		}
+	}
+	for i, binding := range networkBindings {
+		if binding.Name != s.Networks[i].Name || binding.Provider != networks.ProviderPodman || binding.Identity == "" || binding.Driver != "bridge" {
+			return "", fmt.Errorf("network %q has unsupported or incomplete resolved metadata; no changes made", s.Networks[i].Name)
+		}
+		args = append(args,
+			"--label", networkLabel(binding.Name)+"="+string(binding.Provider)+":"+binding.Identity+":"+binding.Driver,
+			"--network", binding.Identity)
 	}
 	if h := s.Healthcheck; h != nil {
 		// Explicit JSON prevents Podman from interpreting commands such as "none"
@@ -103,6 +128,10 @@ func (c Client) DeployWithSecrets(ctx context.Context, app string, s manifest.Se
 
 func secretLabel(target string) string {
 	return "dev.orisema.secret." + target
+}
+
+func networkLabel(name string) string {
+	return "dev.orisema.network." + name
 }
 
 // cleanupFailedCreate handles Podman's documented behavior of retaining a

@@ -165,9 +165,10 @@ artefatos AMD64/ARM64 e reinstalou com sucesso o binário AMD64 baixado.
   de rede, preservando rejeição nos contratos anteriores (#94).
 - [x] Resolver redes Podman externas por identidade e fornecer revalidação para
   o deploy futuro, sem criar, adotar, alterar ou remover redes (#96).
-- [ ] Detectar drift de ambiente e associações de rede sem imprimir valores.
-- [ ] Validar ausência, incompatibilidade, troca de identidade, cleanup e
-  preservação de recursos externos em Podman rootless.
+- [x] Detectar drift de ambiente e associações de rede sem imprimir valores
+  (#98).
+- [x] Validar drift, entrega, cleanup do contêiner e preservação de recursos
+  externos em Podman rootless (#98).
 - [ ] Executar MixIdentity com backend e dependências artificiais isoladas.
 
 **Gate:** nenhuma configuração é tratada como secreta; nenhuma rede externa é

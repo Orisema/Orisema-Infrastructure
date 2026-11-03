@@ -58,6 +58,12 @@ jobs:
             work/networks.test -test.v \
             -test.run '^TestPodmanNetworkIntegrationReadOnly$' \
             | tee work/alpha7-network-provider.txt
+      - name: Exercise Alpha 7 public configuration and external network deploy
+        run: |
+          set -euo pipefail
+          sudo env ORISEMA_BINARY="$PWD/work/orisema" \
+            EVIDENCE_DIR="$PWD/work/alpha7-config-network" \
+            scripts/alpha7-config-network-lab.sh
       - name: Deploy isolated healthcheck and verify real inspect
         run: |
           set -euo pipefail
@@ -257,6 +263,7 @@ jobs:
             work/alpha6-secret-lifecycle/*.txt
             work/alpha6-secret-lifecycle/*.out
             work/alpha6-secret-lifecycle/*.err
+            work/alpha7-config-network/*.txt
             work/alpha3-update/*.json
             work/alpha3-update/*.txt
             work/alpha5-update-apply/*.json

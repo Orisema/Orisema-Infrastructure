@@ -20,6 +20,7 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/buildinfo"
 	"github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/networks"
 	"github.com/Orisema/Orisema-Infrastructure/internal/operation"
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
 	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
@@ -116,16 +117,21 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "secret resolution blocked: %v; no changes made\n", err)
 			return 1
 		}
+		resolvedNetworks, err := resolveManifestNetworks(context.Background(), m)
+		if err != nil {
+			fmt.Fprintf(stderr, "network resolution blocked: %v; no changes made\n", err)
+			return 1
+		}
 		containers, err := (runtime.Client{}).List(context.Background())
 		if err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
 		fmt.Fprintf(stdout, "Read-only Podman plan for %q:\n", m.Name)
-		for _, step := range planner.BuildInspectedResolved(context.Background(), m, containers, runtime.Client{}, resolved) {
+		for _, step := range planner.BuildInspectedResolvedRuntime(context.Background(), m, containers, runtime.Client{}, resolved, resolvedNetworks) {
 			fmt.Fprintf(stdout, "  [%s] %s: %s (%s)\n", step.Action, step.Name, step.Image, step.Reason)
 		}
-		fmt.Fprintln(stdout, "NOOP checks only ownership labels, configured image reference, ports, healthcheck and restart policy configuration; live health and other settings not verified. No changes made.")
+		fmt.Fprintln(stdout, "NOOP checks ownership labels, configured image reference, ports, healthcheck, restart policy, resolved secret metadata, declared public configuration and network bindings; live health and other settings are not verified. No changes made.")
 	case "deploy":
 		client := runtime.Client{}
 		resolved, err := resolveManifestSecrets(context.Background(), m)
@@ -133,12 +139,17 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "secret resolution blocked: %v; no changes made\n", err)
 			return 1
 		}
+		resolvedNetworks, err := resolveManifestNetworks(context.Background(), m)
+		if err != nil {
+			fmt.Fprintf(stderr, "network resolution blocked: %v; no changes made\n", err)
+			return 1
+		}
 		containers, err := client.List(context.Background())
 		if err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
-		steps := planner.BuildInspectedResolved(context.Background(), m, containers, client, resolved)
+		steps := planner.BuildInspectedResolvedRuntime(context.Background(), m, containers, client, resolved, resolvedNetworks)
 		creates := 0
 		blocked := false
 		fmt.Fprintf(stdout, "Conservative deployment plan for %q:\n", m.Name)
@@ -187,12 +198,16 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				fmt.Fprintln(stderr, "deployment stopped: secret identity changed or became unavailable after confirmation; no container created for this service")
 				return 1
 			}
+			if err := networks.RevalidateManifest(context.Background(), m, networkInspectors(), resolvedNetworks); err != nil {
+				fmt.Fprintf(stderr, "deployment stopped: network identity changed or became unavailable after confirmation: %v\n", err)
+				return 1
+			}
 			prepared, cleanupSecrets, err := (secrets.Preparer{}).PrepareService(context.Background(), m.Name, m.Services[i].Name, fresh[m.Services[i].Name])
 			if err != nil {
 				fmt.Fprintf(stderr, "deployment stopped while preparing secrets: %v\n", err)
 				return 1
 			}
-			id, err := client.DeployWithSecrets(context.Background(), m.Name, m.Services[i], prepared)
+			id, err := client.DeployWithResolved(context.Background(), m.Name, m.Services[i], prepared, resolvedNetworks[m.Services[i].Name])
 			cleanupErr := cleanupSecrets(context.Background())
 			if err != nil {
 				fmt.Fprintf(stderr, "deployment stopped: %v\nPreviously created services, if any, were not rolled back.\n", err)
@@ -266,6 +281,16 @@ func resolveManifestSecrets(ctx context.Context, m *manifest.Manifest) (map[stri
 		secrets.ProviderPodman: secrets.PodmanInspector{},
 		secrets.ProviderFile:   secrets.FileInspector{},
 	})
+}
+
+func networkInspectors() map[networks.Provider]networks.Inspector {
+	return map[networks.Provider]networks.Inspector{
+		networks.ProviderPodman: networks.PodmanInspector{},
+	}
+}
+
+func resolveManifestNetworks(ctx context.Context, m *manifest.Manifest) (map[string][]networks.ResolvedBinding, error) {
+	return networks.ResolveManifest(ctx, m, networkInspectors())
 }
 
 func runSecretCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

@@ -40,6 +40,7 @@ type Inspection struct {
 	Config       struct {
 		Image       string            `json:"Image"`
 		Labels      map[string]string `json:"Labels"`
+		Env         []string          `json:"Env"`
 		Secrets     []SecretReference `json:"Secrets"`
 		Healthcheck *struct {
 			Test     []string `json:"Test"`
@@ -55,6 +56,13 @@ type Inspection struct {
 			MaximumRetryCount int    `json:"MaximumRetryCount"`
 		} `json:"RestartPolicy"`
 	} `json:"HostConfig"`
+	NetworkSettings struct {
+		Networks map[string]NetworkEndpoint `json:"Networks"`
+	} `json:"NetworkSettings"`
+}
+
+type NetworkEndpoint struct {
+	NetworkID string `json:"NetworkID"`
 }
 
 // Inspect reads a container's configured image reference, ownership labels,

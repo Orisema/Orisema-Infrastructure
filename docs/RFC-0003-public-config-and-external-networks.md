@@ -1,6 +1,6 @@
 # RFC-0003: configuração pública e redes Podman externas
 
-- Status: proposta para Alpha 7
+- Status: implementação incremental na Alpha 7
 - Issue: #92
 - Contrato candidato: `orisema.dev/v1alpha4`
 
@@ -183,9 +183,9 @@ público e provisiona previamente as redes referenciadas.
    sem dados de produção;
 7. reconciliar documentação e publicar somente após o gate completo.
 
-As etapas 1 e 2 foram implementadas nas issues #94 e #96. A revalidação existe
-como contrato interno, mas nenhuma mutação a consome até a integração explícita
-das etapas 3 e 4.
+As etapas 1 e 2 foram implementadas nas issues #94 e #96. As etapas 3, 4 e o
+laboratório de drift/entrega/preservação da etapa 5 foram implementados na issue
+#98. A revalidação agora é consumida imediatamente antes de cada CREATE.
 
 Um probe prático em Podman 4.9.3 rootless confirmou IDs hexadecimais de 64
 caracteres, driver `bridge`, criação de contêiner por ID e preservação da rede

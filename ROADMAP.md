@@ -3,8 +3,9 @@
 Etapas propostas, sem datas prometidas.
 
 O plano verificável para as versões experimentais está em
-[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–5 foram publicadas;
-a Alpha 6 começa pelo contrato seguro de configuração e segredos.
+[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–6 foram publicadas;
+configuração não secreta e redes permanecem como os próximos contratos
+separados para aplicações reais.
 
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.

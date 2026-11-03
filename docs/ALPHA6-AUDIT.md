@@ -53,3 +53,17 @@ build AMD64/ARM64, checksums e instalação do artefato AMD64 publicado.
   bloqueados até existir operação autorizada específica.
 - Configuração não secreta e redes permanecem no roadmap como contrato futuro
   separado e não fazem parte da Alpha 6.
+
+## Release verificada
+
+A pré-release [`v0.1.0-alpha.6`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.6)
+foi publicada em 3 de novembro de 2026 no commit
+`92a352ccbdb241ff2e371839d780a52ad8951598`. O workflow de release terminou com
+sucesso e a verificação independente após a publicação confirmou:
+
+- `2125c470f4032c239bfa52b4466838fbee19e71208d1dc25d9037bd24c0bd285`
+  para `orisema_linux_amd64.tar.gz`;
+- `5973043f71e9661365b22eb2a4076dc633a8f27480feaffbef021d637d9b550f`
+  para `orisema_linux_arm64.tar.gz`;
+- o binário AMD64 baixado reportou `Version: v0.1.0-alpha.6`, o commit completo
+  acima, Go 1.23.12 e alvo `linux/amd64`.

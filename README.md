@@ -31,6 +31,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Contrato de manifesto da Alpha 2](docs/MANIFEST-V1ALPHA2.md)
 - [Contrato parcial de manifesto da Alpha 6](docs/MANIFEST-V1ALPHA3.md)
 - [Proposta de segredos seguros da Alpha 6](docs/RFC-0002-secure-secrets.md)
+- [Proposta de configuração pública e redes da Alpha 7](docs/RFC-0003-public-config-and-external-networks.md)
 - [Laboratório de update e rollback da Alpha 3](docs/CONTROLLED-UPDATE-LAB.md)
 - [Backup e restauração de configuração](docs/BACKUP-RESTORE-DESIGN.md)
 - [Transporte SSH estrito](docs/SSH.md)

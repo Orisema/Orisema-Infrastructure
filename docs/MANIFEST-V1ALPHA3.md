@@ -1,7 +1,8 @@
 # Manifest contract — `orisema.dev/v1alpha3`
 
-Status: **partial Alpha 6 implementation**. Podman and validated local file
-references can be delivered locally; the secret lifecycle CLI remains pending.
+Status: **implemented Alpha 6 contract**. Podman and validated local file
+references can be delivered locally, and managed Podman secrets have a
+non-disclosing lifecycle CLI.
 
 ## Compatibility
 
@@ -70,8 +71,23 @@ container mount across restart.
 
 The internal provider interface exposes references and allowlisted metadata
 only. It has no content/value field and never invokes `podman secret inspect
---showsecret`. Lifecycle commands remain the next Alpha 6 increment governed
-by [RFC-0002](RFC-0002-secure-secrets.md).
+--showsecret`.
+
+## Lifecycle CLI
+
+```text
+orisema secret create NAME --provider podman --stdin
+orisema secret list
+orisema secret inspect NAME
+orisema secret remove NAME
+```
+
+Create accepts at most 64 KiB through a pipe or redirected stdin and never
+accepts a value argument. List and inspect show only allowlisted metadata.
+Remove accepts only secrets carrying exact Orisema lifecycle ownership labels,
+refuses identities consumed by any container, requires confirmation bound to
+name and ID, revalidates ownership/identity/consumers, and removes by ID.
+There is no show, export or reveal operation.
 
 The repository includes
 [`examples/alpha6-secret-references.yaml`](../examples/alpha6-secret-references.yaml)

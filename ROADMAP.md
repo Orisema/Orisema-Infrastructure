@@ -84,8 +84,8 @@ incompletas sempre exigem diagnóstico e intervenção explícita.
   após testes práticos sem divulgação (#81).
 - [x] Validar provider `file` contra permissões inseguras, links e corridas,
   usando staging transitório por descritor (#83).
-- [ ] Implementar ciclo de vida create/list/inspect/remove sem exibição ou
-  exportação de conteúdo.
+- [x] Implementar ciclo de vida create/list/inspect/remove sem exibição ou
+  exportação de conteúdo (#85).
 - [ ] Definir separadamente configuração não secreta e redes necessárias às
   aplicações reais.
 - [ ] Repetir o laboratório MixIdentity com credenciais artificiais e sem dados

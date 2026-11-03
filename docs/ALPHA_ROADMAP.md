@@ -137,8 +137,9 @@ específico de ownership e consistência.
   entrega por arquivo e interface somente de metadados (#81).
 - [x] Implementar provider `file` como compatibilidade com handoff seguro via
   secret Podman transitório e cleanup validado (#83).
-- [ ] Entregar somente em `/run/secrets/<target>`, sem valor inline ou ambiente.
-- [ ] Garantir não divulgação em plano, inspect, logs, erros, journal e backup.
+- [x] Entregar somente em `/run/secrets/<target>`, sem valor inline ou ambiente.
+- [x] Garantir não divulgação em plan, inspect, logs, erros, journal e backup
+  para o contrato implementado (#81, #83, #85).
 - [ ] Validar ausência, rotação, permissões, links, corrida, limites e cleanup
   em Podman rootless.
 - [ ] Validar uma aplicação real em laboratório com segredos artificiais.

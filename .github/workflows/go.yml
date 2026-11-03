@@ -156,6 +156,14 @@ jobs:
             ORISEMA_EVIDENCE_DIR="$PWD/work/alpha6-file-secrets" \
             scripts/alpha6-file-secrets-lab.sh
           sudo chown -R "$USER":"$(id -gn)" work/alpha6-file-secrets
+      - name: Exercise Alpha 6 secret lifecycle
+        run: |
+          set -euo pipefail
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/alpha6-secret-lifecycle" \
+            scripts/alpha6-secret-lifecycle-lab.sh
+          sudo chown -R "$USER":"$(id -gn)" work/alpha6-secret-lifecycle
       - name: Exercise Alpha 3 update and rollback laboratory
         run: |
           set -euo pipefail
@@ -237,6 +245,9 @@ jobs:
             work/alpha2-contract/*.txt
             work/alpha6-podman-secrets/*.txt
             work/alpha6-file-secrets/*.txt
+            work/alpha6-secret-lifecycle/*.txt
+            work/alpha6-secret-lifecycle/*.out
+            work/alpha6-secret-lifecycle/*.err
             work/alpha3-update/*.json
             work/alpha3-update/*.txt
             work/alpha5-update-apply/*.json

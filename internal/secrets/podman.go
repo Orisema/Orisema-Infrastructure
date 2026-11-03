@@ -25,27 +25,46 @@ func (p PodmanInspector) InspectMetadata(ctx context.Context, ref Reference) (Me
 	if ref.Provider != ProviderPodman || ref.Locator == "" {
 		return Metadata{}, errors.New("invalid Podman secret reference")
 	}
-	bin := p.Binary
+	item, err := inspectPodmanSecret(ctx, p.Binary, ref.Locator)
+	if err != nil {
+		return Metadata{}, err
+	}
+	if item.Spec.Name != ref.Locator {
+		return Metadata{}, errors.New("Podman returned mismatched secret metadata")
+	}
+	return Metadata{Provider: ProviderPodman, Locator: item.Spec.Name, Identity: item.ID}, nil
+}
+
+type podmanSecretRecord struct {
+	ID        string    `json:"ID"`
+	CreatedAt time.Time `json:"CreatedAt"`
+	UpdatedAt time.Time `json:"UpdatedAt"`
+	Spec      struct {
+		Name   string            `json:"Name"`
+		Labels map[string]string `json:"Labels"`
+		Driver struct {
+			Name string `json:"Name"`
+		} `json:"Driver"`
+	} `json:"Spec"`
+}
+
+func inspectPodmanSecret(ctx context.Context, binary, locator string) (podmanSecretRecord, error) {
+	bin := binary
 	if bin == "" {
 		bin = "podman"
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, bin, "secret", "inspect", ref.Locator).Output()
+	out, err := exec.CommandContext(ctx, bin, "secret", "inspect", locator).Output()
 	if err != nil {
-		return Metadata{}, fmt.Errorf("Podman secret metadata unavailable: %w", err)
+		return podmanSecretRecord{}, fmt.Errorf("Podman secret metadata unavailable: %w", err)
 	}
-	var items []struct {
-		ID   string `json:"ID"`
-		Spec struct {
-			Name string `json:"Name"`
-		} `json:"Spec"`
-	}
+	var items []podmanSecretRecord
 	if err := json.Unmarshal(out, &items); err != nil {
-		return Metadata{}, fmt.Errorf("decode Podman secret metadata: %w", err)
+		return podmanSecretRecord{}, fmt.Errorf("decode Podman secret metadata: %w", err)
 	}
-	if len(items) != 1 || !podmanSecretIdentity.MatchString(items[0].ID) || items[0].Spec.Name != ref.Locator {
-		return Metadata{}, errors.New("Podman returned mismatched secret metadata")
+	if len(items) != 1 || !podmanSecretIdentity.MatchString(items[0].ID) || items[0].Spec.Name == "" {
+		return podmanSecretRecord{}, errors.New("Podman returned invalid secret metadata")
 	}
-	return Metadata{Provider: ProviderPodman, Locator: items[0].Spec.Name, Identity: items[0].ID}, nil
+	return items[0], nil
 }

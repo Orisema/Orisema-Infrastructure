@@ -131,8 +131,10 @@ específico de ownership e consistência.
 
 - [x] Propor o contrato e modelo de ameaça para segredos externos por arquivo
   ([RFC-0002](RFC-0002-secure-secrets.md), #77).
-- [ ] Versionar o manifesto sem ampliar `v1alpha1` ou `v1alpha2` em silêncio.
-- [ ] Implementar provider `podman` como padrão e `file` como compatibilidade.
+- [x] Implementar a base de `v1alpha3` sem ampliar `v1alpha1` ou `v1alpha2` em
+  silêncio (#79); bindings permanecem fail-closed.
+- [ ] Implementar provider `podman` como padrão e `file` como compatibilidade;
+  a interface inicial expõe somente metadados.
 - [ ] Entregar somente em `/run/secrets/<target>`, sem valor inline ou ambiente.
 - [ ] Garantir não divulgação em plano, inspect, logs, erros, journal e backup.
 - [ ] Validar ausência, rotação, permissões, links, corrida, limites e cleanup

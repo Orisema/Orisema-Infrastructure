@@ -31,6 +31,10 @@ func Build(m *manifest.Manifest, existing []runtime.Container) []Step {
 	steps := make([]Step, 0, len(m.Services))
 	for _, s := range m.Services {
 		name := "orisema-" + m.Name + "-" + s.Name
+		if len(s.Secrets) != 0 {
+			steps = append(steps, Step{Name: name, Image: s.Image, Action: Review, Reason: "secret delivery is declared but not implemented; no changes made"})
+			continue
+		}
 		found, exists := runtime.Find(existing, name)
 		if !exists {
 			steps = append(steps, Step{Name: name, Image: s.Image, Action: Create, Reason: "container not found"})

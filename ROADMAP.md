@@ -77,10 +77,11 @@ incompletas sempre exigem diagnóstico e intervenção explícita.
 
 - [x] Propor contrato de segredos por arquivo e providers `podman`/`file`, com
   modelo de ameaça e gates de implementação ([RFC-0002](docs/RFC-0002-secure-secrets.md), #77).
-- [ ] Aprovar e implementar versão de manifesto posterior a `v1alpha2`, sem
-  alterar os contratos antigos.
-- [ ] Implementar provider API e integração Podman sem transportar valores por
-  planos, resultados, logs ou journals.
+- [x] Implementar a base de `v1alpha3` sem alterar os contratos antigos (#79).
+- [x] Introduzir provider API somente de metadados, sem transportar valores
+  por planos, resultados, logs ou journals (#79).
+- [ ] Integrar o provider Podman e remover o bloqueio de entrega somente após
+  os testes práticos.
 - [ ] Validar provider `file` contra permissões inseguras, links e corridas.
 - [ ] Implementar ciclo de vida create/list/inspect/remove sem exibição ou
   exportação de conteúdo.

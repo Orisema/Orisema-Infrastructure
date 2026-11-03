@@ -4,6 +4,7 @@
 package manifest
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,8 +36,12 @@ func TestLoadRejectsUnknownFields(t *testing.T) {
 			if err := os.WriteFile(p, []byte(content), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := Load(p); err == nil || !strings.Contains(err.Error(), "field") {
-				t.Fatalf("Load() error = %v; want unknown field rejection", err)
+			want := "field"
+			if strings.HasPrefix(field, "secrets:") {
+				want = "secrets are not part of orisema.dev/v1alpha2"
+			}
+			if _, err := Load(p); err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("Load() error = %v; want rejection containing %q", err, want)
 			}
 		})
 	}
@@ -109,6 +114,11 @@ func TestManifestVersionContracts(t *testing.T) {
 			m.APIVersion, m.Kind = "orisema.dev/v1alpha2", "Application"
 			m.Services[0].Ports = []Port{{Host: 8080, Container: 80, HostIP: "::1"}}
 		}},
+		{name: "v1alpha3 requires kind", mutate: func(m *Manifest) { m.APIVersion = "orisema.dev/v1alpha3" }, wantErr: "kind must be Application"},
+		{name: "v1alpha3 preserves explicit loopback", mutate: func(m *Manifest) {
+			m.APIVersion, m.Kind = "orisema.dev/v1alpha3", "Application"
+			m.Services[0].Ports = []Port{{Host: 8080, Container: 80, HostIP: "127.0.0.1"}}
+		}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -125,6 +135,135 @@ func TestManifestVersionContracts(t *testing.T) {
 				t.Fatalf("error = %v; want substring %q", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestV1Alpha3SecretReferences(t *testing.T) {
+	valid := `apiVersion: orisema.dev/v1alpha3
+kind: Application
+name: demo
+secrets:
+  - name: database-password
+    source:
+      podman:
+        name: demo-database-password
+  - name: legacy-key
+    source:
+      file:
+        path: /home/operator/.config/orisema/secrets/legacy-key
+services:
+  - name: web
+    image: nginx:latest
+    secrets:
+      - name: database-password
+        target: database-password
+      - name: legacy-key
+        target: legacy-key
+`
+	load := func(t *testing.T, content string) (*Manifest, error) {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "manifest.yaml")
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return Load(path)
+	}
+	m, err := load(t, valid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Secrets) != 2 || len(m.Services[0].Secrets) != 2 {
+		t.Fatalf("unexpected decoded secrets: %#v", m)
+	}
+
+	tests := []struct {
+		name    string
+		old     string
+		new     string
+		wantErr string
+	}{
+		{"v1alpha2 rejects declarations", "orisema.dev/v1alpha3", "orisema.dev/v1alpha2", "secrets are not part"},
+		{"missing source", "source:\n      podman:\n        name: demo-database-password", "source: {}", "exactly one"},
+		{"multiple sources", "source:\n      podman:\n        name: demo-database-password", "source:\n      podman:\n        name: demo-database-password\n      file:\n        path: /safe/secret", "exactly one"},
+		{"relative file", "/home/operator/.config/orisema/secrets/legacy-key", "relative/legacy-key", "clean and absolute"},
+		{"unclean file", "/home/operator/.config/orisema/secrets/legacy-key", "/safe/../legacy-key", "clean and absolute"},
+		{"undeclared binding", "name: legacy-key\n        target: legacy-key", "name: missing\n        target: missing", "is not declared"},
+		{"invalid target", "target: legacy-key", "target: ../legacy-key", "valid file name"},
+		{"duplicate target", "target: legacy-key", "target: database-password", "target \"database-password\" is used more than once"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := load(t, strings.Replace(valid, tc.old, tc.new, 1))
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error = %v; want substring %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestOldContractsRejectSecretFieldPresence(t *testing.T) {
+	for _, version := range []string{"orisema.dev/v1alpha1", "orisema.dev/v1alpha2"} {
+		for _, value := range []string{"[]", "null"} {
+			for _, level := range []string{"top", "service"} {
+				t.Run(version+"-"+level+"-"+value, func(t *testing.T) {
+					kind := ""
+					if version == "orisema.dev/v1alpha2" {
+						kind = "kind: Application\n"
+					}
+					content := "apiVersion: " + version + "\n" + kind + "name: demo\n"
+					if level == "top" {
+						content += "secrets: " + value + "\n"
+					}
+					content += "services:\n  - name: web\n    image: nginx:latest\n"
+					if level == "service" {
+						content += "    secrets: " + value + "\n"
+					}
+					path := filepath.Join(t.TempDir(), "manifest.yaml")
+					if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "secrets are not part") {
+						t.Fatalf("Load() error = %v; want version rejection", err)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestV1Alpha3SecretValueIsNeverReflected(t *testing.T) {
+	const canary = "alpha6-canary-do-not-disclose"
+	content := "apiVersion: orisema.dev/v1alpha3\nkind: Application\nname: demo\nsecrets:\n  - name: token\n    source:\n      podman:\n        name: token\n        value: " + canary + "\nservices:\n  - name: web\n    image: nginx:latest\n"
+	path := filepath.Join(t.TempDir(), "manifest.yaml")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("Load() unexpectedly accepted inline value")
+	}
+	if strings.Contains(err.Error(), canary) {
+		t.Fatalf("validation error exposed canary: %v", err)
+	}
+}
+
+func TestV1Alpha3SecretLimits(t *testing.T) {
+	declarations := make([]SecretDeclaration, 65)
+	for i := range declarations {
+		declarations[i] = SecretDeclaration{Name: fmt.Sprintf("secret-%d", i), Source: SecretSource{Podman: &PodmanSecretSource{Name: fmt.Sprintf("secret-%d", i)}}}
+	}
+	m := Manifest{APIVersion: "orisema.dev/v1alpha3", Kind: "Application", Name: "demo", Secrets: declarations, Services: []Service{{Name: "web", Image: "nginx:latest"}}}
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "at most 64 declarations") {
+		t.Fatalf("Validate() error = %v; want declaration limit", err)
+	}
+	m.Secrets = declarations[:64]
+	bindings := make([]SecretBinding, 65)
+	for i := range bindings {
+		bindings[i] = SecretBinding{Name: fmt.Sprintf("secret-%d", i%64), Target: fmt.Sprintf("target-%d", i)}
+	}
+	m.Services[0].Secrets = bindings
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "at most 64 bindings") {
+		t.Fatalf("Validate() error = %v; want binding limit", err)
 	}
 }
 

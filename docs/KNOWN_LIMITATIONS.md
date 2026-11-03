@@ -25,8 +25,11 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   existente restaura somente o container da aplicação preservado pelo update.
 - Backup/restore protege somente configuração validada e histórico operacional
   inerte. Nenhum dado persistente, secret ou credencial é protegido.
-- Gerenciamento de secrets, variáveis de ambiente, volumes, limites de
-  recursos, redes personalizadas e permissões avançadas no manifesto.
+- `v1alpha3` reconhece apenas referências estáticas de secrets; resolução,
+  montagem e ciclo de vida ainda não estão implementados e qualquer binding
+  bloqueia plan/deploy com `REVIEW`.
+- Variáveis de ambiente, volumes, limites de recursos, redes personalizadas e
+  permissões avançadas no manifesto.
 - Identidade autenticada do operador ou journal resistente a adulteração.
 - O audit local remoto é durável e privado, mas não é assinado nem resistente a
   adulteração por um usuário com acesso ao arquivo.

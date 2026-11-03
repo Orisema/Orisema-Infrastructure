@@ -3,8 +3,8 @@
 Etapas propostas, sem datas prometidas.
 
 O plano verificável para as versões experimentais está em
-[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–4 foram publicadas;
-a Alpha 5 começa pela exposição somente leitura do plano de atualização.
+[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–5 foram publicadas;
+a Alpha 6 começa pelo contrato seguro de configuração e segredos.
 
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.
@@ -72,6 +72,26 @@ incompletas sempre exigem diagnóstico e intervenção explícita.
 - [x] Manter WireGuard, Tailscale, Headscale e equivalentes opcionais e administrados pelo usuário; nenhum produto específico ou CGNAT real é declarado validado (#71, #73).
 
 **Princípio:** o Orisema Infrastructure funciona de maneira autônoma, sem dependência obrigatória de infraestrutura central, contas externas ou serviços hospedados pelo projeto. O Orisema não operará relay, VPN ou serviço de coordenação oficial. Atravessar NAT/CGNAT requer conectividade previamente estabelecida pelo operador (por VPN, proxy/bastion ou outro intermediário acessível); SSH isolado não garante esse acesso. Consulte [ADR 0002](docs/adr/0002-independent-connectivity.md).
+
+## Alpha 6 — configuração segura para aplicações reais
+
+- [x] Propor contrato de segredos por arquivo e providers `podman`/`file`, com
+  modelo de ameaça e gates de implementação ([RFC-0002](docs/RFC-0002-secure-secrets.md), #77).
+- [ ] Aprovar e implementar versão de manifesto posterior a `v1alpha2`, sem
+  alterar os contratos antigos.
+- [ ] Implementar provider API e integração Podman sem transportar valores por
+  planos, resultados, logs ou journals.
+- [ ] Validar provider `file` contra permissões inseguras, links e corridas.
+- [ ] Implementar ciclo de vida create/list/inspect/remove sem exibição ou
+  exportação de conteúdo.
+- [ ] Definir separadamente configuração não secreta e redes necessárias às
+  aplicações reais.
+- [ ] Repetir o laboratório MixIdentity com credenciais artificiais e sem dados
+  de produção.
+
+**Princípio:** segredo é referência externa e chega ao consumidor como arquivo
+somente leitura em `/run/secrets`; nunca é valor inline ou variável de ambiente
+no primeiro incremento.
 
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.

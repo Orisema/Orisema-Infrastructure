@@ -87,8 +87,6 @@ incompletas sempre exigem diagnóstico e intervenção explícita.
   usando staging transitório por descritor (#83).
 - [x] Implementar ciclo de vida create/list/inspect/remove sem exibição ou
   exportação de conteúdo (#85).
-- [ ] Definir separadamente configuração não secreta e redes necessárias às
-  aplicações reais.
 - [x] Repetir o laboratório MixIdentity com credenciais artificiais e sem dados
   de produção.
 
@@ -99,6 +97,22 @@ gate de segredos da Alpha 6.
 **Princípio:** segredo é referência externa e chega ao consumidor como arquivo
 somente leitura em `/run/secrets`; nunca é valor inline ou variável de ambiente
 no primeiro incremento.
+
+## Alpha 7 — configuração pública e redes externas
+
+- [x] Propor contrato `v1alpha4`, modelo de ameaça e gates para configuração
+  explicitamente não secreta e redes Podman externas ([RFC-0003](docs/RFC-0003-public-config-and-external-networks.md), #92).
+- [ ] Implementar tipos e validação sem ampliar contratos antigos.
+- [ ] Resolver e revalidar redes externas por identidade, sem lifecycle.
+- [ ] Comparar drift de configuração pública e associações de rede.
+- [ ] Entregar configuração e redes no deploy sem shell nem remoção de recurso
+  externo.
+- [ ] Validar em Podman rootless e repetir o laboratório MixIdentity completo
+  com dependências e dados artificiais.
+
+**Princípio:** configuração pública pode ser observada e nunca recebe garantia
+de sigilo; redes são referências externas somente leitura até existir contrato
+de lifecycle separado.
 
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.

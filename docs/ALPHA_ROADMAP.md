@@ -157,6 +157,23 @@ entrega.
 no commit `92a352c`; o workflow repetiu vet, testes e race detector, publicou
 artefatos AMD64/ARM64 e reinstalou com sucesso o binário AMD64 baixado.
 
+## v0.1.0-alpha.7 — configuração pública e redes externas
+
+- [x] Propor contrato, modelo de ameaça e sequência de implementação
+  ([RFC-0003](RFC-0003-public-config-and-external-networks.md), #92).
+- [ ] Adicionar `v1alpha4` com configuração explicitamente pública e referências
+  de rede, preservando rejeição nos contratos anteriores.
+- [ ] Resolver redes Podman externas por identidade e revalidá-las antes do
+  deploy, sem criar, adotar, alterar ou remover redes.
+- [ ] Detectar drift de ambiente e associações de rede sem imprimir valores.
+- [ ] Validar ausência, incompatibilidade, troca de identidade, cleanup e
+  preservação de recursos externos em Podman rootless.
+- [ ] Executar MixIdentity com backend e dependências artificiais isoladas.
+
+**Gate:** nenhuma configuração é tratada como secreta; nenhuma rede externa é
+mutada; contratos anteriores permanecem compatíveis; falhas de resolução ou
+identidade acontecem antes de criar contêiner.
+
 ## Integração opcional futura — Orisema Data
 
 O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integração será precedida por RFC e laboratório com serviço simulado. Não é requisito para as Alphas 1–6; Gera Base fica fora do escopo.

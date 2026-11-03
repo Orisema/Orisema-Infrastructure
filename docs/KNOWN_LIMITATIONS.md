@@ -28,8 +28,9 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 - `v1alpha3` resolve e monta referências Podman e arquivos locais validados por
   identidade e gerencia o ciclo de vida Podman sem revelar valores; apenas
   update/rollback com bindings continuam bloqueados.
-- Variáveis de ambiente, volumes, limites de recursos, redes personalizadas e
-  permissões avançadas no manifesto.
+- `v1alpha4` valida configuração pública e referências de redes externas, mas
+  sua resolução e entrega ainda permanecem bloqueadas. Secrets em variáveis de
+  ambiente, volumes, limites de recursos e permissões avançadas não têm suporte.
 - Identidade autenticada do operador ou journal resistente a adulteração.
 - O audit local remoto é durável e privado, mas não é assinado nem resistente a
   adulteração por um usuário com acesso ao arquivo.

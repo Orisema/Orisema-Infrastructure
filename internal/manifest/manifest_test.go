@@ -119,6 +119,11 @@ func TestManifestVersionContracts(t *testing.T) {
 			m.APIVersion, m.Kind = "orisema.dev/v1alpha3", "Application"
 			m.Services[0].Ports = []Port{{Host: 8080, Container: 80, HostIP: "127.0.0.1"}}
 		}},
+		{name: "v1alpha4 requires kind", mutate: func(m *Manifest) { m.APIVersion = "orisema.dev/v1alpha4" }, wantErr: "kind must be Application"},
+		{name: "v1alpha4 preserves explicit loopback", mutate: func(m *Manifest) {
+			m.APIVersion, m.Kind = "orisema.dev/v1alpha4", "Application"
+			m.Services[0].Ports = []Port{{Host: 8080, Container: 80, HostIP: "127.0.0.1"}}
+		}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -135,6 +140,147 @@ func TestManifestVersionContracts(t *testing.T) {
 				t.Fatalf("error = %v; want substring %q", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestV1Alpha4PublicConfigurationAndNetworks(t *testing.T) {
+	valid := `apiVersion: orisema.dev/v1alpha4
+kind: Application
+name: demo
+networks:
+  - name: private
+    source:
+      podman:
+        name: demo-private
+services:
+  - name: web
+    image: nginx:latest
+    publicEnvironment:
+      - name: APP_MODE
+        value: laboratory
+      - name: EMPTY_VALUE
+        value: ""
+    networks:
+      - name: private
+`
+	load := func(t *testing.T, content string) (*Manifest, error) {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "manifest.yaml")
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return Load(path)
+	}
+	m, err := load(t, valid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Networks) != 1 || len(m.Services[0].Networks) != 1 || len(m.Services[0].PublicEnvironment) != 2 {
+		t.Fatalf("unexpected decoded v1alpha4 manifest: %#v", m)
+	}
+
+	tests := []struct {
+		name    string
+		old     string
+		new     string
+		wantErr string
+	}{
+		{"v1alpha3 rejects networks", "orisema.dev/v1alpha4", "orisema.dev/v1alpha3", "networks are not part"},
+		{"invalid environment name", "name: APP_MODE", "name: 1APP_MODE", "invalid publicEnvironment name"},
+		{"duplicate environment name", "name: EMPTY_VALUE", "name: APP_MODE", "duplicate publicEnvironment name"},
+		{"environment newline", "value: laboratory", "value: |\n          laboratory\n          second-line", "forbidden character"},
+		{"missing network source", "source:\n      podman:\n        name: demo-private", "source: {}", "one valid podman name"},
+		{"undeclared network", "name: private\n", "name: missing\n", "is not declared"},
+		{"duplicate binding", "networks:\n      - name: private", "networks:\n      - name: private\n      - name: private", "bound more than once"},
+		{"service without network", "    networks:\n      - name: private\n", "", "at least one declared network binding"},
+		{"unused network", "services:\n", "  - name: unused\n    source:\n      podman:\n        name: demo-unused\nservices:\n", "declared but not consumed"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := load(t, strings.Replace(valid, tc.old, tc.new, 1))
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error = %v; want substring %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestOldContractsRejectAlpha4FieldPresence(t *testing.T) {
+	for _, version := range []string{"orisema.dev/v1alpha1", "orisema.dev/v1alpha2", "orisema.dev/v1alpha3"} {
+		for _, value := range []string{"[]", "null"} {
+			for _, field := range []string{"top-networks", "service-networks", "public-environment"} {
+				t.Run(version+"-"+field+"-"+value, func(t *testing.T) {
+					kind := ""
+					if version != "orisema.dev/v1alpha1" {
+						kind = "kind: Application\n"
+					}
+					content := "apiVersion: " + version + "\n" + kind + "name: demo\n"
+					if field == "top-networks" {
+						content += "networks: " + value + "\n"
+					}
+					content += "services:\n  - name: web\n    image: nginx:latest\n"
+					switch field {
+					case "service-networks":
+						content += "    networks: " + value + "\n"
+					case "public-environment":
+						content += "    publicEnvironment: " + value + "\n"
+					}
+					path := filepath.Join(t.TempDir(), "manifest.yaml")
+					if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "not part of") {
+						t.Fatalf("Load() error = %v; want version rejection", err)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestV1Alpha4PublicEnvironmentLimitsAndNoValueReflection(t *testing.T) {
+	entries := make([]PublicEnvironmentEntry, 129)
+	for i := range entries {
+		entries[i] = PublicEnvironmentEntry{Name: fmt.Sprintf("VALUE_%d", i), Value: "public"}
+	}
+	m := Manifest{APIVersion: "orisema.dev/v1alpha4", Kind: "Application", Name: "demo", Services: []Service{{Name: "web", Image: "nginx:latest", PublicEnvironment: entries}}}
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "at most 128 entries") {
+		t.Fatalf("Validate() error = %v; want entry limit", err)
+	}
+	m.Services[0].PublicEnvironment = []PublicEnvironmentEntry{{Name: "PUBLIC_VALUE", Value: strings.Repeat("x", 4097)}}
+	err := m.Validate()
+	if err == nil || !strings.Contains(err.Error(), "exceeds limits") {
+		t.Fatalf("Validate() error = %v; want value limit", err)
+	}
+	if strings.Contains(err.Error(), strings.Repeat("x", 64)) {
+		t.Fatalf("validation error reflected public value: %v", err)
+	}
+	total := make([]PublicEnvironmentEntry, 9)
+	for i := range total {
+		total[i] = PublicEnvironmentEntry{Name: fmt.Sprintf("VALUE_%d", i), Value: strings.Repeat("x", 4096)}
+	}
+	m.Services[0].PublicEnvironment = total
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "exceeds 32 KiB total") {
+		t.Fatalf("Validate() error = %v; want total size limit", err)
+	}
+
+	networks := make([]NetworkDeclaration, 33)
+	for i := range networks {
+		name := fmt.Sprintf("network-%d", i)
+		networks[i] = NetworkDeclaration{Name: name, Source: NetworkSource{Podman: &PodmanNetworkSource{Name: name}}}
+	}
+	m.Services[0].PublicEnvironment = nil
+	m.Networks = networks
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "at most 32 declarations") {
+		t.Fatalf("Validate() error = %v; want network declaration limit", err)
+	}
+	m.Networks = networks[:9]
+	m.Services[0].Networks = make([]NetworkBinding, 9)
+	for i := range m.Services[0].Networks {
+		m.Services[0].Networks[i] = NetworkBinding{Name: networks[i].Name}
+	}
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "at most 8 bindings") {
+		t.Fatalf("Validate() error = %v; want network binding limit", err)
 	}
 }
 

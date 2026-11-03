@@ -588,6 +588,10 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		return 1
 	}
 	for _, service := range m.Services {
+		if len(service.PublicEnvironment) != 0 || len(service.Networks) != 0 {
+			fmt.Fprintln(stderr, "update blocked: public configuration and network bindings are not yet supported by update/rollback; no changes made")
+			return 1
+		}
 		if len(service.Secrets) != 0 {
 			fmt.Fprintln(stderr, "update blocked: secret bindings are not yet supported by update/rollback; no changes made")
 			return 1

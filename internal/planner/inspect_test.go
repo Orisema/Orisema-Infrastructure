@@ -65,6 +65,21 @@ func TestBuildInspectedBlocksUnimplementedSecretDelivery(t *testing.T) {
 	}
 }
 
+func TestBuildInspectedBlocksUnimplementedAlpha4Delivery(t *testing.T) {
+	m := &manifest.Manifest{Name: "demo", Services: []manifest.Service{{
+		Name: "web", Image: "nginx:latest",
+		PublicEnvironment: []manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}},
+		Networks:          []manifest.NetworkBinding{{Name: "private"}},
+	}}}
+	got := BuildInspected(context.Background(), m, nil, fakeInspector{})
+	if len(got) != 1 || got[0].Action != Review || !strings.Contains(got[0].Reason, "not implemented") {
+		t.Fatalf("BuildInspected() = %#v; want fail-closed REVIEW", got)
+	}
+	if strings.Contains(got[0].Reason, "laboratory") {
+		t.Fatalf("plan reason exposed public value: %#v", got)
+	}
+}
+
 func TestBuildInspectedResolvedComparesSecretIdentityLabels(t *testing.T) {
 	m := &manifest.Manifest{Name: "demo", Services: []manifest.Service{{Name: "web", Image: "nginx:latest", Secrets: []manifest.SecretBinding{{Name: "token", Target: "token"}}}}}
 	mounts := map[string][]secrets.ResolvedMount{"web": {{Name: "token", Provider: secrets.ProviderPodman, Identity: "secret-id", Target: "token"}}}

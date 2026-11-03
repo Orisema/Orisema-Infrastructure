@@ -31,6 +31,10 @@ func Build(m *manifest.Manifest, existing []runtime.Container) []Step {
 	steps := make([]Step, 0, len(m.Services))
 	for _, s := range m.Services {
 		name := "orisema-" + m.Name + "-" + s.Name
+		if len(s.PublicEnvironment) != 0 || len(s.Networks) != 0 {
+			steps = append(steps, Step{Name: name, Image: s.Image, Action: Review, Reason: "public configuration or network delivery is declared but not implemented; no changes made"})
+			continue
+		}
 		if len(s.Secrets) != 0 {
 			steps = append(steps, Step{Name: name, Image: s.Image, Action: Review, Reason: "secret delivery is declared but not implemented; no changes made"})
 			continue

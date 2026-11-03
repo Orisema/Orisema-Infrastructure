@@ -39,6 +39,10 @@ Estado, verificações e logs
   riscos, sem possuir capacidade de mutação do runtime.
 - **Runtime:** lista e inspeciona contêineres e executa operações explicitamente
   solicitadas pela CLI.
+- **Secret providers:** resolvem somente metadados e entregam conteúdo por
+  arquivo em `/run/secrets`, sem transportar valores pelo planner.
+- **Network provider:** inspeciona somente nome, ID e driver de redes Podman
+  externas; não possui API de criação, alteração, conexão ou remoção.
 - **Host registry:** valida destinos SSH, caminhos de credenciais externas,
   timeouts e cadeias ProxyJump em arquivo local privado.
 - **Remote transport/executor:** gera configuração OpenSSH efêmera, autentica
@@ -77,16 +81,15 @@ acessa a rede nem arquivos externos.
 ## Decisões atuais e abertas
 
 Go 1.23 é a linguagem e versão mínima declarada pelo módulo. Podman em Linux é
-o primeiro runtime; Docker, Windows e macOS não são suportados. O contrato atual
-é `orisema.dev/v1alpha2`, mantendo leitura compatível de `v1alpha1`; versão,
-migração e guardrails estão definidos em
-[MANIFEST-V1ALPHA2.md](MANIFEST-V1ALPHA2.md). Gestão de segredos, volumes e um
-formato de saída estruturado permanecem deliberadamente fora desse contrato. A
-proposta da Alpha 6 para referências externas e entrega somente por arquivo
-está em [RFC-0002](RFC-0002-secure-secrets.md); ela não é comportamento
-implementado nem amplia `v1alpha2`. A
-matriz entre artefatos produzidos e ambientes realmente executados está em
-[COMPATIBILITY.md](COMPATIBILITY.md).
+o primeiro runtime; Docker, Windows e macOS não são suportados. O contrato mais
+recente é `orisema.dev/v1alpha4`, mantendo leitura e semântica compatíveis de
+`v1alpha1`–`v1alpha3`. Secrets externos e entrega por arquivo estão
+implementados; configuração pública e redes externas estão em implementação
+incremental e permanecem bloqueadas no planner/deploy. Consulte
+[MANIFEST-V1ALPHA4.md](MANIFEST-V1ALPHA4.md),
+[RFC-0002](RFC-0002-secure-secrets.md),
+[RFC-0003](RFC-0003-public-config-and-external-networks.md) e a
+[matriz de compatibilidade](COMPATIBILITY.md).
 
 ## Backup e restauração
 

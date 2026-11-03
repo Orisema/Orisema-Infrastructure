@@ -183,6 +183,10 @@ público e provisiona previamente as redes referenciadas.
    sem dados de produção;
 7. reconciliar documentação e publicar somente após o gate completo.
 
+As etapas 1 e 2 foram implementadas nas issues #94 e #96. A revalidação existe
+como contrato interno, mas nenhuma mutação a consome até a integração explícita
+das etapas 3 e 4.
+
 Um probe prático em Podman 4.9.3 rootless confirmou IDs hexadecimais de 64
 caracteres, driver `bridge`, criação de contêiner por ID e preservação da rede
 depois da remoção do consumidor. Isso valida a premissa técnica, mas não

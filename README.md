@@ -29,6 +29,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Changelog](CHANGELOG.md)
 - [Limitações conhecidas da Alpha 5](docs/KNOWN_LIMITATIONS.md)
 - [Contrato de manifesto da Alpha 2](docs/MANIFEST-V1ALPHA2.md)
+- [Proposta de segredos seguros da Alpha 6](docs/RFC-0002-secure-secrets.md)
 - [Laboratório de update e rollback da Alpha 3](docs/CONTROLLED-UPDATE-LAB.md)
 - [Backup e restauração de configuração](docs/BACKUP-RESTORE-DESIGN.md)
 - [Transporte SSH estrito](docs/SSH.md)

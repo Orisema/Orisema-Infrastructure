@@ -84,8 +84,9 @@ Go 1.23 é a linguagem e versão mínima declarada pelo módulo. Podman em Linux
 o primeiro runtime; Docker, Windows e macOS não são suportados. O contrato mais
 recente é `orisema.dev/v1alpha4`, mantendo leitura e semântica compatíveis de
 `v1alpha1`–`v1alpha3`. Secrets externos e entrega por arquivo estão
-implementados; configuração pública e redes externas estão em implementação
-incremental e permanecem bloqueadas no planner/deploy. Consulte
+implementados; configuração pública e redes externas são resolvidas,
+comparadas e entregues no CREATE, mas permanecem bloqueadas em update/rollback
+e não possuem lifecycle gerenciado. Consulte
 [MANIFEST-V1ALPHA4.md](MANIFEST-V1ALPHA4.md),
 [RFC-0002](RFC-0002-secure-secrets.md),
 [RFC-0003](RFC-0003-public-config-and-external-networks.md) e a

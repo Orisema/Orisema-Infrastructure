@@ -33,6 +33,9 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   ciclo de vida dessas redes. Update/rollback com esses campos, secrets em
   variáveis de ambiente, volumes, limites de recursos e permissões avançadas
   não têm suporte.
+- Aliases DNS de rede não fazem parte do contrato. O laboratório MixIdentity
+  aplica o alias isolado `identity-app` explicitamente entre dois deploys; isso
+  não representa gerenciamento de alias pelo Orisema.
 - Identidade autenticada do operador ou journal resistente a adulteração.
 - O audit local remoto é durável e privado, mas não é assinado nem resistente a
   adulteração por um usuário com acesso ao arquivo.

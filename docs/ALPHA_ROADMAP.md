@@ -169,7 +169,8 @@ artefatos AMD64/ARM64 e reinstalou com sucesso o binário AMD64 baixado.
   (#98).
 - [x] Validar drift, entrega, cleanup do contêiner e preservação de recursos
   externos em Podman rootless (#98).
-- [ ] Executar MixIdentity com backend e dependências artificiais isoladas.
+- [x] Executar MixIdentity com backend e dependências artificiais isoladas
+  (#100; [auditoria](ALPHA7-AUDIT.md)).
 
 **Gate:** nenhuma configuração é tratada como secreta; nenhuma rede externa é
 mutada; contratos anteriores permanecem compatíveis; falhas de resolução ou

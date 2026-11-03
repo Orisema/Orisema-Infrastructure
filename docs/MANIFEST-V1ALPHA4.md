@@ -65,4 +65,5 @@ the application declares networks.
 manifest from appearing accepted while silently ignoring Alpha 7 semantics.
 
 See [RFC-0003](RFC-0003-public-config-and-external-networks.md) for the threat
-model, runtime design and remaining gates.
+model and runtime design, and the [Alpha 7 audit](ALPHA7-AUDIT.md) for the
+practical gate and preserved boundaries.

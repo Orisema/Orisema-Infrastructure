@@ -1,4 +1,4 @@
-# CLI prototype (Alpha 5 development)
+# CLI prototype (Alpha 6)
 
 This is an **experimental laboratory CLI**, not production-ready. `validate` works offline; `plan`, `status` and lifecycle commands query local Podman.
 

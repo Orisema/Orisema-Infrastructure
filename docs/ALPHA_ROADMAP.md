@@ -140,9 +140,13 @@ específico de ownership e consistência.
 - [x] Entregar somente em `/run/secrets/<target>`, sem valor inline ou ambiente.
 - [x] Garantir não divulgação em plan, inspect, logs, erros, journal e backup
   para o contrato implementado (#81, #83, #85).
-- [ ] Validar ausência, rotação, permissões, links, corrida, limites e cleanup
+- [x] Validar ausência, rotação, permissões, links, corrida, limites e cleanup
   em Podman rootless.
-- [ ] Validar uma aplicação real em laboratório com segredos artificiais.
+- [x] Validar uma aplicação real em laboratório com segredos artificiais.
+
+As evidências e a fronteira exata desta conclusão estão registradas na
+[auditoria da Alpha 6](ALPHA6-AUDIT.md). A publicação da pré-release ainda
+depende dos checks do commit final e da verificação dos artefatos gerados.
 
 **Gate:** os contratos antigos permanecem compatíveis; nenhum canário aparece
 nas evidências; toda identidade é revalidada antes de mutação; falhas deixam o

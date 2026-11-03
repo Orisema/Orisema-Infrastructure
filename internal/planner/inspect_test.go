@@ -5,9 +5,12 @@ package planner
 
 import (
 	"context"
+	"strings"
+	"testing"
+
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
-	"testing"
+	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 )
 
 type fakeInspector struct {
@@ -59,5 +62,31 @@ func TestBuildInspectedBlocksUnimplementedSecretDelivery(t *testing.T) {
 	got := BuildInspected(context.Background(), m, nil, fakeInspector{})
 	if len(got) != 1 || got[0].Action != Review || got[0].Reason != "secret delivery is declared but not implemented; no changes made" {
 		t.Fatalf("BuildInspected() = %#v; want fail-closed REVIEW", got)
+	}
+}
+
+func TestBuildInspectedResolvedComparesSecretIdentityLabels(t *testing.T) {
+	m := &manifest.Manifest{Name: "demo", Services: []manifest.Service{{Name: "web", Image: "nginx:latest", Secrets: []manifest.SecretBinding{{Name: "token", Target: "token"}}}}}
+	mounts := map[string][]secrets.ResolvedMount{"web": {{Name: "token", Provider: secrets.ProviderPodman, Identity: "secret-id", Target: "token"}}}
+	got := BuildInspectedResolved(context.Background(), m, nil, fakeInspector{}, mounts)
+	if len(got) != 1 || got[0].Action != Create {
+		t.Fatalf("missing container plan = %#v; want CREATE", got)
+	}
+	item := runtime.Inspection{}
+	item.Config.Image = "nginx:latest"
+	item.Config.Labels = map[string]string{
+		"dev.orisema.managed": "true", "dev.orisema.app": "demo", "dev.orisema.service": "web",
+		"dev.orisema.secret.token": "podman:secret-id",
+	}
+	item.HostConfig.RestartPolicy.Name = "no"
+	existing := []runtime.Container{{Names: []string{"orisema-demo-web"}}}
+	got = BuildInspectedResolved(context.Background(), m, existing, fakeInspector{item: item}, mounts)
+	if got[0].Action != Noop {
+		t.Fatalf("matching secret plan = %#v; want NOOP", got)
+	}
+	item.Config.Labels["dev.orisema.secret.token"] = "podman:changed"
+	got = BuildInspectedResolved(context.Background(), m, existing, fakeInspector{item: item}, mounts)
+	if got[0].Action != Drift || !strings.Contains(got[0].Reason, "secret binding metadata differs") {
+		t.Fatalf("changed secret plan = %#v; want DRIFT", got)
 	}
 }

@@ -25,9 +25,9 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   existente restaura somente o container da aplicação preservado pelo update.
 - Backup/restore protege somente configuração validada e histórico operacional
   inerte. Nenhum dado persistente, secret ou credencial é protegido.
-- `v1alpha3` reconhece apenas referências estáticas de secrets; resolução,
-  montagem e ciclo de vida ainda não estão implementados e qualquer binding
-  bloqueia plan/deploy com `REVIEW`.
+- `v1alpha3` resolve e monta referências Podman locais por identidade, mas o
+  provider `file`, o ciclo de vida e update/rollback com bindings ainda estão
+  bloqueados.
 - Variáveis de ambiente, volumes, limites de recursos, redes personalizadas e
   permissões avançadas no manifesto.
 - Identidade autenticada do operador ou journal resistente a adulteração.

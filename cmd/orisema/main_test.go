@@ -175,6 +175,19 @@ esac
 	}
 }
 
+func TestUpdateBlocksManifestWithSecretBindings(t *testing.T) {
+	manifestPath := filepath.Join(t.TempDir(), "manifest.yaml")
+	manifestData := "apiVersion: orisema.dev/v1alpha3\nkind: Application\nname: demo\nsecrets:\n  - name: token\n    source:\n      podman:\n        name: demo-token\nservices:\n  - name: web\n    image: nginx:new\n    secrets:\n      - name: token\n        target: token\n"
+	if err := os.WriteFile(manifestPath, []byte(manifestData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"update", "plan", manifestPath}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "secret bindings are not yet supported") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestOperationDiagnosisIsReadOnlyAndConservative(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "operations")
 	store, err := operation.OpenStore(root)

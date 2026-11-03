@@ -140,6 +140,14 @@ jobs:
             ORISEMA_EVIDENCE_DIR="$PWD/work/alpha2-contract" \
             scripts/alpha2-contract-regressions.sh
           sudo chown -R "$USER":"$(id -gn)" work/alpha2-contract
+      - name: Exercise Alpha 6 Podman secret delivery
+        run: |
+          set -euo pipefail
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/alpha6-podman-secrets" \
+            scripts/alpha6-podman-secrets-lab.sh
+          sudo chown -R "$USER":"$(id -gn)" work/alpha6-podman-secrets
       - name: Exercise Alpha 3 update and rollback laboratory
         run: |
           set -euo pipefail
@@ -219,6 +227,7 @@ jobs:
             work/*.txt
             work/alpha1-negative/*.txt
             work/alpha2-contract/*.txt
+            work/alpha6-podman-secrets/*.txt
             work/alpha3-update/*.json
             work/alpha3-update/*.txt
             work/alpha5-update-apply/*.json

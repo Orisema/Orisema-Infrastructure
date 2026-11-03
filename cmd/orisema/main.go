@@ -24,6 +24,7 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
 	"github.com/Orisema/Orisema-Infrastructure/internal/remote"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
+	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 	"github.com/Orisema/Orisema-Infrastructure/internal/updateplan"
 )
 
@@ -106,24 +107,34 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "validate":
 		fmt.Fprintf(stdout, "valid: %s (%d services)\n", m.Name, len(m.Services))
 	case "plan":
+		resolved, err := resolveManifestSecrets(context.Background(), m)
+		if err != nil {
+			fmt.Fprintf(stderr, "secret resolution blocked: %v; no changes made\n", err)
+			return 1
+		}
 		containers, err := (runtime.Client{}).List(context.Background())
 		if err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
 		fmt.Fprintf(stdout, "Read-only Podman plan for %q:\n", m.Name)
-		for _, step := range planner.BuildInspected(context.Background(), m, containers, runtime.Client{}) {
+		for _, step := range planner.BuildInspectedResolved(context.Background(), m, containers, runtime.Client{}, resolved) {
 			fmt.Fprintf(stdout, "  [%s] %s: %s (%s)\n", step.Action, step.Name, step.Image, step.Reason)
 		}
 		fmt.Fprintln(stdout, "NOOP checks only ownership labels, configured image reference, ports, healthcheck and restart policy configuration; live health and other settings not verified. No changes made.")
 	case "deploy":
 		client := runtime.Client{}
+		resolved, err := resolveManifestSecrets(context.Background(), m)
+		if err != nil {
+			fmt.Fprintf(stderr, "secret resolution blocked: %v; no changes made\n", err)
+			return 1
+		}
 		containers, err := client.List(context.Background())
 		if err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
-		steps := planner.BuildInspected(context.Background(), m, containers, client)
+		steps := planner.BuildInspectedResolved(context.Background(), m, containers, client, resolved)
 		creates := 0
 		blocked := false
 		fmt.Fprintf(stdout, "Conservative deployment plan for %q:\n", m.Name)
@@ -167,7 +178,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			if step.Action != planner.Create {
 				continue
 			}
-			id, err := client.Deploy(context.Background(), m.Name, m.Services[i])
+			fresh, err := resolveManifestSecrets(context.Background(), m)
+			if err != nil || !secrets.SameMounts(resolved[m.Services[i].Name], fresh[m.Services[i].Name]) {
+				fmt.Fprintln(stderr, "deployment stopped: secret identity changed or became unavailable after confirmation; no container created for this service")
+				return 1
+			}
+			id, err := client.DeployWithSecrets(context.Background(), m.Name, m.Services[i], fresh[m.Services[i].Name])
 			if err != nil {
 				fmt.Fprintf(stderr, "deployment stopped: %v\nPreviously created services, if any, were not rolled back.\n", err)
 				return 1
@@ -226,6 +242,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	}
 	return 0
+}
+
+func resolveManifestSecrets(ctx context.Context, m *manifest.Manifest) (map[string][]secrets.ResolvedMount, error) {
+	return secrets.ResolveManifest(ctx, m, map[secrets.Provider]secrets.Inspector{
+		secrets.ProviderPodman: secrets.PodmanInspector{},
+	})
 }
 
 func printUsage(w io.Writer) {
@@ -425,6 +447,12 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	if err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
+	}
+	for _, service := range m.Services {
+		if len(service.Secrets) != 0 {
+			fmt.Fprintln(stderr, "update blocked: secret bindings are not yet supported by update/rollback; no changes made")
+			return 1
+		}
 	}
 	if verify {
 		return runUpdateVerify(*m, args[3], args[5], args[7], stdout, stderr)

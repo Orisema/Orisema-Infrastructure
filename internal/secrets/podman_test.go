@@ -6,6 +6,7 @@ package secrets
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -15,6 +16,23 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if os.Getenv("ORISEMA_FILE_STAGE_HELPER") == "1" {
+		if len(os.Args) >= 3 && os.Args[1] == "secret" && os.Args[2] == "create" {
+			content, err := io.ReadAll(os.Stdin)
+			if err != nil || string(content) != os.Getenv("ORISEMA_EXPECTED_FILE_SECRET") {
+				os.Exit(8)
+			}
+			_, _ = os.Stdout.WriteString("abcdef0123456789abcdef012\n")
+			os.Exit(0)
+		}
+		if len(os.Args) == 4 && os.Args[1] == "secret" && os.Args[2] == "rm" {
+			if marker := os.Getenv("ORISEMA_FILE_CLEANUP_MARKER"); marker != "" {
+				_ = os.WriteFile(marker, []byte(os.Args[3]), 0o600)
+			}
+			os.Exit(0)
+		}
+		os.Exit(9)
+	}
 	if os.Getenv("ORISEMA_SECRET_ARGV_HELPER") == "1" {
 		if len(os.Args) != 4 || os.Args[1] != "secret" || os.Args[2] != "inspect" {
 			os.Exit(9)

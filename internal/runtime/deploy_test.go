@@ -181,6 +181,30 @@ func TestDeployPodmanSecretArgumentsContainIdentityNotLocator(t *testing.T) {
 	}
 }
 
+func TestDeployFileSecretUsesTransientRuntimeIdentity(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ORISEMA_ARGV_HELPER", "1")
+	mount := secrets.ResolvedMount{Name: "token", Provider: secrets.ProviderFile, Locator: "/private/token", Identity: "file-metadata-id", RuntimeIdentity: "abcdef0123456789abcdef012", Target: "token"}
+	out, err := (Client{Binary: binary}).DeployWithSecrets(context.Background(), "secret-lab", manifest.Service{Name: "web", Image: "nginx:1.27"}, []secrets.ResolvedMount{mount})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(out), &args); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "--secret abcdef0123456789abcdef012,target=token,type=mount") || !strings.Contains(joined, "dev.orisema.secret.token=file:file-metadata-id") {
+		t.Fatalf("argv = %#v; want transient runtime ID and persistent metadata label", args)
+	}
+	if strings.Contains(joined, "/private/token") {
+		t.Fatalf("argv unexpectedly contains host file path: %#v", args)
+	}
+}
+
 func TestUpdateRuntimeCommandsPreserveArgumentBoundaries(t *testing.T) {
 	binary, err := os.Executable()
 	if err != nil {

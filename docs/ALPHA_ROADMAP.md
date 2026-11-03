@@ -135,7 +135,8 @@ específico de ownership e consistência.
   silêncio (#79); bindings permanecem fail-closed.
 - [x] Implementar provider `podman` como padrão, com identidade revalidada,
   entrega por arquivo e interface somente de metadados (#81).
-- [ ] Implementar provider `file` como compatibilidade com handoff seguro.
+- [x] Implementar provider `file` como compatibilidade com handoff seguro via
+  secret Podman transitório e cleanup validado (#83).
 - [ ] Entregar somente em `/run/secrets/<target>`, sem valor inline ou ambiente.
 - [ ] Garantir não divulgação em plano, inspect, logs, erros, journal e backup.
 - [ ] Validar ausência, rotação, permissões, links, corrida, limites e cleanup

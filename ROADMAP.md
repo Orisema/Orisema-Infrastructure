@@ -82,7 +82,8 @@ incompletas sempre exigem diagnóstico e intervenção explícita.
   por planos, resultados, logs ou journals (#79).
 - [x] Integrar o provider Podman, revalidar identidade e entregar por arquivo
   após testes práticos sem divulgação (#81).
-- [ ] Validar provider `file` contra permissões inseguras, links e corridas.
+- [x] Validar provider `file` contra permissões inseguras, links e corridas,
+  usando staging transitório por descritor (#83).
 - [ ] Implementar ciclo de vida create/list/inspect/remove sem exibição ou
   exportação de conteúdo.
 - [ ] Definir separadamente configuração não secreta e redes necessárias às

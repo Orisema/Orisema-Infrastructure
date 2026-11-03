@@ -4,10 +4,11 @@
 and references to pre-existing external Podman networks. It preserves every
 validated `v1alpha3` field, including file-delivered secrets.
 
-The current increment implements schema and validation only. `validate` accepts
-a valid manifest, while `plan` returns `REVIEW` and `deploy` makes no changes
-when `publicEnvironment` or service network bindings are present. Runtime
-delivery will be enabled only after identity resolution and revalidation land.
+The current increment implements schema, validation and metadata-only network
+resolution. `validate` accepts a valid manifest, while `plan` still returns
+`REVIEW` and `deploy` makes no changes when `publicEnvironment` or service
+network bindings are present. Runtime delivery will be enabled only after the
+resolved identities are integrated into planning and deployment.
 
 ## Public environment
 
@@ -46,8 +47,9 @@ services:
 
 Application network names are logical references. Podman names identify
 external `bridge` networks that the operator creates separately. The first
-runtime increment will inspect and revalidate immutable IDs but will never
-create, adopt, change or remove those networks.
+provider inspects exact names, accepts only 64-character immutable IDs and the
+`bridge` driver, and exposes a revalidation operation for the future mutation
+boundary. It never creates, adopts, changes or removes those networks.
 
 At most 32 networks may be declared and each service may bind at most 8.
 Bindings must reference declarations, duplicates are rejected, every declared

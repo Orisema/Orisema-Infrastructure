@@ -100,8 +100,9 @@ See [the controlled update laboratory](CONTROLLED-UPDATE-LAB.md).
   [the Alpha 6 contract](MANIFEST-V1ALPHA3.md).
 - `orisema.dev/v1alpha4` additionally validates explicitly public environment
   entries and references to pre-existing external Podman networks. Runtime
-  resolution and delivery are not implemented yet, so `plan` returns `REVIEW`
-  and `deploy` remains unchanged. See
+  metadata resolution is implemented without lifecycle operations, but planner
+  and deploy integration are not: `plan` returns `REVIEW` and `deploy` remains
+  unchanged. See
   [the Alpha 7 contract](MANIFEST-V1ALPHA4.md).
 - Secret values in environment variables, volumes, custom permissions and JSON
   output are not supported and fail closed. See

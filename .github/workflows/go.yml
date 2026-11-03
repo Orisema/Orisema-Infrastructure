@@ -49,6 +49,15 @@ jobs:
           mkdir -p work
           go build -o work/orisema ./cmd/orisema
           go test -c -o work/planner.test ./internal/planner
+          go test -c -o work/networks.test ./internal/networks
+
+      - name: Exercise Alpha 7 read-only network provider
+        run: |
+          set -euo pipefail
+          sudo env ORISEMA_PODMAN_NETWORK_INTEGRATION=1 \
+            work/networks.test -test.v \
+            -test.run '^TestPodmanNetworkIntegrationReadOnly$' \
+            | tee work/alpha7-network-provider.txt
       - name: Deploy isolated healthcheck and verify real inspect
         run: |
           set -euo pipefail

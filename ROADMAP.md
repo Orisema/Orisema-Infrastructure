@@ -80,8 +80,8 @@ incompletas sempre exigem diagnóstico e intervenção explícita.
 - [x] Implementar a base de `v1alpha3` sem alterar os contratos antigos (#79).
 - [x] Introduzir provider API somente de metadados, sem transportar valores
   por planos, resultados, logs ou journals (#79).
-- [ ] Integrar o provider Podman e remover o bloqueio de entrega somente após
-  os testes práticos.
+- [x] Integrar o provider Podman, revalidar identidade e entregar por arquivo
+  após testes práticos sem divulgação (#81).
 - [ ] Validar provider `file` contra permissões inseguras, links e corridas.
 - [ ] Implementar ciclo de vida create/list/inspect/remove sem exibição ou
   exportação de conteúdo.

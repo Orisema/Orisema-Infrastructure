@@ -14,11 +14,19 @@ import (
 	"time"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 )
 
 // Deploy creates a new container only. It never replaces, removes, or updates
 // an existing container. Podman is responsible for enforcing port conflicts.
 func (c Client) Deploy(ctx context.Context, app string, s manifest.Service) (string, error) {
+	return c.DeployWithSecrets(ctx, app, s, nil)
+}
+
+// DeployWithSecrets creates a new container with already resolved, immutable
+// provider identities. The caller must revalidate these identities immediately
+// before invoking this method.
+func (c Client) DeployWithSecrets(ctx context.Context, app string, s manifest.Service, mounts []secrets.ResolvedMount) (string, error) {
 	name := "orisema-" + app + "-" + s.Name
 	bin := c.Binary
 	if bin == "" {
@@ -68,6 +76,14 @@ func (c Client) Deploy(ctx context.Context, app string, s manifest.Service) (str
 		}
 		args = append(args, "--publish", published)
 	}
+	for _, mount := range mounts {
+		if mount.Provider != secrets.ProviderPodman || mount.Identity == "" {
+			return "", fmt.Errorf("secret %q has unsupported or incomplete resolved metadata", mount.Name)
+		}
+		args = append(args,
+			"--label", secretLabel(mount.Target)+"="+string(mount.Provider)+":"+mount.Identity,
+			"--secret", mount.Identity+",target="+mount.Target+",type=mount")
+	}
 	args = append(args, s.Image)
 	// No shell interpolation; arguments are passed directly to Podman.
 	out, err := exec.CommandContext(ctx, bin, args...).CombinedOutput()
@@ -76,6 +92,10 @@ func (c Client) Deploy(ctx context.Context, app string, s manifest.Service) (str
 		return "", fmt.Errorf("podman run failed: %w: %s%s", err, strings.TrimSpace(string(out)), cleanup)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func secretLabel(target string) string {
+	return "dev.orisema.secret." + target
 }
 
 // cleanupFailedCreate handles Podman's documented behavior of retaining a

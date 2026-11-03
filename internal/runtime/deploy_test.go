@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 )
 
 // Reuse the test executable as a subprocess to verify actual argv boundaries.
@@ -153,6 +154,30 @@ func TestDeployExplicitHostIPArguments(t *testing.T) {
 				t.Fatalf("argv = %#v; want publish %q", args, tc.want)
 			}
 		})
+	}
+}
+
+func TestDeployPodmanSecretArgumentsContainIdentityNotLocator(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ORISEMA_ARGV_HELPER", "1")
+	mount := secrets.ResolvedMount{Name: "token", Provider: secrets.ProviderPodman, Locator: "human-readable-name", Identity: "immutable-id", Target: "token"}
+	out, err := (Client{Binary: binary}).DeployWithSecrets(context.Background(), "secret-lab", manifest.Service{Name: "web", Image: "nginx:1.27"}, []secrets.ResolvedMount{mount})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(out), &args); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "--secret immutable-id,target=token,type=mount") || !strings.Contains(joined, "dev.orisema.secret.token=podman:immutable-id") {
+		t.Fatalf("argv = %#v; want resolved secret identity and ownership label", args)
+	}
+	if strings.Contains(joined, "human-readable-name") {
+		t.Fatalf("argv unexpectedly contains mutable locator: %#v", args)
 	}
 }
 

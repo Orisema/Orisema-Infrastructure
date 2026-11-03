@@ -13,6 +13,7 @@ import (
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
+	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 )
 
 const (
@@ -27,10 +28,21 @@ type Inspector interface {
 // BuildInspected checks declared managed fields only. It never mutates Podman.
 // Inspection failures are REVIEW, not evidence of safe equivalence.
 func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtime.Container, inspector Inspector) []Step {
+	return buildInspected(ctx, m, existing, inspector, nil, false)
+}
+
+// BuildInspectedResolved includes externally resolved secret identities in the
+// comparison without reading or transporting their values.
+func BuildInspectedResolved(ctx context.Context, m *manifest.Manifest, existing []runtime.Container, inspector Inspector, resolved map[string][]secrets.ResolvedMount) []Step {
+	return buildInspected(ctx, m, existing, inspector, resolved, true)
+}
+
+func buildInspected(ctx context.Context, m *manifest.Manifest, existing []runtime.Container, inspector Inspector, resolved map[string][]secrets.ResolvedMount, allowSecrets bool) []Step {
 	steps := make([]Step, 0, len(m.Services))
 	for _, svc := range m.Services {
 		name := "orisema-" + m.Name + "-" + svc.Name
-		if len(svc.Secrets) != 0 {
+		mounts := resolved[svc.Name]
+		if len(svc.Secrets) != 0 && (!allowSecrets || len(mounts) != len(svc.Secrets)) {
 			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Review, Reason: "secret delivery is declared but not implemented; no changes made"})
 			continue
 		}
@@ -50,6 +62,24 @@ func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 			continue
 		}
 		reasons := []string{}
+		expectedSecretLabels := make(map[string]string, len(mounts))
+		for _, mount := range mounts {
+			expectedSecretLabels["dev.orisema.secret."+mount.Target] = string(mount.Provider) + ":" + mount.Identity
+		}
+		for key, expected := range expectedSecretLabels {
+			if labels[key] != expected {
+				reasons = append(reasons, "secret binding metadata differs")
+				break
+			}
+		}
+		for key := range labels {
+			if strings.HasPrefix(key, "dev.orisema.secret.") {
+				if _, ok := expectedSecretLabels[key]; !ok {
+					reasons = append(reasons, "unexpected secret binding metadata")
+					break
+				}
+			}
+		}
 		if inspected.Config.Image != svc.Image {
 			reasons = append(reasons, "configured image differs")
 		}
@@ -115,7 +145,7 @@ func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 		if len(reasons) > 0 {
 			steps = append(steps, Step{Name: name, Image: svc.Image, CurrentImage: inspected.Config.Image, CurrentID: inspected.ID, Action: Drift, Differences: append([]string(nil), reasons...), Reason: strings.Join(reasons, ", ")})
 		} else {
-			steps = append(steps, Step{Name: name, Image: svc.Image, CurrentImage: inspected.Config.Image, CurrentID: inspected.ID, Action: Noop, Reason: "managed image reference, ports, healthcheck and restart policy configuration match; live health and other settings not verified"})
+			steps = append(steps, Step{Name: name, Image: svc.Image, CurrentImage: inspected.Config.Image, CurrentID: inspected.ID, Action: Noop, Reason: "managed image reference, ports, healthcheck, restart policy and secret binding metadata match; live health and other settings not verified"})
 		}
 	}
 	return steps

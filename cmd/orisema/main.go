@@ -150,7 +150,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		if m.APIVersion == "orisema.dev/v1alpha1" {
 			fmt.Fprintln(stdout, "Images may be downloaded; legacy v1alpha1 ports bind to all interfaces. No rollback or health verification.")
 		} else {
-			fmt.Fprintln(stdout, "Images may be downloaded; v1alpha2 ports use their explicit loopback hostIP. No rollback or health verification.")
+			fmt.Fprintf(stdout, "Images may be downloaded; %s ports use their explicit loopback hostIP. No rollback or health verification.\n", m.APIVersion)
 		}
 		fmt.Fprint(stdout, "Type DEPLOY to continue: ")
 		reader := bufio.NewReader(stdin)

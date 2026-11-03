@@ -30,6 +30,10 @@ func BuildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 	steps := make([]Step, 0, len(m.Services))
 	for _, svc := range m.Services {
 		name := "orisema-" + m.Name + "-" + svc.Name
+		if len(svc.Secrets) != 0 {
+			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Review, Reason: "secret delivery is declared but not implemented; no changes made"})
+			continue
+		}
 		_, exists := runtime.Find(existing, name)
 		if !exists {
 			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Create, Reason: "container not found"})

@@ -53,3 +53,11 @@ func TestBuildInspected(t *testing.T) {
 	existing = nil
 	check(Create)
 }
+
+func TestBuildInspectedBlocksUnimplementedSecretDelivery(t *testing.T) {
+	m := &manifest.Manifest{Name: "demo", Services: []manifest.Service{{Name: "web", Image: "nginx:latest", Secrets: []manifest.SecretBinding{{Name: "token", Target: "token"}}}}}
+	got := BuildInspected(context.Background(), m, nil, fakeInspector{})
+	if len(got) != 1 || got[0].Action != Review || got[0].Reason != "secret delivery is declared but not implemented; no changes made" {
+		t.Fatalf("BuildInspected() = %#v; want fail-closed REVIEW", got)
+	}
+}

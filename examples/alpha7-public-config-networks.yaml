@@ -1,0 +1,16 @@
+apiVersion: orisema.dev/v1alpha4
+kind: Application
+name: alpha7-config-lab
+networks:
+  - name: private
+    source:
+      podman:
+        name: alpha7-config-lab-private
+services:
+  - name: web
+    image: docker.io/library/nginx:1.27-alpine
+    publicEnvironment:
+      - name: APP_MODE
+        value: laboratory
+    networks:
+      - name: private

@@ -25,3 +25,11 @@ func TestBuildBlocksUnimplementedSecretDelivery(t *testing.T) {
 		t.Fatalf("Build() = %#v; want fail-closed REVIEW", got)
 	}
 }
+
+func TestBuildBlocksUnimplementedAlpha4Delivery(t *testing.T) {
+	m := &manifest.Manifest{Name: "demo", Services: []manifest.Service{{Name: "web", Image: "nginx:latest", PublicEnvironment: []manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}}}}}
+	got := Build(m, nil)
+	if len(got) != 1 || got[0].Action != Review || got[0].Reason != "public configuration or network delivery is declared but not implemented; no changes made" {
+		t.Fatalf("Build() = %#v; want fail-closed REVIEW", got)
+	}
+}

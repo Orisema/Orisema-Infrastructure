@@ -35,6 +35,9 @@ func (c Client) RenameContainer(ctx context.Context, from, to string) error {
 // CreateUpdateCandidate creates the replacement under the original service
 // name. It deliberately performs no cleanup on failure.
 func (c Client) CreateUpdateCandidate(ctx context.Context, app string, service manifest.Service) (string, error) {
+	if len(service.PublicEnvironment) != 0 || len(service.Networks) != 0 {
+		return "", fmt.Errorf("public configuration and network delivery are not implemented for update; no changes made")
+	}
 	name := "orisema-" + app + "-" + service.Name
 	bin := c.Binary
 	if bin == "" {

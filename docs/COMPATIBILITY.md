@@ -98,8 +98,14 @@ See [the controlled update laboratory](CONTROLLED-UPDATE-LAB.md).
   and file delivery; managed Podman lifecycle is supported, while
   update/rollback with bindings remains blocked. See
   [the Alpha 6 contract](MANIFEST-V1ALPHA3.md).
-- Environment, secret values, volumes, custom permissions and JSON output are
-  not supported and fail closed. See [the Alpha 2 contract](MANIFEST-V1ALPHA2.md).
+- `orisema.dev/v1alpha4` additionally validates explicitly public environment
+  entries and references to pre-existing external Podman networks. Runtime
+  resolution and delivery are not implemented yet, so `plan` returns `REVIEW`
+  and `deploy` remains unchanged. See
+  [the Alpha 7 contract](MANIFEST-V1ALPHA4.md).
+- Secret values in environment variables, volumes, custom permissions and JSON
+  output are not supported and fail closed. See
+  [the Alpha 2 contract](MANIFEST-V1ALPHA2.md).
 
 ## Meaning of `NOOP`
 
@@ -110,7 +116,8 @@ It does **not** confirm:
 - that the container is running or healthy;
 - image digest, freshness or registry identity;
 - undeclared or image-inherited settings outside the supported comparison;
-- volumes, secrets, environment variables, networks or security context;
+- volumes, undeclared or unsupported secrets, public environment entries,
+  networks or security context;
 - firewall exposure, dependencies or application-level reachability;
 - production readiness.
 

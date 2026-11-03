@@ -161,8 +161,8 @@ artefatos AMD64/ARM64 e reinstalou com sucesso o binário AMD64 baixado.
 
 - [x] Propor contrato, modelo de ameaça e sequência de implementação
   ([RFC-0003](RFC-0003-public-config-and-external-networks.md), #92).
-- [ ] Adicionar `v1alpha4` com configuração explicitamente pública e referências
-  de rede, preservando rejeição nos contratos anteriores.
+- [x] Adicionar `v1alpha4` com configuração explicitamente pública e referências
+  de rede, preservando rejeição nos contratos anteriores (#94).
 - [ ] Resolver redes Podman externas por identidade e revalidá-las antes do
   deploy, sem criar, adotar, alterar ou remover redes.
 - [ ] Detectar drift de ambiente e associações de rede sem imprimir valores.

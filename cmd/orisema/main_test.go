@@ -188,6 +188,22 @@ func TestUpdateBlocksManifestWithSecretBindings(t *testing.T) {
 	}
 }
 
+func TestUpdateBlocksManifestWithAlpha4Delivery(t *testing.T) {
+	manifestPath := filepath.Join(t.TempDir(), "manifest.yaml")
+	manifestData := "apiVersion: orisema.dev/v1alpha4\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:new\n    publicEnvironment:\n      - name: APP_MODE\n        value: laboratory\n"
+	if err := os.WriteFile(manifestPath, []byte(manifestData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"update", "plan", manifestPath}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "public configuration and network bindings are not yet supported") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if strings.Contains(stderr.String(), "laboratory") {
+		t.Fatalf("update error exposed public value: %q", stderr.String())
+	}
+}
+
 func TestOperationDiagnosisIsReadOnlyAndConservative(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "operations")
 	store, err := operation.OpenStore(root)

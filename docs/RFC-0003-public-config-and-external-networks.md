@@ -132,8 +132,9 @@ contêiner recebe labels com os nomes gerenciados e um hash determinístico do
 conjunto declarado; a comparação ainda lê o ambiente configurado para impedir
 que um label adulterado prove equivalência.
 
-Nenhum valor de `publicEnvironment` entra em journal, backup ou labels. Isso é
-redução de exposição acidental, não uma garantia de segredo.
+Nenhum valor de `publicEnvironment` entra em journal ou labels. O backup de
+configuração inclui o manifesto validado e, portanto, inclui esses valores
+públicos por design. Isso reforça que o campo não oferece sigilo.
 
 ## Planejamento e mutação
 
@@ -158,7 +159,7 @@ incremento não reconcilia nem substitui esse contêiner.
 | Troca de rede entre plano e deploy | identidade observada e revalidação imediata antes da mutação |
 | Adoção ou remoção de rede alheia | provider externo somente leitura; nenhuma operação de lifecycle de rede |
 | Associação à rede errada por nome reutilizado | deploy pelo ID revalidado e label de identidade no contêiner |
-| Valor público vazando em logs | erros e planos mencionam apenas nomes; valores não entram em labels, journals ou backups |
+| Valor público aparecendo em saídas acidentais | erros e planos mencionam apenas nomes; valores não entram em labels ou journals; o backup do manifesto é exposição documentada |
 | Argument injection | validação de nome e passagem por `exec` com argumentos separados, sem shell |
 | Configuração fora do limite do host | limites por entrada, quantidade e total antes de consultar o runtime |
 | Driver de rede fora do contrato testado | allowlist inicial somente para `bridge`, validada na resolução e revalidação |

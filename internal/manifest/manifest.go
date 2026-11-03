@@ -19,23 +19,51 @@ import (
 )
 
 type Manifest struct {
-	APIVersion     string              `yaml:"apiVersion"`
-	Kind           string              `yaml:"kind,omitempty"`
-	Name           string              `yaml:"name"`
-	Secrets        []SecretDeclaration `yaml:"secrets,omitempty"`
-	Services       []Service           `yaml:"services"`
-	secretsPresent bool
+	APIVersion      string               `yaml:"apiVersion"`
+	Kind            string               `yaml:"kind,omitempty"`
+	Name            string               `yaml:"name"`
+	Secrets         []SecretDeclaration  `yaml:"secrets,omitempty"`
+	Networks        []NetworkDeclaration `yaml:"networks,omitempty"`
+	Services        []Service            `yaml:"services"`
+	secretsPresent  bool
+	networksPresent bool
 }
 
 type Service struct {
-	Name           string          `yaml:"name"`
-	Image          string          `yaml:"image"`
-	Ports          []Port          `yaml:"ports,omitempty"`
-	Healthcheck    *Healthcheck    `yaml:"healthcheck,omitempty"`
-	Restart        *Restart        `yaml:"restart,omitempty"`
-	Recovery       *Recovery       `yaml:"recovery,omitempty"`
-	Secrets        []SecretBinding `yaml:"secrets,omitempty"`
-	secretsPresent bool
+	Name                     string                   `yaml:"name"`
+	Image                    string                   `yaml:"image"`
+	Ports                    []Port                   `yaml:"ports,omitempty"`
+	Healthcheck              *Healthcheck             `yaml:"healthcheck,omitempty"`
+	Restart                  *Restart                 `yaml:"restart,omitempty"`
+	Recovery                 *Recovery                `yaml:"recovery,omitempty"`
+	Secrets                  []SecretBinding          `yaml:"secrets,omitempty"`
+	PublicEnvironment        []PublicEnvironmentEntry `yaml:"publicEnvironment,omitempty"`
+	Networks                 []NetworkBinding         `yaml:"networks,omitempty"`
+	secretsPresent           bool
+	publicEnvironmentPresent bool
+	networksPresent          bool
+}
+
+type PublicEnvironmentEntry struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
+}
+
+type NetworkDeclaration struct {
+	Name   string        `yaml:"name"`
+	Source NetworkSource `yaml:"source"`
+}
+
+type NetworkSource struct {
+	Podman *PodmanNetworkSource `yaml:"podman,omitempty"`
+}
+
+type PodmanNetworkSource struct {
+	Name string `yaml:"name"`
+}
+
+type NetworkBinding struct {
+	Name string `yaml:"name"`
 }
 
 type SecretDeclaration struct {
@@ -92,6 +120,7 @@ type Port struct {
 }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
+var environmentName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,127}$`)
 
 func Load(path string) (*Manifest, error) {
 	f, err := os.Open(path)
@@ -119,7 +148,7 @@ func Load(path string) (*Manifest, error) {
 		}
 		return nil, fmt.Errorf("parse trailing YAML: %w", err)
 	}
-	markSecretFieldPresence(data, &m)
+	markVersionedFieldPresence(data, &m)
 	if err := m.Validate(); err != nil {
 		return nil, err
 	}
@@ -128,7 +157,8 @@ func Load(path string) (*Manifest, error) {
 
 func (m *Manifest) Validate() error {
 	loopbackPorts := false
-	alpha3 := false
+	secretsSupported := false
+	alpha4 := false
 	switch m.APIVersion {
 	case "orisema.dev/v1alpha1":
 		if m.Kind != "" {
@@ -141,15 +171,25 @@ func (m *Manifest) Validate() error {
 		}
 	case "orisema.dev/v1alpha3":
 		loopbackPorts = true
-		alpha3 = true
+		secretsSupported = true
 		if m.Kind != "Application" {
 			return errors.New("kind must be Application for orisema.dev/v1alpha3")
 		}
+	case "orisema.dev/v1alpha4":
+		loopbackPorts = true
+		secretsSupported = true
+		alpha4 = true
+		if m.Kind != "Application" {
+			return errors.New("kind must be Application for orisema.dev/v1alpha4")
+		}
 	default:
-		return errors.New("apiVersion must be orisema.dev/v1alpha1, orisema.dev/v1alpha2 or orisema.dev/v1alpha3")
+		return errors.New("apiVersion must be orisema.dev/v1alpha1, orisema.dev/v1alpha2, orisema.dev/v1alpha3 or orisema.dev/v1alpha4")
 	}
-	if !alpha3 && (m.secretsPresent || len(m.Secrets) != 0) {
+	if !secretsSupported && (m.secretsPresent || len(m.Secrets) != 0) {
 		return fmt.Errorf("secrets are not part of %s; migrate the manifest to orisema.dev/v1alpha3", m.APIVersion)
+	}
+	if !alpha4 && (m.networksPresent || len(m.Networks) != 0) {
+		return fmt.Errorf("networks are not part of %s; migrate the manifest to orisema.dev/v1alpha4", m.APIVersion)
 	}
 	if !identifier.MatchString(m.Name) {
 		return errors.New("name must be lowercase letters, digits or hyphens and start with a letter (max 63 chars)")
@@ -187,6 +227,23 @@ func (m *Manifest) Validate() error {
 			return fmt.Errorf("secret %q: source must contain exactly one of podman or file", secret.Name)
 		}
 	}
+	if len(m.Networks) > 32 {
+		return errors.New("networks must contain at most 32 declarations")
+	}
+	declaredNetworks := make(map[string]bool, len(m.Networks))
+	usedNetworks := make(map[string]bool, len(m.Networks))
+	for _, network := range m.Networks {
+		if !identifier.MatchString(network.Name) {
+			return fmt.Errorf("invalid network name %q", network.Name)
+		}
+		if declaredNetworks[network.Name] {
+			return fmt.Errorf("duplicate network %q", network.Name)
+		}
+		declaredNetworks[network.Name] = true
+		if network.Source.Podman == nil || !identifier.MatchString(network.Source.Podman.Name) {
+			return fmt.Errorf("network %q: source must contain one valid podman name", network.Name)
+		}
+	}
 	seen := map[string]bool{}
 	ports := map[int]bool{}
 	for _, s := range m.Services {
@@ -198,8 +255,52 @@ func (m *Manifest) Validate() error {
 			return fmt.Errorf("duplicate service %q", s.Name)
 		}
 		seen[s.Name] = true
-		if !alpha3 && (s.secretsPresent || len(s.Secrets) != 0) {
+		if !secretsSupported && (s.secretsPresent || len(s.Secrets) != 0) {
 			return fmt.Errorf("service %q: secrets are not part of %s; migrate the manifest to orisema.dev/v1alpha3", s.Name, m.APIVersion)
+		}
+		if !alpha4 && (s.publicEnvironmentPresent || len(s.PublicEnvironment) != 0) {
+			return fmt.Errorf("service %q: publicEnvironment is not part of %s; migrate the manifest to orisema.dev/v1alpha4", s.Name, m.APIVersion)
+		}
+		if !alpha4 && (s.networksPresent || len(s.Networks) != 0) {
+			return fmt.Errorf("service %q: networks are not part of %s; migrate the manifest to orisema.dev/v1alpha4", s.Name, m.APIVersion)
+		}
+		if len(s.PublicEnvironment) > 128 {
+			return fmt.Errorf("service %q: publicEnvironment must contain at most 128 entries", s.Name)
+		}
+		environmentNames := make(map[string]bool, len(s.PublicEnvironment))
+		environmentBytes := 0
+		for _, entry := range s.PublicEnvironment {
+			if !environmentName.MatchString(entry.Name) {
+				return fmt.Errorf("service %q: invalid publicEnvironment name %q", s.Name, entry.Name)
+			}
+			if environmentNames[entry.Name] {
+				return fmt.Errorf("service %q: duplicate publicEnvironment name %q", s.Name, entry.Name)
+			}
+			environmentNames[entry.Name] = true
+			if len(entry.Value) > 4096 || strings.ContainsAny(entry.Value, "\x00\r\n") {
+				return fmt.Errorf("service %q: publicEnvironment value for %q exceeds limits or contains a forbidden character", s.Name, entry.Name)
+			}
+			environmentBytes += len(entry.Name) + len(entry.Value)
+		}
+		if environmentBytes > 32*1024 {
+			return fmt.Errorf("service %q: publicEnvironment exceeds 32 KiB total", s.Name)
+		}
+		if len(s.Networks) > 8 {
+			return fmt.Errorf("service %q: networks must contain at most 8 bindings", s.Name)
+		}
+		boundNetworks := make(map[string]bool, len(s.Networks))
+		for _, binding := range s.Networks {
+			if !identifier.MatchString(binding.Name) || !declaredNetworks[binding.Name] {
+				return fmt.Errorf("service %q: network %q is not declared", s.Name, binding.Name)
+			}
+			if boundNetworks[binding.Name] {
+				return fmt.Errorf("service %q: network %q is bound more than once", s.Name, binding.Name)
+			}
+			boundNetworks[binding.Name] = true
+			usedNetworks[binding.Name] = true
+		}
+		if len(m.Networks) != 0 && len(s.Networks) == 0 {
+			return fmt.Errorf("service %q: at least one declared network binding is required", s.Name)
 		}
 		if len(s.Secrets) > 64 {
 			return fmt.Errorf("service %q: secrets must contain at most 64 bindings", s.Name)
@@ -293,16 +394,22 @@ func (m *Manifest) Validate() error {
 			containerPorts[p.Container] = true
 		}
 	}
+	for _, network := range m.Networks {
+		if !usedNetworks[network.Name] {
+			return fmt.Errorf("network %q is declared but not consumed", network.Name)
+		}
+	}
 	return nil
 }
 
-func markSecretFieldPresence(data []byte, m *Manifest) {
+func markVersionedFieldPresence(data []byte, m *Manifest) {
 	var document yaml.Node
 	if err := yaml.Unmarshal(data, &document); err != nil || len(document.Content) == 0 {
 		return
 	}
 	root := document.Content[0]
 	m.secretsPresent = mappingHasKey(root, "secrets")
+	m.networksPresent = mappingHasKey(root, "networks")
 	services := mappingValue(root, "services")
 	if services == nil || services.Kind != yaml.SequenceNode {
 		return
@@ -312,6 +419,8 @@ func markSecretFieldPresence(data []byte, m *Manifest) {
 			break
 		}
 		m.Services[i].secretsPresent = mappingHasKey(node, "secrets")
+		m.Services[i].publicEnvironmentPresent = mappingHasKey(node, "publicEnvironment")
+		m.Services[i].networksPresent = mappingHasKey(node, "networks")
 	}
 }
 

@@ -42,6 +42,10 @@ func buildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 	for _, svc := range m.Services {
 		name := "orisema-" + m.Name + "-" + svc.Name
 		mounts := resolved[svc.Name]
+		if len(svc.PublicEnvironment) != 0 || len(svc.Networks) != 0 {
+			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Review, Reason: "public configuration or network delivery is declared but not implemented; no changes made"})
+			continue
+		}
 		if len(svc.Secrets) != 0 && (!allowSecrets || len(mounts) != len(svc.Secrets)) {
 			steps = append(steps, Step{Name: name, Image: svc.Image, Action: Review, Reason: "secret delivery is declared but not implemented; no changes made"})
 			continue

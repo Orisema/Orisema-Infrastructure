@@ -181,6 +181,22 @@ func TestDeployPodmanSecretArgumentsContainIdentityNotLocator(t *testing.T) {
 	}
 }
 
+func TestDeployBlocksUnimplementedAlpha4DeliveryBeforeRuntime(t *testing.T) {
+	for _, svc := range []manifest.Service{
+		{Name: "web", Image: "nginx:1.27", PublicEnvironment: []manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}}},
+		{Name: "web", Image: "nginx:1.27", Networks: []manifest.NetworkBinding{{Name: "private"}}},
+	} {
+		_, err := (Client{Binary: "/does/not/exist"}).DeployWithSecrets(context.Background(), "alpha7", svc, nil)
+		if err == nil || !strings.Contains(err.Error(), "not implemented; no changes made") {
+			t.Fatalf("DeployWithSecrets() error = %v; want fail-closed rejection", err)
+		}
+		_, err = (Client{Binary: "/does/not/exist"}).CreateUpdateCandidate(context.Background(), "alpha7", svc)
+		if err == nil || !strings.Contains(err.Error(), "not implemented for update; no changes made") {
+			t.Fatalf("CreateUpdateCandidate() error = %v; want fail-closed rejection", err)
+		}
+	}
+}
+
 func TestDeployFileSecretUsesTransientRuntimeIdentity(t *testing.T) {
 	binary, err := os.Executable()
 	if err != nil {

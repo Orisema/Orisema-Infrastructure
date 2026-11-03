@@ -102,7 +102,7 @@ no primeiro incremento.
 
 - [x] Propor contrato `v1alpha4`, modelo de ameaça e gates para configuração
   explicitamente não secreta e redes Podman externas ([RFC-0003](docs/RFC-0003-public-config-and-external-networks.md), #92).
-- [ ] Implementar tipos e validação sem ampliar contratos antigos.
+- [x] Implementar tipos e validação sem ampliar contratos antigos (#94).
 - [ ] Resolver e revalidar redes externas por identidade, sem lifecycle.
 - [ ] Comparar drift de configuração pública e associações de rede.
 - [ ] Entregar configuração e redes no deploy sem shell nem remoção de recurso

@@ -27,6 +27,9 @@ func (c Client) Deploy(ctx context.Context, app string, s manifest.Service) (str
 // provider identities. The caller must revalidate these identities immediately
 // before invoking this method.
 func (c Client) DeployWithSecrets(ctx context.Context, app string, s manifest.Service, mounts []secrets.ResolvedMount) (string, error) {
+	if len(s.PublicEnvironment) != 0 || len(s.Networks) != 0 {
+		return "", fmt.Errorf("public configuration and network delivery are not implemented; no changes made")
+	}
 	name := "orisema-" + app + "-" + s.Name
 	bin := c.Binary
 	if bin == "" {

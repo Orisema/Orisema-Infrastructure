@@ -77,12 +77,16 @@ func (c Client) DeployWithSecrets(ctx context.Context, app string, s manifest.Se
 		args = append(args, "--publish", published)
 	}
 	for _, mount := range mounts {
-		if mount.Provider != secrets.ProviderPodman || mount.Identity == "" {
+		runtimeIdentity := mount.RuntimeIdentity
+		if runtimeIdentity == "" {
+			runtimeIdentity = mount.Identity
+		}
+		if (mount.Provider != secrets.ProviderPodman && mount.Provider != secrets.ProviderFile) || mount.Identity == "" || runtimeIdentity == "" {
 			return "", fmt.Errorf("secret %q has unsupported or incomplete resolved metadata", mount.Name)
 		}
 		args = append(args,
 			"--label", secretLabel(mount.Target)+"="+string(mount.Provider)+":"+mount.Identity,
-			"--secret", mount.Identity+",target="+mount.Target+",type=mount")
+			"--secret", runtimeIdentity+",target="+mount.Target+",type=mount")
 	}
 	args = append(args, s.Image)
 	// No shell interpolation; arguments are passed directly to Podman.

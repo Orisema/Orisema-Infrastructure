@@ -183,12 +183,25 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				fmt.Fprintln(stderr, "deployment stopped: secret identity changed or became unavailable after confirmation; no container created for this service")
 				return 1
 			}
-			id, err := client.DeployWithSecrets(context.Background(), m.Name, m.Services[i], fresh[m.Services[i].Name])
+			prepared, cleanupSecrets, err := (secrets.Preparer{}).PrepareService(context.Background(), m.Name, m.Services[i].Name, fresh[m.Services[i].Name])
+			if err != nil {
+				fmt.Fprintf(stderr, "deployment stopped while preparing secrets: %v\n", err)
+				return 1
+			}
+			id, err := client.DeployWithSecrets(context.Background(), m.Name, m.Services[i], prepared)
+			cleanupErr := cleanupSecrets(context.Background())
 			if err != nil {
 				fmt.Fprintf(stderr, "deployment stopped: %v\nPreviously created services, if any, were not rolled back.\n", err)
+				if cleanupErr != nil {
+					fmt.Fprintf(stderr, "transient secret cleanup also failed: %v\n", cleanupErr)
+				}
 				return 1
 			}
 			fmt.Fprintf(stdout, "created %s: %s\n", step.Name, id)
+			if cleanupErr != nil {
+				fmt.Fprintf(stderr, "container was created, but transient secret cleanup failed: %v; remove only the labeled transient secret after inspection\n", cleanupErr)
+				return 1
+			}
 		}
 	case "status":
 		client := runtime.Client{}
@@ -247,6 +260,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func resolveManifestSecrets(ctx context.Context, m *manifest.Manifest) (map[string][]secrets.ResolvedMount, error) {
 	return secrets.ResolveManifest(ctx, m, map[secrets.Provider]secrets.Inspector{
 		secrets.ProviderPodman: secrets.PodmanInspector{},
+		secrets.ProviderFile:   secrets.FileInspector{},
 	})
 }
 

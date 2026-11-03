@@ -1,8 +1,7 @@
 # Manifest contract — `orisema.dev/v1alpha3`
 
-Status: **partial Alpha 6 implementation**. Podman references can be resolved
-and delivered locally; the `file` provider and secret lifecycle CLI remain
-blocked until their separate gates pass.
+Status: **partial Alpha 6 implementation**. Podman and validated local file
+references can be delivered locally; the secret lifecycle CLI remains pending.
 
 ## Compatibility
 
@@ -61,11 +60,18 @@ stores a provider/ID binding in a managed label so later plans can detect drift
 without hashing or reading content. Update and rollback remain blocked for
 services with secret bindings until those flows preserve the same contract.
 
+The `file` provider rejects symlinks, hardlinks, non-regular files, ownership
+mismatch, modes more permissive than `0600`, paths under group/world-writable
+directories and files larger than 64 KiB. It records a metadata identity, never
+a content hash. After confirmation it reopens with `O_NOFOLLOW`, revalidates the
+identity and streams that descriptor to a randomly named, labeled Podman secret.
+The transient secret is removed after container creation; Podman preserves the
+container mount across restart.
+
 The internal provider interface exposes references and allowlisted metadata
 only. It has no content/value field and never invokes `podman secret inspect
---showsecret`. File permission checks, descriptor-safe handoff and lifecycle
-commands remain future Alpha 6 increments governed by
-[RFC-0002](RFC-0002-secure-secrets.md).
+--showsecret`. Lifecycle commands remain the next Alpha 6 increment governed
+by [RFC-0002](RFC-0002-secure-secrets.md).
 
 The repository includes
 [`examples/alpha6-secret-references.yaml`](../examples/alpha6-secret-references.yaml)

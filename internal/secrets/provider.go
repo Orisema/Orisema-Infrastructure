@@ -43,11 +43,12 @@ type Inspector interface {
 // ResolvedMount binds a logical declaration to one container target using
 // provider metadata only. Identity is never derived from secret content.
 type ResolvedMount struct {
-	Name     string
-	Provider Provider
-	Locator  string
-	Identity string
-	Target   string
+	Name            string
+	Provider        Provider
+	Locator         string
+	Identity        string
+	Target          string
+	RuntimeIdentity string
 }
 
 // ResolveManifest resolves only declarations consumed by a service. It never
@@ -105,7 +106,9 @@ func SameMounts(a, b []ResolvedMount) bool {
 		return false
 	}
 	for i := range a {
-		if a[i] != b[i] {
+		left, right := a[i], b[i]
+		left.RuntimeIdentity, right.RuntimeIdentity = "", ""
+		if left != right {
 			return false
 		}
 	}

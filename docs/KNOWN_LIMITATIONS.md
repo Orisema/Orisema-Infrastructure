@@ -1,6 +1,6 @@
-# Limitações conhecidas — v0.1.0-alpha.5
+# Limitações conhecidas — v0.1.0-alpha.6
 
-A Alpha 5 é um protótipo operacional para hosts Linux descartáveis. **Não é
+A Alpha 6 é um protótipo operacional para hosts Linux descartáveis. **Não é
 indicada para produção** e não possui garantia de estabilidade ou continuidade.
 
 ## Escopo suportado
@@ -48,4 +48,4 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   posterior falhar, serviços anteriores já criados não são revertidos.
 
 Veja o [plano Alpha](ALPHA_ROADMAP.md) para o que está proposto nas versões
-seguintes; itens futuros não são contratos da Alpha 5.
+seguintes; itens futuros não são contratos da Alpha 6.

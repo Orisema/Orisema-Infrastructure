@@ -6,6 +6,34 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.6] - 2026-11-03
+
+### Adicionado
+
+- Contrato `orisema.dev/v1alpha3` com referências externas de segredos e
+  bindings por serviço, sem valores inline ou variáveis de ambiente.
+- Providers `podman` e `file` com resolução somente de metadados, identidade
+  revalidada e entrega somente leitura em `/run/secrets/<target>`.
+- Handoff do provider `file` por descritor validado e secret Podman transitório,
+  removido após a criação do contêiner sem invalidar reinícios posteriores.
+- Ciclo de vida `secret create/list/inspect/remove`, sem comando de exibição ou
+  exportação e com confirmação exata, ownership e consumer tracking na remoção.
+
+### Validação
+
+- Laboratórios rootless cobrem entrega, ausência, rotação detectada como drift,
+  permissões, links, troca de identidade, limite de tamanho e cleanup.
+- Um laboratório isolado entrega uma credencial artificial à imagem real do
+  MixIdentity, sem alterar o ambiente de laboratório já existente.
+- Canários permanecem ausentes de planos, inspeções, erros e evidências; os
+  contratos `v1alpha1` e `v1alpha2` continuam rejeitando campos de segredos.
+
+### Limitações
+
+- Update e rollback permanecem fail-closed quando há bindings de segredos.
+- Configuração comum, redes, rotação automatizada e operação remota de segredos
+  exigem contratos futuros separados.
+
 ## [0.1.0-alpha.5] - 2026-10-31
 
 ### Adicionado
@@ -139,3 +167,4 @@ Primeira versão experimental instalável. **Não indicada para produção.**
 [0.1.0-alpha.3]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.3
 [0.1.0-alpha.4]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.4
 [0.1.0-alpha.5]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.5
+[0.1.0-alpha.6]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.6

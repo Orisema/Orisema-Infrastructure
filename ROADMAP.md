@@ -88,8 +88,12 @@ incompletas sempre exigem diagnóstico e intervenção explícita.
   exportação de conteúdo (#85).
 - [ ] Definir separadamente configuração não secreta e redes necessárias às
   aplicações reais.
-- [ ] Repetir o laboratório MixIdentity com credenciais artificiais e sem dados
+- [x] Repetir o laboratório MixIdentity com credenciais artificiais e sem dados
   de produção.
+
+O item de configuração não secreta e redes permanece intencionalmente separado:
+ele é o próximo contrato de aplicações reais, não uma ampliação silenciosa do
+gate de segredos da Alpha 6.
 
 **Princípio:** segredo é referência externa e chega ao consumidor como arquivo
 somente leitura em `/run/secrets`; nunca é valor inline ou variável de ambiente

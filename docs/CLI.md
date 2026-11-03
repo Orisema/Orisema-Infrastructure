@@ -43,6 +43,15 @@ The `validate` command checks the versioned manifest structure, service
 identifiers, images, port ranges and version-specific bind rules. See the
 [`v1alpha2` contract](MANIFEST-V1ALPHA2.md).
 
+## Secret lifecycle (Alpha 6)
+
+`orisema secret create NAME --provider podman --stdin` creates a managed
+Podman secret from a bounded pipe or redirected file. `secret list` and
+`secret inspect NAME` expose metadata only. `secret remove NAME` requires exact
+ownership, no container consumers and a confirmation containing both name and
+immutable ID. Secret values cannot be shown or exported by the CLI. See the
+[`v1alpha3` contract](MANIFEST-V1ALPHA3.md).
+
 `operation diagnose` reads the Alpha 4 operation journal without querying
 Podman or changing journal files. It lists only incomplete operations and
 always reports automatic resume as unsafe. Missing, corrupt or unsafe journal

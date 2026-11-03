@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -50,6 +51,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if len(args) > 0 && args[0] == "remote" {
 		return runRemoteCommand(args, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "secret" {
+		return runSecretCommand(args, stdin, stdout, stderr)
 	}
 	if len(args) < 2 {
 		printUsage(stderr)
@@ -264,8 +268,129 @@ func resolveManifestSecrets(ctx context.Context, m *manifest.Manifest) (map[stri
 	})
 }
 
+func runSecretCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	manager := secrets.PodmanManager{}
+	ctx := context.Background()
+	if len(args) == 6 && args[1] == "create" && args[3] == "--provider" && args[4] == "podman" && args[5] == "--stdin" {
+		if file, ok := stdin.(*os.File); ok {
+			info, err := file.Stat()
+			if err != nil || info.Mode()&os.ModeCharDevice != 0 {
+				fmt.Fprintln(stderr, "secret creation blocked: --stdin requires a pipe or redirected file, not a terminal")
+				return 1
+			}
+		}
+		item, err := manager.Create(ctx, args[2], stdin)
+		if err != nil {
+			fmt.Fprintf(stderr, "secret creation failed: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Secret created: name=%s id=%s provider=podman\n", item.Name, item.ID)
+		return 0
+	}
+	if len(args) == 2 && args[1] == "list" {
+		items, err := manager.List(ctx)
+		if err != nil {
+			fmt.Fprintf(stderr, "secret listing failed: %v\n", err)
+			return 1
+		}
+		fmt.Fprintln(stdout, "Podman secret metadata (values are never shown):")
+		for _, item := range items {
+			fmt.Fprintf(stdout, "  name=%s id=%s driver=%s managed=%t transient=%t\n", item.Name, item.ID, item.Driver, item.Managed, item.Transient)
+		}
+		return 0
+	}
+	if len(args) == 3 && args[1] == "inspect" {
+		item, err := manager.Inspect(ctx, args[2])
+		if err != nil {
+			fmt.Fprintf(stderr, "secret inspection failed: %v\n", err)
+			return 1
+		}
+		fmt.Fprintln(stdout, "Podman secret metadata (value is never shown):")
+		fmt.Fprintf(stdout, "  name: %s\n  id: %s\n  driver: %s\n  managed: %t\n  transient: %t\n", item.Name, item.ID, item.Driver, item.Managed, item.Transient)
+		if !item.CreatedAt.IsZero() {
+			fmt.Fprintf(stdout, "  created: %s\n", item.CreatedAt.UTC().Format(time.RFC3339Nano))
+		}
+		if !item.UpdatedAt.IsZero() {
+			fmt.Fprintf(stdout, "  updated: %s\n", item.UpdatedAt.UTC().Format(time.RFC3339Nano))
+		}
+		return 0
+	}
+	if len(args) == 3 && args[1] == "remove" {
+		item, err := manager.Inspect(ctx, args[2])
+		if err != nil {
+			fmt.Fprintf(stderr, "secret removal blocked: %v\n", err)
+			return 1
+		}
+		if !item.Managed || item.Transient {
+			fmt.Fprintln(stderr, "secret removal blocked: ownership labels do not identify a managed lifecycle secret")
+			return 1
+		}
+		consumers, err := secretConsumers(ctx, item.ID)
+		if err != nil {
+			fmt.Fprintf(stderr, "secret removal blocked: %v\n", err)
+			return 1
+		}
+		if len(consumers) != 0 {
+			fmt.Fprintf(stderr, "secret removal blocked: identity is consumed by containers: %s\n", strings.Join(consumers, ", "))
+			return 1
+		}
+		confirmation := "REMOVE SECRET " + item.Name + " " + item.ID
+		fmt.Fprintf(stdout, "Type %s to remove the managed secret: ", confirmation)
+		answer, readErr := bufio.NewReader(stdin).ReadString('\n')
+		if readErr != nil || strings.TrimSpace(answer) != confirmation {
+			fmt.Fprintln(stderr, "cancelled; secret unchanged")
+			return 1
+		}
+		fresh, err := manager.Inspect(ctx, item.ID)
+		if err != nil || fresh.ID != item.ID || fresh.Name != item.Name || !fresh.Managed || fresh.Transient {
+			fmt.Fprintln(stderr, "secret removal blocked: identity or ownership changed after confirmation")
+			return 1
+		}
+		consumers, err = secretConsumers(ctx, item.ID)
+		if err != nil || len(consumers) != 0 {
+			fmt.Fprintln(stderr, "secret removal blocked: consumers changed after confirmation")
+			return 1
+		}
+		if err := manager.Remove(ctx, item.ID); err != nil {
+			fmt.Fprintf(stderr, "secret removal failed: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "Secret removed: name=%s id=%s\n", item.Name, item.ID)
+		return 0
+	}
+	printUsage(stderr)
+	return 2
+}
+
+func secretConsumers(ctx context.Context, identity string) ([]string, error) {
+	client := runtime.Client{}
+	containers, err := client.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list containers before removal: %w", err)
+	}
+	consumers := []string{}
+	for _, container := range containers {
+		if len(container.Names) == 0 || container.Names[0] == "" {
+			return nil, errors.New("container metadata lacked a name")
+		}
+		name := container.Names[0]
+		item, err := client.Inspect(ctx, name)
+		if err != nil {
+			return nil, fmt.Errorf("inspect container %q before secret removal: %w", name, err)
+		}
+		for _, ref := range item.Config.Secrets {
+			if ref.ID == identity {
+				consumers = append(consumers, name)
+				break
+			}
+		}
+	}
+	sort.Strings(consumers)
+	return consumers, nil
+}
+
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
 func runRemoteCommand(args []string, stdout, stderr io.Writer) int {

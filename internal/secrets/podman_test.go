@@ -16,6 +16,36 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if os.Getenv("ORISEMA_LIFECYCLE_HELPER") == "1" {
+		const id = "abcdef0123456789abcdef012"
+		if len(os.Args) >= 3 && os.Args[1] == "secret" && os.Args[2] == "create" {
+			content, err := io.ReadAll(os.Stdin)
+			if err != nil || string(content) != os.Getenv("ORISEMA_LIFECYCLE_CONTENT") || strings.Contains(strings.Join(os.Args, " "), "--replace") {
+				os.Exit(8)
+			}
+			_, _ = os.Stdout.WriteString(id + "\n")
+			os.Exit(0)
+		}
+		if len(os.Args) == 4 && os.Args[1] == "secret" && os.Args[2] == "inspect" {
+			name := os.Getenv("ORISEMA_LIFECYCLE_NAME")
+			_ = json.NewEncoder(os.Stdout).Encode([]any{map[string]any{
+				"ID": id, "CreatedAt": "2026-11-03T12:00:00Z", "UpdatedAt": "2026-11-03T12:00:00Z",
+				"Spec": map[string]any{"Name": name, "Driver": map[string]any{"Name": "file"}, "Labels": map[string]string{"dev.orisema.managed": "true", "dev.orisema.kind": "secret"}},
+			}})
+			os.Exit(0)
+		}
+		if len(os.Args) == 4 && os.Args[1] == "secret" && os.Args[2] == "ls" && os.Args[3] == "--quiet" {
+			_, _ = os.Stdout.WriteString(id + "\n")
+			os.Exit(0)
+		}
+		if len(os.Args) == 4 && os.Args[1] == "secret" && os.Args[2] == "rm" {
+			if marker := os.Getenv("ORISEMA_LIFECYCLE_REMOVE_MARKER"); marker != "" {
+				_ = os.WriteFile(marker, []byte(os.Args[3]), 0o600)
+			}
+			os.Exit(0)
+		}
+		os.Exit(9)
+	}
 	if os.Getenv("ORISEMA_FILE_STAGE_HELPER") == "1" {
 		if len(os.Args) >= 3 && os.Args[1] == "secret" && os.Args[2] == "create" {
 			content, err := io.ReadAll(os.Stdin)

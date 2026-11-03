@@ -15,6 +15,11 @@ type Binding struct {
 	HostIP   string `json:"HostIp"`
 	HostPort string `json:"HostPort"`
 }
+
+type SecretReference struct {
+	Name string `json:"Name"`
+	ID   string `json:"ID"`
+}
 type Inspection struct {
 	ID    string `json:"Id"`
 	Name  string `json:"Name"`
@@ -35,6 +40,7 @@ type Inspection struct {
 	Config       struct {
 		Image       string            `json:"Image"`
 		Labels      map[string]string `json:"Labels"`
+		Secrets     []SecretReference `json:"Secrets"`
 		Healthcheck *struct {
 			Test     []string `json:"Test"`
 			Interval int64    `json:"Interval"`

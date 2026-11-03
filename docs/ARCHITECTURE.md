@@ -81,7 +81,10 @@ o primeiro runtime; Docker, Windows e macOS não são suportados. O contrato atu
 é `orisema.dev/v1alpha2`, mantendo leitura compatível de `v1alpha1`; versão,
 migração e guardrails estão definidos em
 [MANIFEST-V1ALPHA2.md](MANIFEST-V1ALPHA2.md). Gestão de segredos, volumes e um
-formato de saída estruturado permanecem deliberadamente fora do contrato. A
+formato de saída estruturado permanecem deliberadamente fora desse contrato. A
+proposta da Alpha 6 para referências externas e entrega somente por arquivo
+está em [RFC-0002](RFC-0002-secure-secrets.md); ela não é comportamento
+implementado nem amplia `v1alpha2`. A
 matriz entre artefatos produzidos e ambientes realmente executados está em
 [COMPATIBILITY.md](COMPATIBILITY.md).
 

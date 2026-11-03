@@ -12,6 +12,9 @@ versionamento usa SemVer com identificadores de pré-lançamento.
   pública e associação a redes Podman externas `bridge` por ID revalidado.
 - Labels sem valores para provar o conjunto de ambiente gerenciado e identidades
   de rede, além de laboratório rootless de drift e preservação das redes.
+- Laboratório reproduzível com imagens reais de app/web do MixIdentity, bancos
+  e Keycloak isolados, credenciais artificiais e fronteira explícita para alias
+  DNS ainda não gerenciado.
 
 ### Segurança
 

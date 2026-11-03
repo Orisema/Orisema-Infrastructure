@@ -136,11 +136,13 @@ other results remain `ROLLING_BACK` for explicit operator intervention.
 
 ## Scope and limits
 
-- YAML schemas: legacy `orisema.dev/v1alpha1` and current
-  `orisema.dev/v1alpha2`; migration is documented and never implicit.
-- Only service names, images, TCP port mappings and the existing documented
-  health/restart/recovery fields are represented.
-- No support yet for secrets, persistent storage, custom networks, or full security context management.
+- YAML schemas: `orisema.dev/v1alpha1` through opt-in `v1alpha4`; migration is
+  documented and never implicit.
+- Supported fields are limited to those documented in the versioned manifest
+  contracts, including file-delivered secrets, explicitly public environment
+  and pre-existing external Podman `bridge` networks.
+- No support yet for persistent storage, managed network lifecycle, DNS aliases,
+  resource limits or full security-context management.
 - Do not use this prototype to deploy production applications.
 
 ## Configuration backup and restore

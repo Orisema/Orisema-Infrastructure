@@ -64,6 +64,15 @@ jobs:
           sudo env ORISEMA_BINARY="$PWD/work/orisema" \
             EVIDENCE_DIR="$PWD/work/alpha7-config-network" \
             scripts/alpha7-config-network-lab.sh
+      - name: Exercise isolated full MixIdentity topology when local images exist
+        run: |
+          set -euo pipefail
+          status=0
+          sudo env ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/alpha7-mixidentity" \
+            scripts/alpha7-mixidentity-lab.sh || status=$?
+          sudo chown -R "$USER":"$(id -gn)" work/alpha7-mixidentity
+          exit "$status"
       - name: Deploy isolated healthcheck and verify real inspect
         run: |
           set -euo pipefail
@@ -264,6 +273,7 @@ jobs:
             work/alpha6-secret-lifecycle/*.out
             work/alpha6-secret-lifecycle/*.err
             work/alpha7-config-network/*.txt
+            work/alpha7-mixidentity/*.txt
             work/alpha3-update/*.json
             work/alpha3-update/*.txt
             work/alpha5-update-apply/*.json

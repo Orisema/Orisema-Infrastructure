@@ -4,8 +4,8 @@ Etapas propostas, sem datas prometidas.
 
 O plano verificável para as versões experimentais está em
 [docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–6 foram publicadas;
-configuração não secreta e redes permanecem como os próximos contratos
-separados para aplicações reais.
+a Alpha 7 implementa configuração explicitamente pública e referências a redes
+externas para CREATE, mantendo lifecycle e update/rollback fora do contrato.
 
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.
@@ -108,8 +108,8 @@ no primeiro incremento.
   valores (#98).
 - [x] Entregar configuração e redes no deploy por argumentos separados, com
   revalidação de identidade e sem lifecycle de recurso externo (#98).
-- [ ] Validar em Podman rootless e repetir o laboratório MixIdentity completo
-  com dependências e dados artificiais.
+- [x] Validar em Podman rootless e repetir o laboratório MixIdentity completo
+  com dependências e dados artificiais (#100).
 
 **Princípio:** configuração pública pode ser observada e nunca recebe garantia
 de sigilo; redes são referências externas somente leitura até existir contrato

@@ -185,7 +185,9 @@ público e provisiona previamente as redes referenciadas.
 
 As etapas 1 e 2 foram implementadas nas issues #94 e #96. As etapas 3, 4 e o
 laboratório de drift/entrega/preservação da etapa 5 foram implementados na issue
-#98. A revalidação agora é consumida imediatamente antes de cada CREATE.
+#98. A etapa 6 foi concluída com imagens reais do MixIdentity e dependências
+artificiais isoladas na issue #100. A revalidação é consumida imediatamente
+antes de cada CREATE.
 
 Um probe prático em Podman 4.9.3 rootless confirmou IDs hexadecimais de 64
 caracteres, driver `bridge`, criação de contêiner por ID e preservação da rede

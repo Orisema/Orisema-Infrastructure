@@ -145,8 +145,7 @@ específico de ownership e consistência.
 - [x] Validar uma aplicação real em laboratório com segredos artificiais.
 
 As evidências e a fronteira exata desta conclusão estão registradas na
-[auditoria da Alpha 6](ALPHA6-AUDIT.md). A publicação da pré-release ainda
-depende dos checks do commit final e da verificação dos artefatos gerados.
+[auditoria da Alpha 6](ALPHA6-AUDIT.md).
 
 **Gate:** os contratos antigos permanecem compatíveis; nenhum canário aparece
 nas evidências; toda identidade é revalidada antes de mutação; falhas deixam o
@@ -154,9 +153,13 @@ runtime inalterado ou uma recuperação explícita e diagnosticável. Configura�
 não secreta e redes terão contrato próprio e não serão confundidas com esta
 entrega.
 
+**Gate concluído em 03/11/2026:** a pré-release `v0.1.0-alpha.6` foi publicada
+no commit `92a352c`; o workflow repetiu vet, testes e race detector, publicou
+artefatos AMD64/ARM64 e reinstalou com sucesso o binário AMD64 baixado.
+
 ## Integração opcional futura — Orisema Data
 
-O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integração será precedida por RFC e laboratório com serviço simulado. Não é requisito para as Alphas 1–5; Gera Base fica fora do escopo.
+O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integração será precedida por RFC e laboratório com serviço simulado. Não é requisito para as Alphas 1–6; Gera Base fica fora do escopo.
 
 ## Beta e futuro (fora do Alpha inicial)
 

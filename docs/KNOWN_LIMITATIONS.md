@@ -1,6 +1,6 @@
-# Limitações conhecidas — v0.1.0-alpha.7
+# Limitações conhecidas — v0.1.0-alpha.8
 
-A Alpha 7 é um protótipo operacional para hosts Linux descartáveis. **Não é
+A Alpha 8 é um protótipo operacional para hosts Linux descartáveis. **Não é
 indicada para produção** e não possui garantia de estabilidade ou continuidade.
 
 ## Escopo suportado
@@ -21,6 +21,9 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 - Docker, Windows e macOS.
 - O fluxo experimental Alpha 5 atualiza apenas um serviço elegível por vez;
   `deploy` continua bloqueando `DRIFT` e `REVIEW`.
+- Update configurado aceita somente drift exclusivo de imagem. Mudanças
+  declarativas de ambiente, secrets ou redes exigem uma operação futura de
+  substituição controlada e não são aplicadas in-place.
 - Rollback de dados, backup/restore e migrações de volume. O rollback público
   existente restaura somente o container da aplicação preservado pelo update.
 - Backup/restore protege somente configuração validada e histórico operacional

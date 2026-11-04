@@ -201,6 +201,11 @@ isolada.
 valor secreto ou público no journal; mudanças de identidade falham fechado; a
 unidade anterior oferece rollback manual e recursos externos são preservados.
 
+**Gate concluído em 04/11/2026:** intenção v2, execução, verify e rollback
+configurados passaram na suíte automatizada, nos laboratórios Podman, na VM
+Fedora 45 rootless com SELinux Enforcing e no MixIdentity artificial isolado.
+A issue de release #121 controla a publicação imutável da pré-release.
+
 ## Integração opcional futura — Orisema Data
 
 O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integração será precedida por RFC e laboratório com serviço simulado. Não é requisito para as Alphas 1–6; Gera Base fica fora do escopo.

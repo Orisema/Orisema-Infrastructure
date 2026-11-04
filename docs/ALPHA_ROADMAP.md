@@ -176,6 +176,10 @@ artefatos AMD64/ARM64 e reinstalou com sucesso o binário AMD64 baixado.
 mutada; contratos anteriores permanecem compatíveis; falhas de resolução ou
 identidade acontecem antes de criar contêiner.
 
+**Gate funcional concluído em 03/11/2026:** testes genéricos e laboratórios
+rootless passaram, incluindo a topologia MixIdentity isolada. A publicação da
+pré-release é controlada pela issue #102 e pelo workflow reproduzível de release.
+
 ## Integração opcional futura — Orisema Data
 
 O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integração será precedida por RFC e laboratório com serviço simulado. Não é requisito para as Alphas 1–6; Gera Base fica fora do escopo.

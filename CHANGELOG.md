@@ -6,6 +6,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.7] - 2026-11-04
+
 ### Adicionado
 
 - Planner e CREATE deploy para `v1alpha4`, com configuração explicitamente

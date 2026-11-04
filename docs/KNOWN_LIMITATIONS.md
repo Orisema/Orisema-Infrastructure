@@ -1,6 +1,6 @@
-# Limitações conhecidas — desenvolvimento da v0.1.0-alpha.7
+# Limitações conhecidas — v0.1.0-alpha.7
 
-A Alpha 6 é um protótipo operacional para hosts Linux descartáveis. **Não é
+A Alpha 7 é um protótipo operacional para hosts Linux descartáveis. **Não é
 indicada para produção** e não possui garantia de estabilidade ou continuidade.
 
 ## Escopo suportado

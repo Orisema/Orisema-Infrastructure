@@ -5,6 +5,7 @@ package operation
 
 import (
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -99,5 +100,41 @@ func TestUpdateRollbackTamperingFailsClosed(t *testing.T) {
 	}
 	if _, err := store.Load(op.ID); err == nil || !strings.Contains(err.Error(), "out of order") {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestConcurrentBeginUpdateRollbackHasOneWinner(t *testing.T) {
+	store, op, now, resources := recoveryRequiredUpdate(t)
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := store.BeginUpdateRollback(op.ID, "orisema-failed-concurrent", resources, now.Add(5*time.Minute))
+			errs <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	var successes, rejected int
+	for err := range errs {
+		if err == nil {
+			successes++
+		} else if strings.Contains(err.Error(), "not eligible for rollback") {
+			rejected++
+		} else {
+			t.Fatal(err)
+		}
+	}
+	if successes != 1 || rejected != 1 {
+		t.Fatalf("successes=%d rejected=%d", successes, rejected)
+	}
+	loaded, err := store.Load(op.ID)
+	if err != nil || loaded.State != RollingBack || loaded.Rollback == nil || loaded.Rollback.PendingStep != "stop-candidate" {
+		t.Fatalf("operation=%#v err=%v", loaded, err)
 	}
 }

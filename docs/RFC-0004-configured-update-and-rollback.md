@@ -204,6 +204,13 @@ configurados agora resolvem novamente os bindings, exigem o fingerprint
 autorizado e inspecionam a configuração completa antes de registrar saúde ou
 iniciar qualquer mutação de rollback.
 
+Os gates finais exercitam concorrência nos limites de preparação e rollback,
+falha fechada quando uma identidade muda entre fases, Podman rootless nativo e
+a topologia MixIdentity artificial isolada. No MixIdentity, uma falha forçada
+do candidato web produziu `RECOVERY_REQUIRED`; o rollback restaurou o mesmo ID
+da unidade anterior, passou o healthcheck e persistiu `ROLLED_BACK`, mantendo
+bancos, Keycloak e rede externa fora do lifecycle do Orisema.
+
 ## Gate de conclusão
 
 - `go vet ./...`, `go test ./...` e `go test -race ./...` passam;

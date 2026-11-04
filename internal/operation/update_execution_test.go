@@ -80,6 +80,53 @@ func TestConfiguredUpdateExecutionPersistsBindingsBeforeStop(t *testing.T) {
 	}
 }
 
+func TestConcurrentConfiguredBindingPreparationHasOneWinner(t *testing.T) {
+	store, _, now := fixture(t)
+	created, err := store.CreateUpdateIntent(configuredIntentRequest("update-configured-concurrent-bindings", now))
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorized, err := store.AuthorizeUpdateIntent(created.ID, created.Intent.PlanFingerprint, observedIntentResource(), now.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.BeginUpdateExecution(authorized.ID, authorized.Intent.PlanFingerprint, "orisema-rollback-configured-concurrent", observedIntentResource(), now.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := store.RecordUpdateBindingsPrepared(authorized.ID, []string{"transient-secret-id"}, now.Add(3*time.Minute))
+			errs <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	var successes, rejected int
+	for err := range errs {
+		if err == nil {
+			successes++
+		} else if strings.Contains(err.Error(), "not pending preparation") {
+			rejected++
+		} else {
+			t.Fatal(err)
+		}
+	}
+	if successes != 1 || rejected != 1 {
+		t.Fatalf("successes=%d rejected=%d", successes, rejected)
+	}
+	loaded, err := store.Load(authorized.ID)
+	if err != nil || !loaded.Execution.BindingsPrepared || loaded.Execution.PendingStep != "stop-previous" {
+		t.Fatalf("operation=%#v err=%v", loaded, err)
+	}
+}
+
 func TestUpdateExecutionRejectsStaleDivergentAndRepeatedStarts(t *testing.T) {
 	t.Run("stale", func(t *testing.T) {
 		store, op, now := authorizedIntent(t)

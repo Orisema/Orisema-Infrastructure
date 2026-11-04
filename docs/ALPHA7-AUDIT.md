@@ -54,6 +54,14 @@ Update/rollback, lifecycle de rede, aliases DNS e credenciais de aplicações qu
 aceitam somente ambiente permanecem fora do contrato e devem continuar
 fail-closed.
 
-A publicação de `v0.1.0-alpha.7` é condicionada ao gate #102: o workflow deve
-repetir vet, testes e race detector, verificar arquivos AMD64/ARM64 e checksums,
-publicar a pré-release e reinstalar o binário AMD64 baixado.
+A pré-release [`v0.1.0-alpha.7`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.7)
+foi publicada em 04/11/2026 a partir do commit
+`af030413c526319165b5258b8a9a20f44e0e0a6d`. O workflow de release:
+
+- repetiu vet, testes e race detector;
+- construiu e verificou arquivos Linux AMD64 e ARM64;
+- publicou checksums SHA-256 e confirmou ambos após novo download;
+- executou o binário AMD64 publicado e confirmou versão, commit e arquitetura.
+
+Uma verificação independente repetiu o download, validou os dois checksums e
+confirmou `Version: v0.1.0-alpha.7` e o commit integral esperado.

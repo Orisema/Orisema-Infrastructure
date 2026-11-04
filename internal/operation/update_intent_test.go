@@ -40,6 +40,114 @@ func TestCreateUpdateIntentPersistsAndReopens(t *testing.T) {
 	}
 }
 
+func configuredIntentRequest(id string, at time.Time) UpdateIntentRequest {
+	request := intentRequest(id, at)
+	request.Bindings = &UpdateBindingEvidence{
+		PublicEnvironmentNames:  []string{"HTTP_PORT", "APP_MODE"},
+		PublicEnvironmentDigest: strings.Repeat("a", 64),
+		Secrets: []UpdateSecretEvidence{
+			{Name: "token", Provider: "file", Target: "token", Identity: "file-identity"},
+			{Name: "database", Provider: "podman", Target: "database", Identity: "podman-identity"},
+		},
+		Networks: []UpdateNetworkEvidence{{Name: "private", Provider: "podman", Identity: strings.Repeat("b", 64), Driver: "bridge"}},
+	}
+	return request
+}
+
+func TestCreateUpdateIntentV2PersistsCanonicalEvidenceWithoutValuesOrLocators(t *testing.T) {
+	store, _, now := fixture(t)
+	got, err := store.CreateUpdateIntent(configuredIntentRequest("intent-v2", now))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Intent.Contract != updateIntentV2 || got.Intent.ConfigurationFingerprint == "" || got.Intent.Bindings == nil {
+		t.Fatalf("intent=%#v", got.Intent)
+	}
+	if strings.Join(got.Intent.Bindings.PublicEnvironmentNames, ",") != "APP_MODE,HTTP_PORT" || got.Intent.Bindings.Secrets[0].Name != "database" {
+		t.Fatalf("binding evidence is not canonical: %#v", got.Intent.Bindings)
+	}
+	data, err := os.ReadFile(filepath.Join(store.root, got.ID+".json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"public-value", "/secret/path", "locator"} {
+		if strings.Contains(string(data), forbidden) {
+			t.Fatalf("journal contains forbidden %q: %s", forbidden, data)
+		}
+	}
+	reopened, err := OpenExistingStore(store.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reopened.Load(got.ID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateIntentV2FingerprintIsOrderIndependentAndIdentitySensitive(t *testing.T) {
+	storeA, _, now := fixture(t)
+	requestA := configuredIntentRequest("intent-order-a", now)
+	gotA, err := storeA.CreateUpdateIntent(requestA)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	storeB, _, _ := fixture(t)
+	requestB := configuredIntentRequest("intent-order-b", now)
+	requestB.Bindings.PublicEnvironmentNames[0], requestB.Bindings.PublicEnvironmentNames[1] = requestB.Bindings.PublicEnvironmentNames[1], requestB.Bindings.PublicEnvironmentNames[0]
+	requestB.Bindings.Secrets[0], requestB.Bindings.Secrets[1] = requestB.Bindings.Secrets[1], requestB.Bindings.Secrets[0]
+	gotB, err := storeB.CreateUpdateIntent(requestB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotA.Intent.PlanFingerprint != gotB.Intent.PlanFingerprint {
+		t.Fatal("equivalent binding order changed the fingerprint")
+	}
+
+	storeC, _, _ := fixture(t)
+	requestC := configuredIntentRequest("intent-identity", now)
+	requestC.Bindings.Secrets[0].Identity = "changed-identity"
+	gotC, err := storeC.CreateUpdateIntent(requestC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotA.Intent.PlanFingerprint == gotC.Intent.PlanFingerprint {
+		t.Fatal("changed secret identity did not change the fingerprint")
+	}
+}
+
+func TestCreateUpdateIntentV2RejectsInvalidEvidence(t *testing.T) {
+	store, _, now := fixture(t)
+	request := configuredIntentRequest("intent-v2-invalid", now)
+	request.Bindings.Secrets = append(request.Bindings.Secrets, request.Bindings.Secrets[0])
+	if _, err := store.CreateUpdateIntent(request); err == nil || !strings.Contains(err.Error(), "duplicated") {
+		t.Fatalf("expected duplicate rejection, got %v", err)
+	}
+}
+
+func TestLoadRejectsTamperedUpdateIntentV2Bindings(t *testing.T) {
+	store, _, now := fixture(t)
+	got, err := store.CreateUpdateIntent(configuredIntentRequest("intent-v2-tamper", now))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(store.root, got.ID+".json")
+	data, _ := os.ReadFile(path)
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	bindings := raw["intent"].(map[string]any)["bindings"].(map[string]any)
+	bindings["networks"].([]any)[0].(map[string]any)["identity"] = strings.Repeat("c", 64)
+	data, _ = json.Marshal(raw)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Load(got.ID); err == nil || !strings.Contains(err.Error(), "binding evidence") {
+		t.Fatalf("expected binding tampering rejection, got %v", err)
+	}
+}
+
 func TestConcurrentUpdateIntentAllowsOnePerApplication(t *testing.T) {
 	store, _, now := fixture(t)
 	start := make(chan struct{})

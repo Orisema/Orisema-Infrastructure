@@ -184,10 +184,10 @@ isolada.
 
 ## v0.1.0-alpha.8 — update e rollback de aplicações configuradas
 
-- [ ] Definir intenção v2 e fingerprints sem valores para bindings
-  ([RFC-0004](RFC-0004-configured-update-and-rollback.md), #105).
-- [ ] Resolver e revalidar secrets e redes em plan, prepare e authorize antes
-  de habilitar qualquer mutação.
+- [x] Definir intenção v2 e fingerprints sem valores para bindings
+  ([RFC-0004](RFC-0004-configured-update-and-rollback.md), #105, #107).
+- [x] Resolver e revalidar secrets e redes em plan, prepare e authorize antes
+  de habilitar qualquer mutação (#109).
 - [ ] Criar candidatos com configuração pública, secrets e redes completos,
   compartilhando a entrega segura do deploy.
 - [ ] Integrar verify e rollback à nova evidência sem recriar a unidade anterior

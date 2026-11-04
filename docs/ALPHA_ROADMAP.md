@@ -204,7 +204,9 @@ unidade anterior oferece rollback manual e recursos externos são preservados.
 **Gate concluído em 04/11/2026:** intenção v2, execução, verify e rollback
 configurados passaram na suíte automatizada, nos laboratórios Podman, na VM
 Fedora 45 rootless com SELinux Enforcing e no MixIdentity artificial isolado.
-A issue de release #121 controla a publicação imutável da pré-release.
+A issue de release #121 foi encerrada pelo PR #122 após todos os checks passarem.
+A pré-release `v0.1.0-alpha.8` foi publicada a partir do commit `c12ebb2` e seus
+artefatos foram baixados e verificados novamente pelo workflow de release.
 
 ## Integração opcional futura — Orisema Data
 

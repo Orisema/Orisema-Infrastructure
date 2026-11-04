@@ -76,8 +76,22 @@ testes source-backed.
 - sem assinatura de artefatos ou provenance attestation;
 - Docker, macOS e Windows continuam não suportados.
 
-## Autorização de publicação
+## Publicação verificada
 
 A issue [#121](https://github.com/Orisema/Orisema-Infrastructure/issues/121)
-é o gate explícito da `v0.1.0-alpha.8`. Seu fechamento por meio do PR de
-preparação autoriza a criação da tag imutável somente após a CI verde.
+foi o gate explícito da `v0.1.0-alpha.8`. Ela foi encerrada pelo
+[PR #122](https://github.com/Orisema/Orisema-Infrastructure/pull/122) após a CI
+verde. O workflow de release publicou a tag imutável a partir do commit
+`c12ebb2bbdb90c6bad7e80a8c0ac439238f91848`, baixou os artefatos publicados e
+executou novamente o binário AMD64.
+
+A verificação independente posterior confirmou ambos os arquivos com
+`sha256sum --check` e confirmou no binário AMD64 a versão `v0.1.0-alpha.8` e o
+commit completo acima. Checksums publicados:
+
+```text
+cc48562479e73e587051b7f0c905b74ca936c52937b0584fbc255ade5590c268  orisema_linux_amd64.tar.gz
+d6fec50737ad38e4517a02d293a432e2d23464fcaf56d9afee9bc50f77bc72b8  orisema_linux_arm64.tar.gz
+```
+
+Release: [v0.1.0-alpha.8](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.8).

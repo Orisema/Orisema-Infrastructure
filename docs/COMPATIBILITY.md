@@ -30,6 +30,13 @@ deploy, explicit health probe, status, `NOOP` plan and removal passed; an initia
 occupied-port attempt failed and removed its partial container safely. This is
 evidence from one environment, not a minimum-version guarantee.
 
+On 2026-11-04 the isolated MixIdentity topology on that host also completed a
+configured web image update, forced candidate failure, durable
+`RECOVERY_REQUIRED`, manual restoration of the exact previous container and
+healthy `ROLLED_BACK`. Its artificial PostgreSQL and Keycloak dependencies and
+external network remained outside the update lifecycle; all scoped resources
+and the temporary image tag were removed afterward.
+
 On 2026-11-04 a separate disposable Fedora 43 AMD64 userspace laboratory ran
 Podman 5.8.9 rootful with `vfs`. The CLI smoke test and the Alpha 8 configured
 update through `apply` passed, preserving public configuration, external-network

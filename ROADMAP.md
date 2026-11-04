@@ -125,8 +125,8 @@ de lifecycle separado.
   nunca mutação in-place.
 - [x] Integrar verify e rollback à evidência de bindings, preservando a unidade
   anterior e mantendo recursos externos fora do lifecycle (#117).
-- [ ] Validar falhas e rollback em Podman rootless e no MixIdentity artificial
-  isolado antes da release.
+- [x] Validar falhas e rollback em Podman rootless e no MixIdentity artificial
+  isolado antes da release (#119).
 
 **Princípio:** cada candidato recebe a configuração declarada completa e toda
 identidade externa é revalidada; dúvida ou mudança entre fases falha fechado.

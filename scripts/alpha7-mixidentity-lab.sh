@@ -10,6 +10,7 @@ binary=${ORISEMA_BINARY:-"$repo_root/work/orisema"}
 evidence_dir=${ORISEMA_EVIDENCE_DIR:-"$repo_root/work/alpha7-mixidentity"}
 app_image=${MIXIDENTITY_APP_IMAGE:-localhost/mix-identity_identity-app:latest}
 web_image=${MIXIDENTITY_WEB_IMAGE:-localhost/mix-identity-web:1.0.0}
+web_old_image=localhost/orisema-alpha8-mixidentity-web:previous
 keycloak_image=${MIXIDENTITY_KEYCLOAK_IMAGE:-localhost/mix-identity-keycloak:26.7.5}
 postgres_image=${MIXIDENTITY_POSTGRES_IMAGE:-docker.io/library/postgres:17.6-alpine3.22}
 
@@ -22,6 +23,7 @@ managed_web=orisema-alpha7-mixidentity-lab-identity-web
 manifest_dir=$(mktemp -d)
 app_manifest="$manifest_dir/app.yaml"
 web_manifest="$manifest_dir/web.yaml"
+web_old_manifest="$manifest_dir/web-old.yaml"
 combined_manifest="$manifest_dir/combined.yaml"
 
 identity_password="alpha7-identity-${RANDOM}-${RANDOM}-artificial"
@@ -29,14 +31,24 @@ keycloak_password="alpha7-keycloak-${RANDOM}-${RANDOM}-artificial"
 admin_password="alpha7-admin-${RANDOM}-${RANDOM}-artificial"
 app_key="base64:YWxwaGE3LW1peGlkZW50aXR5LWFydGlmaWNpYWwtMTI="
 client_secret="alpha7-client-${RANDOM}-${RANDOM}-artificial"
+rollback_name=
+failed_name=
 
 cleanup() {
 	set +e
 	for container in "$managed_web" "$managed_app" "$keycloak" "$keycloak_db" "$identity_db"; do
 		podman rm --force "$container" >/dev/null 2>&1 || true
 	done
+	if [ -n "$rollback_name" ]; then
+		podman rm --force "$rollback_name" >/dev/null 2>&1 || true
+	fi
+	if [ -n "$failed_name" ]; then
+		podman rm --force "$failed_name" >/dev/null 2>&1 || true
+	fi
 	podman network rm "$network" >/dev/null 2>&1
-	rm -rf "$manifest_dir"
+	podman image rm "$web_old_image" >/dev/null 2>&1 || true
+	find "$manifest_dir" -mindepth 1 -delete 2>/dev/null || true
+	rmdir "$manifest_dir" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -61,6 +73,7 @@ for image in "$app_image" "$web_image" "$keycloak_image" "$postgres_image"; do
 		exit 0
 	fi
 done
+podman tag "$web_image" "$web_old_image"
 
 wait_healthy() {
 	local container=$1
@@ -155,7 +168,9 @@ podman network disconnect "$network" "$managed_app"
 podman network connect --alias identity-app "$network" "$managed_app"
 printf 'operator-applied isolated alias: identity-app\n' >"$evidence_dir/dns-alias-boundary.txt"
 
-cat >"$web_manifest" <<YAML
+write_web_manifest() {
+	local image=$1 output=$2
+	cat >"$output" <<YAML
 apiVersion: orisema.dev/v1alpha4
 kind: Application
 name: alpha7-mixidentity-lab
@@ -166,7 +181,7 @@ networks:
         name: $network
 services:
   - name: identity-web
-    image: $web_image
+    image: $image
     publicEnvironment:
       - {name: ORISEMA_LAB_TOPOLOGY, value: alpha7-mixidentity}
     healthcheck:
@@ -177,19 +192,57 @@ services:
     networks:
       - name: private
 YAML
+}
 
-"$binary" validate "$web_manifest" >"$evidence_dir/web-validate.txt"
-"$binary" plan "$web_manifest" >"$evidence_dir/web-plan-before.txt"
+write_web_manifest "$web_old_image" "$web_old_manifest"
+write_web_manifest "$web_image" "$web_manifest"
+
+"$binary" validate "$web_old_manifest" >"$evidence_dir/web-validate.txt"
+"$binary" plan "$web_old_manifest" >"$evidence_dir/web-plan-before.txt"
 grep -Fq '[CREATE]' "$evidence_dir/web-plan-before.txt"
-printf 'DEPLOY\n' | "$binary" deploy "$web_manifest" >"$evidence_dir/web-deploy.txt"
+printf 'DEPLOY\n' | "$binary" deploy "$web_old_manifest" >"$evidence_dir/web-deploy.txt"
 wait_healthy "$managed_web" 30
 podman exec "$managed_web" wget -q -O /dev/null http://127.0.0.1:8080/health/live
 printf 'real app/web health endpoint reachable\n' >"$evidence_dir/reachability.txt"
 
+old_web_id=$(podman inspect --format '{{.Id}}' "$managed_web")
+"$binary" update prepare "$web_manifest" identity-web --journal "$evidence_dir/update-journal" >"$evidence_dir/update-prepare.txt"
+operation_id=$(awk '/^Update intent persisted:/ {print $4}' "$evidence_dir/update-prepare.txt")
+test -n "$operation_id"
+printf 'AUTHORIZE UPDATE alpha7-mixidentity-lab/identity-web\n' | \
+	"$binary" update authorize "$web_manifest" identity-web --journal "$evidence_dir/update-journal" \
+		--operation "$operation_id" >"$evidence_dir/update-authorize.txt"
+printf 'APPLY UPDATE alpha7-mixidentity-lab/identity-web\n' | \
+	"$binary" update apply "$web_manifest" identity-web --journal "$evidence_dir/update-journal" \
+		--operation "$operation_id" >"$evidence_dir/update-apply.txt"
+
+rollback_name="orisema-rollback-${operation_id#update-}"
+candidate_id=$(podman inspect --format '{{.Id}}' "$managed_web")
+test "$candidate_id" != "$old_web_id"
+test "$(podman inspect --format '{{.Id}}' "$rollback_name")" = "$old_web_id"
+test "$(podman inspect --format '{{.Config.Image}}' "$managed_web")" = "$web_image"
+podman stop --time 0 "$managed_web" >"$evidence_dir/update-candidate-stop.txt"
+"$binary" update verify "$web_manifest" identity-web --journal "$evidence_dir/update-journal" \
+	--operation "$operation_id" >"$evidence_dir/update-verify.txt"
+grep -Fq 'decision: RECOVERY_REQUIRED' "$evidence_dir/update-verify.txt"
+
+failed_name="orisema-failed-${operation_id#update-}"
+printf 'ROLLBACK UPDATE alpha7-mixidentity-lab/identity-web %s\n' "$operation_id" | \
+	"$binary" update rollback "$web_manifest" identity-web --journal "$evidence_dir/update-journal" \
+		--operation "$operation_id" >"$evidence_dir/update-rollback.txt"
+test "$(podman inspect --format '{{.Id}}' "$managed_web")" = "$old_web_id"
+test "$(podman inspect --format '{{.Id}}' "$failed_name")" = "$candidate_id"
+wait_healthy "$managed_web" 30
+"$binary" update rollback-verify "$web_manifest" identity-web --journal "$evidence_dir/update-journal" \
+	--operation "$operation_id" >"$evidence_dir/update-rollback-verify.txt"
+grep -Fq 'decision=ROLLED_BACK' "$evidence_dir/update-rollback-verify.txt"
+grep -Fq '"state": "ROLLED_BACK"' "$evidence_dir/update-journal/$operation_id.json"
+printf 'configured web update failure and rollback passed\n' >"$evidence_dir/update-result.txt"
+
 {
 	sed -n '1,/^services:/p' "$app_manifest"
 	sed -n '/^  - name: identity-app/,$p' "$app_manifest"
-	sed -n '/^  - name: identity-web/,$p' "$web_manifest"
+	sed -n '/^  - name: identity-web/,$p' "$web_old_manifest"
 } >"$combined_manifest"
 "$binary" validate "$combined_manifest" >"$evidence_dir/combined-validate.txt"
 "$binary" plan "$combined_manifest" >"$evidence_dir/combined-plan-after.txt"
@@ -209,4 +262,4 @@ podman container exists "$keycloak_db"
 podman container exists "$keycloak"
 printf 'external network and dependencies preserved after managed cleanup\n' >"$evidence_dir/external-resources-preserved.txt"
 
-echo "Alpha 7 isolated full MixIdentity laboratory passed."
+echo "Alpha 8 isolated MixIdentity configured update and rollback laboratory passed."

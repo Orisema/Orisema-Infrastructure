@@ -192,9 +192,10 @@ isolada.
   revalidando identidades e registrando preparação transitória (#111).
 - [x] Integrar verify e rollback à nova evidência sem recriar a unidade anterior
   nem assumir lifecycle de recursos externos (#117).
-- [ ] Testar rotação entre fases, falha parcial, interrupção, concorrência,
-  ausência de divulgação e compatibilidade com updates antigos.
-- [ ] Executar laboratórios Podman rootless e MixIdentity artificial isolado.
+- [x] Testar rotação entre fases, falha parcial, interrupção, concorrência,
+  ausência de divulgação e compatibilidade com updates antigos (#119).
+- [x] Executar laboratórios Podman rootless e MixIdentity artificial isolado
+  (#119).
 
 **Gate:** nenhuma mutação sem intenção durável, confirmação e revalidação; nenhum
 valor secreto ou público no journal; mudanças de identidade falham fechado; a

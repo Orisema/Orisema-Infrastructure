@@ -45,6 +45,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Auditoria de conclusão da Fase 2](docs/PHASE2-AUDIT.md)
 - [Auditoria de conclusão da Alpha 6](docs/ALPHA6-AUDIT.md)
 - [Auditoria de conclusão da Alpha 7](docs/ALPHA7-AUDIT.md)
+- [Laboratório Fedora 43 da Alpha 8](docs/ALPHA8-FEDORA-LAB.md)
 
 ## Versão do binário
 

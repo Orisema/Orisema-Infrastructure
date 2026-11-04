@@ -1,6 +1,6 @@
 # Orisema Infrastructure — Alpha release plan
 
-Status: **plano ativo, atualizado em 03/11/2026**. Não representa promessa de
+Status: **plano ativo, atualizado em 04/11/2026**. Não representa promessa de
 datas nem declara funcionalidade de produção.
 
 ## Base existente
@@ -181,6 +181,24 @@ no commit `af03041`; o workflow repetiu vet, testes e race detector, publicou
 artefatos AMD64/ARM64 com checksums verificados e reinstalou com sucesso o
 binário AMD64 baixado. Os laboratórios rootless incluem a topologia MixIdentity
 isolada.
+
+## v0.1.0-alpha.8 — update e rollback de aplicações configuradas
+
+- [ ] Definir intenção v2 e fingerprints sem valores para bindings
+  ([RFC-0004](RFC-0004-configured-update-and-rollback.md), #105).
+- [ ] Resolver e revalidar secrets e redes em plan, prepare e authorize antes
+  de habilitar qualquer mutação.
+- [ ] Criar candidatos com configuração pública, secrets e redes completos,
+  compartilhando a entrega segura do deploy.
+- [ ] Integrar verify e rollback à nova evidência sem recriar a unidade anterior
+  nem assumir lifecycle de recursos externos.
+- [ ] Testar rotação entre fases, falha parcial, interrupção, concorrência,
+  ausência de divulgação e compatibilidade com updates antigos.
+- [ ] Executar laboratórios Podman rootless e MixIdentity artificial isolado.
+
+**Gate:** nenhuma mutação sem intenção durável, confirmação e revalidação; nenhum
+valor secreto ou público no journal; mudanças de identidade falham fechado; a
+unidade anterior oferece rollback manual e recursos externos são preservados.
 
 ## Integração opcional futura — Orisema Data
 

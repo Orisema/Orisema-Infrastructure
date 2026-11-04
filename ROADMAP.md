@@ -3,9 +3,9 @@
 Etapas propostas, sem datas prometidas.
 
 O plano verificável para as versões experimentais está em
-[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–6 foram publicadas;
-a Alpha 7 implementa configuração explicitamente pública e referências a redes
-externas para CREATE, mantendo lifecycle e update/rollback fora do contrato.
+[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–7 foram publicadas;
+a Alpha 8 planeja estender update/rollback às aplicações configuradas sem
+assumir lifecycle sobre secrets ou redes externos.
 
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.
@@ -114,6 +114,22 @@ no primeiro incremento.
 **Princípio:** configuração pública pode ser observada e nunca recebe garantia
 de sigilo; redes são referências externas somente leitura até existir contrato
 de lifecycle separado.
+
+## Alpha 8 — atualização segura de aplicações configuradas
+
+- [ ] Definir intenção versionada, fingerprints e revalidação para update de
+  serviços com bindings ([RFC-0004](docs/RFC-0004-configured-update-and-rollback.md), #105).
+- [ ] Permitir update de imagem preservando configuração pública, secrets e
+  redes declarados, sem persistir valores.
+- [ ] Tratar rotação suportada de configuração como substituição controlada,
+  nunca mutação in-place.
+- [ ] Integrar verify e rollback à evidência de bindings, preservando a unidade
+  anterior e mantendo recursos externos fora do lifecycle.
+- [ ] Validar falhas e rollback em Podman rootless e no MixIdentity artificial
+  isolado antes da release.
+
+**Princípio:** cada candidato recebe a configuração declarada completa e toda
+identidade externa é revalidada; dúvida ou mudança entre fases falha fechado.
 
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.

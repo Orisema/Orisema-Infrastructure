@@ -58,3 +58,39 @@ Resultado: `FEDORA43_ALPHA8_APPLY_PASS`.
 
 Secrets Podman e `file`, verify e rollback configurados não foram validados
 neste laboratório específico e permanecem gates separados da Alpha 8.
+
+## VM Fedora 45 nativa
+
+Um segundo gate, mais representativo, foi executado em 04/11/2026 numa VM
+Fedora 45 AMD64 nativa:
+
+- usuário `jgomes`, UID 1000, sem elevação de privilégio;
+- SELinux `Enforcing`;
+- Podman 6.1.3 rootless;
+- storage `overlay` e runtime `crun`;
+- binário com o mesmo SHA-256 registrado acima.
+
+O laboratório usou nomes `fedora-native-a8` exclusivos e porta loopback 18081.
+O manifesto `v1alpha4` combinou Nginx, configuração pública, rede externa
+`bridge`, healthcheck e um secret artificial pelo provider `file`, armazenado
+num diretório privado 0700 com arquivo 0600.
+
+Foram comprovados:
+
+1. `validate`, plano `CREATE`, deploy rootless e resposta HTTP;
+2. leitura interna do secret montado, comparada sem imprimir seu conteúdo;
+3. classificação `UPDATE_CANDIDATE` para `1.26-alpine` → `1.27-alpine`;
+4. `prepare`, `authorize` e `apply` da intenção v2;
+5. candidato com imagem nova, configuração pública, secret e rede preservados;
+6. unidade anterior em `exited` com a imagem antiga;
+7. ausência de secrets `orisema-transient-*` após a criação;
+8. rejeição esperada de `update verify` configurado nesta etapa;
+9. remoção do candidato, unidade anterior, rede e diretório temporário;
+10. auditoria remota final confirmando a ausência de todos os recursos acima.
+
+Resultado: `FEDORA45_NATIVE_ALPHA8_PASS` e
+`FEDORA45_NATIVE_CLEANUP_VERIFIED`.
+
+O material secreto usado foi exclusivamente artificial. Nenhum projeto ou
+contêiner preexistente da VM fez parte do laboratório. Verify e rollback
+configurados continuam como próximos gates funcionais da Alpha 8.

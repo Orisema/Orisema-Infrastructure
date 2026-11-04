@@ -10,6 +10,7 @@ is not recommended for production**.
 | --- | --- | --- | --- |
 | Ubuntu 24.04.5 AMD64 | Linux AMD64 | CLI, packaging, quick start and extended Podman laboratory | Podman 4.9.3 observed |
 | Ubuntu 22.04.5 AMD64 | Linux AMD64 | CLI and isolated quick start | Podman 3.4.4 observed |
+| Fedora 43 AMD64 (nested lab) | Linux AMD64 | Manual CLI, deploy and configured update through `apply` | Podman 5.8.9 rootful observed; privileged disposable container, not a native host |
 | Linux ARM64 | Linux ARM64 | Cross-build and binary metadata inspection only | Native execution not yet validated |
 | Other Linux distributions | Architecture-dependent | Not continuously tested | Not established |
 | macOS | None | Not tested | Not supported |
@@ -27,6 +28,13 @@ Linux kernel 6.8 and rootless Podman 4.9.3. On 2026-10-31 an isolated rootless
 deploy, explicit health probe, status, `NOOP` plan and removal passed; an initial
 occupied-port attempt failed and removed its partial container safely. This is
 evidence from one environment, not a minimum-version guarantee.
+
+On 2026-11-04 a separate disposable Fedora 43 AMD64 userspace laboratory ran
+Podman 5.8.9 rootful with `vfs`. The CLI smoke test and the Alpha 8 configured
+update through `apply` passed, preserving public configuration, external-network
+attachment and the stopped previous container. This nested privileged test is
+not evidence for a native Fedora host, SELinux enforcing or Fedora rootless;
+see the [Fedora laboratory record](ALPHA8-FEDORA-LAB.md).
 
 ## Runtime support
 

@@ -183,13 +183,13 @@ func TestDeployPodmanSecretArgumentsContainIdentityNotLocator(t *testing.T) {
 	}
 }
 
-func TestUpdateBlocksAlpha4DeliveryBeforeRuntime(t *testing.T) {
+func TestUpdateBlocksIncompleteResolvedBindingsBeforeRuntime(t *testing.T) {
 	for _, svc := range []manifest.Service{
-		{Name: "web", Image: "nginx:1.27", PublicEnvironment: []manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}}},
 		{Name: "web", Image: "nginx:1.27", Networks: []manifest.NetworkBinding{{Name: "private"}}},
+		{Name: "web", Image: "nginx:1.27", Secrets: []manifest.SecretBinding{{Name: "token", Target: "token"}}},
 	} {
 		_, err := (Client{Binary: "/does/not/exist"}).CreateUpdateCandidate(context.Background(), "alpha7", svc)
-		if err == nil || !strings.Contains(err.Error(), "not implemented for update; no changes made") {
+		if err == nil || !strings.Contains(err.Error(), "binding metadata is incomplete") {
 			t.Fatalf("CreateUpdateCandidate() error = %v; want fail-closed rejection", err)
 		}
 	}
@@ -286,6 +286,36 @@ func TestUpdateRuntimeCommandsPreserveArgumentBoundaries(t *testing.T) {
 	want := []string{"run", "--detach", "--name", "orisema-app-web", "--label", "dev.orisema.managed=true", "--label", "dev.orisema.app=app", "--label", "dev.orisema.service=web", "--security-opt", "no-new-privileges", "--health-cmd", string(encoded), "--health-interval", "30s", "--health-timeout", "5s", "--health-retries", "3", "--restart", "on-failure:2", "--publish", "127.0.0.1:8080:80/tcp", "nginx:1.27"}
 	if !reflect.DeepEqual(args, want) {
 		t.Fatalf("argv = %#v; want %#v", args, want)
+	}
+}
+
+func TestConfiguredUpdateCandidateIncludesResolvedBindings(t *testing.T) {
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ORISEMA_ARGV_HELPER", "1")
+	service := manifest.Service{
+		Name: "web", Image: "nginx:1.27",
+		PublicEnvironment: []manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}},
+		Secrets:           []manifest.SecretBinding{{Name: "token", Target: "token"}},
+		Networks:          []manifest.NetworkBinding{{Name: "private"}},
+	}
+	mounts := []secrets.ResolvedMount{{Name: "token", Provider: secrets.ProviderFile, Identity: "file-metadata", RuntimeIdentity: "abcdef0123456789abcdef012", Target: "token"}}
+	networkBindings := []networks.ResolvedBinding{{Name: "private", Provider: networks.ProviderPodman, Identity: strings.Repeat("b", 64), Driver: "bridge"}}
+	out, err := (Client{Binary: binary}).CreateUpdateCandidateWithResolved(context.Background(), "app", service, mounts, networkBindings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var args []string
+	if err := json.Unmarshal([]byte(out), &args); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(args, " ")
+	for _, expected := range []string{"--env APP_MODE=laboratory", "--secret abcdef0123456789abcdef012,target=token,type=mount", "dev.orisema.secret.token=file:file-metadata", "--network " + strings.Repeat("b", 64), "dev.orisema.network.private=podman:" + strings.Repeat("b", 64) + ":bridge"} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("argv %q missing %q", joined, expected)
+		}
 	}
 }
 

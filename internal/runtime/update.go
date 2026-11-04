@@ -14,6 +14,9 @@ import (
 	"time"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
+	"github.com/Orisema/Orisema-Infrastructure/internal/networks"
+	"github.com/Orisema/Orisema-Infrastructure/internal/publicconfig"
+	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
 )
 
 // RenameContainer performs only a Podman rename. Callers must persist intent
@@ -35,8 +38,15 @@ func (c Client) RenameContainer(ctx context.Context, from, to string) error {
 // CreateUpdateCandidate creates the replacement under the original service
 // name. It deliberately performs no cleanup on failure.
 func (c Client) CreateUpdateCandidate(ctx context.Context, app string, service manifest.Service) (string, error) {
-	if len(service.PublicEnvironment) != 0 || len(service.Networks) != 0 {
-		return "", fmt.Errorf("public configuration and network delivery are not implemented for update; no changes made")
+	return c.CreateUpdateCandidateWithResolved(ctx, app, service, nil, nil)
+}
+
+// CreateUpdateCandidateWithResolved creates a replacement using the complete
+// resolved configuration. It deliberately performs no container cleanup on
+// failure so update recovery evidence remains available.
+func (c Client) CreateUpdateCandidateWithResolved(ctx context.Context, app string, service manifest.Service, mounts []secrets.ResolvedMount, networkBindings []networks.ResolvedBinding) (string, error) {
+	if len(service.Secrets) != len(mounts) || len(service.Networks) != len(networkBindings) {
+		return "", fmt.Errorf("resolved update binding metadata is incomplete; no changes made")
 	}
 	name := "orisema-" + app + "-" + service.Name
 	bin := c.Binary
@@ -46,6 +56,19 @@ func (c Client) CreateUpdateCandidate(ctx context.Context, app string, service m
 	args := []string{"run", "--detach", "--name", name,
 		"--label", "dev.orisema.managed=true", "--label", "dev.orisema.app=" + app,
 		"--label", "dev.orisema.service=" + service.Name, "--security-opt", "no-new-privileges"}
+	if len(service.PublicEnvironment) != 0 {
+		names, digest := publicconfig.Metadata(service.PublicEnvironment)
+		args = append(args, "--label", publicconfig.NamesLabel+"="+names, "--label", publicconfig.HashLabel+"="+digest)
+		for _, entry := range service.PublicEnvironment {
+			args = append(args, "--env", entry.Name+"="+entry.Value)
+		}
+	}
+	for i, binding := range networkBindings {
+		if binding.Name != service.Networks[i].Name || binding.Provider != networks.ProviderPodman || binding.Identity == "" || binding.Driver != "bridge" {
+			return "", fmt.Errorf("network %q has unsupported or incomplete resolved metadata; no changes made", service.Networks[i].Name)
+		}
+		args = append(args, "--label", networkLabel(binding.Name)+"="+string(binding.Provider)+":"+binding.Identity+":"+binding.Driver, "--network", binding.Identity)
+	}
 	if h := service.Healthcheck; h != nil {
 		command, err := json.Marshal([]string{"CMD-SHELL", h.Command})
 		if err != nil {
@@ -66,6 +89,16 @@ func (c Client) CreateUpdateCandidate(ctx context.Context, app string, service m
 			published = net.JoinHostPort(p.HostIP, strconv.Itoa(p.Host)) + ":" + strconv.Itoa(p.Container) + "/tcp"
 		}
 		args = append(args, "--publish", published)
+	}
+	for _, mount := range mounts {
+		runtimeIdentity := mount.RuntimeIdentity
+		if runtimeIdentity == "" {
+			runtimeIdentity = mount.Identity
+		}
+		if (mount.Provider != secrets.ProviderPodman && mount.Provider != secrets.ProviderFile) || mount.Identity == "" || runtimeIdentity == "" {
+			return "", fmt.Errorf("secret %q has unsupported or incomplete resolved metadata", mount.Name)
+		}
+		args = append(args, "--label", secretLabel(mount.Target)+"="+string(mount.Provider)+":"+mount.Identity, "--secret", runtimeIdentity+",target="+mount.Target+",type=mount")
 	}
 	args = append(args, service.Image)
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)

@@ -196,6 +196,8 @@ case "$1 $2" in
   "network inspect") printf '[{"name":"demo-private","id":"%s","driver":"bridge"}]\n' ;;
   "ps -a") printf '%%s\n' '[{"Names":["orisema-demo-web"],"State":"running","Image":"nginx:old"}]' ;;
   "inspect --type") printf '%%s\n' '[{"Id":"container-123","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:old","Env":["APP_MODE=laboratory"],"Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web","dev.orisema.public-env.names":"APP_MODE","dev.orisema.public-env.hash":"%s","dev.orisema.secret.token":"podman:%s","dev.orisema.network.private":"podman:%s:bridge"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}},"NetworkSettings":{"Networks":{"demo-private":{}}}}]' ;;
+  "stop orisema-demo-web"|"rename orisema-demo-web") ;;
+  "run --detach") printf 'candidate-configured-456\n' ;;
   *) exit 91 ;;
 esac
 `, identityChanged, secretID, networkID, environmentDigest, secretID, networkID)
@@ -256,6 +258,16 @@ esac
 	if err != nil || authorized.State != operation.Preparing || authorized.Authorization == nil || authorized.Authorization.PlanFingerprint != authorized.Intent.PlanFingerprint {
 		t.Fatalf("authorized=%#v err=%v", authorized, err)
 	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "apply", manifestPath, "web", "--journal", journal, "--operation", operations[0].ID}, strings.NewReader("APPLY UPDATE demo/web\n"), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "candidate-configured-456") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	applied, err := store.Load(operations[0].ID)
+	if err != nil || applied.Execution == nil || !applied.Execution.BindingsPrepared || applied.Execution.CandidateID != "candidate-configured-456" {
+		t.Fatalf("applied=%#v err=%v", applied, err)
+	}
 }
 
 func TestConfiguredUpdateMutationRemainsBlocked(t *testing.T) {
@@ -265,8 +277,8 @@ func TestConfiguredUpdateMutationRemainsBlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"update", "apply", manifestPath, "web", "--journal", filepath.Join(t.TempDir(), "operations"), "--operation", "update-test"}, strings.NewReader(""), &stdout, &stderr)
-	if code != 1 || !strings.Contains(stderr.String(), "supported only by plan, prepare, and authorize") {
+	code := run([]string{"update", "verify", manifestPath, "web", "--journal", filepath.Join(t.TempDir(), "operations"), "--operation", "update-test"}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "not yet supported by these phases") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	if strings.Contains(stderr.String(), "laboratory") {

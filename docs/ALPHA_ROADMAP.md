@@ -188,8 +188,8 @@ isolada.
   ([RFC-0004](RFC-0004-configured-update-and-rollback.md), #105, #107).
 - [x] Resolver e revalidar secrets e redes em plan, prepare e authorize antes
   de habilitar qualquer mutação (#109).
-- [ ] Criar candidatos com configuração pública, secrets e redes completos,
-  compartilhando a entrega segura do deploy.
+- [x] Criar candidatos com configuração pública, secrets e redes completos,
+  revalidando identidades e registrando preparação transitória (#111).
 - [ ] Integrar verify e rollback à nova evidência sem recriar a unidade anterior
   nem assumir lifecycle de recursos externos.
 - [ ] Testar rotação entre fases, falha parcial, interrupção, concorrência,

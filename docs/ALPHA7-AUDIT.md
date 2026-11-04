@@ -53,3 +53,7 @@ O gate funcional da Alpha 7 está concluído para CREATE local em Podman rootles
 Update/rollback, lifecycle de rede, aliases DNS e credenciais de aplicações que
 aceitam somente ambiente permanecem fora do contrato e devem continuar
 fail-closed.
+
+A publicação de `v0.1.0-alpha.7` é condicionada ao gate #102: o workflow deve
+repetir vet, testes e race detector, verificar arquivos AMD64/ARM64 e checksums,
+publicar a pré-release e reinstalar o binário AMD64 baixado.

@@ -53,6 +53,33 @@ func TestUpdateExecutionPersistsOrderedRuntimeEvidence(t *testing.T) {
 	}
 }
 
+func TestConfiguredUpdateExecutionPersistsBindingsBeforeStop(t *testing.T) {
+	store, _, now := fixture(t)
+	request := configuredIntentRequest("update-configured-execution", now)
+	created, err := store.CreateUpdateIntent(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorized, err := store.AuthorizeUpdateIntent(created.ID, created.Intent.PlanFingerprint, observedIntentResource(), now.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	applying, err := store.BeginUpdateExecution(authorized.ID, authorized.Intent.PlanFingerprint, "orisema-rollback-configured", observedIntentResource(), now.Add(2*time.Minute))
+	if err != nil || applying.Execution.PendingStep != "prepare-bindings" {
+		t.Fatalf("applying=%#v err=%v", applying, err)
+	}
+	if _, err := store.RecordUpdateExecutionStep(authorized.ID, "previous-stopped", "", now.Add(3*time.Minute)); err == nil {
+		t.Fatal("previous container stop recorded before binding preparation")
+	}
+	prepared, err := store.RecordUpdateBindingsPrepared(authorized.ID, []string{"transient-secret-id"}, now.Add(3*time.Minute))
+	if err != nil || !prepared.Execution.BindingsPrepared || prepared.Execution.PendingStep != "stop-previous" || len(prepared.Execution.TransientSecretIDs) != 1 {
+		t.Fatalf("prepared=%#v err=%v", prepared, err)
+	}
+	if _, err := store.RecordUpdateExecutionStep(authorized.ID, "previous-stopped", "", now.Add(4*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestUpdateExecutionRejectsStaleDivergentAndRepeatedStarts(t *testing.T) {
 	t.Run("stale", func(t *testing.T) {
 		store, op, now := authorizedIntent(t)

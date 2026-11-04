@@ -95,13 +95,14 @@ See [the controlled update laboratory](CONTROLLED-UPDATE-LAB.md).
   `hostIP` for every port.
 - `orisema.dev/v1alpha3` additionally validates external secret references.
   Local Podman and validated `file` references support metadata-only planning
-  and file delivery; managed Podman lifecycle is supported, while
-  update/rollback with bindings remains blocked. See
+  and file delivery; managed Podman lifecycle is supported. A Alpha 8 permite
+  plan/prepare/authorize/apply de update de imagem com bindings preservados;
+  verify e rollback configurados ainda permanecem bloqueados. See
   [the Alpha 6 contract](MANIFEST-V1ALPHA3.md).
 - `orisema.dev/v1alpha4` additionally validates explicitly public environment
   entries and references to pre-existing external Podman networks. Planner and
-  CREATE deploy resolve, compare and revalidate network identities without
-  lifecycle operations; update/rollback with these fields remain blocked. See
+  CREATE e o candidato de update resolvem, comparam e revalidam identidades sem
+  lifecycle de rede; verify e rollback configurados ainda permanecem bloqueados. See
   [the Alpha 7 contract](MANIFEST-V1ALPHA4.md).
 - Secret values in environment variables, volumes, custom permissions and JSON
   output are not supported and fail closed. See

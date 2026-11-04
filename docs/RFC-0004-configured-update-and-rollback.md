@@ -198,6 +198,10 @@ A etapa 1 e as fases somente leitura da etapa 2 foram implementadas nas issues
 bloqueados até que a entrega completa e seus limites journaled sejam
 implementados.
 
+A criação do candidato com bindings completos e a fronteira journaled de
+preparação transitória foram implementadas na issue #111. Verify e rollback
+configurados continuam bloqueados até a etapa seguinte.
+
 ## Gate de conclusão
 
 - `go vet ./...`, `go test ./...` e `go test -race ./...` passam;

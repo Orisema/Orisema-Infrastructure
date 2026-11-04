@@ -614,8 +614,8 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		return 1
 	}
 	configured := !planOnly && manifestServiceHasBindings(m, args[3])
-	if configured && (apply || verify || rollback || rollbackVerify) {
-		fmt.Fprintln(stderr, "update mutation blocked: configured bindings are supported only by plan, prepare, and authorize in this increment; no changes made")
+	if configured && (verify || rollback || rollbackVerify) {
+		fmt.Fprintln(stderr, "update verification and rollback blocked: configured bindings are not yet supported by these phases; no changes made")
 		return 1
 	}
 	if verify {
@@ -724,6 +724,40 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "update execution blocked: %v\n", err)
 			return 1
 		}
+		preparedSecrets := resolvedSecrets[service]
+		cleanupSecrets := func(context.Context) error { return nil }
+		cleanedSecrets := false
+		defer func() {
+			if !cleanedSecrets {
+				_ = cleanupSecrets(context.Background())
+			}
+		}()
+		if configured {
+			freshSecrets, err := resolveManifestSecrets(context.Background(), m)
+			if err != nil || !secrets.SameMounts(resolvedSecrets[service], freshSecrets[service]) {
+				fmt.Fprintln(stderr, "update execution blocked: secret identity changed before binding preparation; previous container remains running")
+				return 1
+			}
+			if err := networks.RevalidateManifest(context.Background(), m, networkInspectors(), resolvedNetworks); err != nil {
+				fmt.Fprintf(stderr, "update execution blocked: network identity changed before binding preparation: %v\n", err)
+				return 1
+			}
+			preparedSecrets, cleanupSecrets, err = (secrets.Preparer{}).PrepareService(context.Background(), m.Name, service, freshSecrets[service])
+			if err != nil {
+				fmt.Fprintf(stderr, "update execution blocked while preparing secrets: %v; previous container remains running\n", err)
+				return 1
+			}
+			transientIDs := []string{}
+			for _, mount := range preparedSecrets {
+				if mount.Provider == secrets.ProviderFile && mount.RuntimeIdentity != "" {
+					transientIDs = append(transientIDs, mount.RuntimeIdentity)
+				}
+			}
+			if _, err := store.RecordUpdateBindingsPrepared(id, transientIDs, time.Time{}); err != nil {
+				fmt.Fprintf(stderr, "journal failed after preparing update bindings: %v\n", err)
+				return 1
+			}
+		}
 		if err := client.Control(context.Background(), m.Name, service, "stop"); err != nil {
 			fmt.Fprintf(stderr, "update stopped before rename: %v; inspect operation %s\n", err, id)
 			return 1
@@ -744,11 +778,22 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "journal failed after renaming previous container: %v\n", err)
 			return 1
 		}
+		if configured {
+			freshSecrets, err := resolveManifestSecrets(context.Background(), m)
+			if err != nil || !secrets.SameMounts(resolvedSecrets[service], freshSecrets[service]) {
+				fmt.Fprintf(stderr, "candidate creation blocked: secret identity changed; previous container remains preserved as %s\n", backupName)
+				return 1
+			}
+			if err := networks.RevalidateManifest(context.Background(), m, networkInspectors(), resolvedNetworks); err != nil {
+				fmt.Fprintf(stderr, "candidate creation blocked: network identity changed; previous container remains preserved as %s: %v\n", backupName, err)
+				return 1
+			}
+		}
 		if _, err := store.PrepareUpdateExecutionStep(id, "create-candidate", time.Time{}); err != nil {
 			fmt.Fprintf(stderr, "journal failed before candidate creation: %v\n", err)
 			return 1
 		}
-		candidateID, err := client.CreateUpdateCandidate(context.Background(), m.Name, *declared)
+		candidateID, err := client.CreateUpdateCandidateWithResolved(context.Background(), m.Name, *declared, preparedSecrets, resolvedNetworks[service])
 		if err != nil {
 			fmt.Fprintf(stderr, "candidate creation failed; previous container remains preserved as %s: %v\n", backupName, err)
 			return 1
@@ -756,6 +801,12 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		op, err := store.RecordUpdateExecutionStep(id, "candidate-created", candidateID, time.Time{})
 		if err != nil {
 			fmt.Fprintf(stderr, "journal failed after candidate creation: %v\n", err)
+			return 1
+		}
+		cleanupErr := cleanupSecrets(context.Background())
+		cleanedSecrets = true
+		if cleanupErr != nil {
+			fmt.Fprintf(stderr, "candidate created, but transient secret cleanup failed: %v; inspect operation %s\n", cleanupErr, id)
 			return 1
 		}
 		fmt.Fprintf(stdout, "Update candidate created: %s state=%s\n", candidateID, op.State)

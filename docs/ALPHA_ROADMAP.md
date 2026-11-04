@@ -176,9 +176,11 @@ artefatos AMD64/ARM64 e reinstalou com sucesso o binário AMD64 baixado.
 mutada; contratos anteriores permanecem compatíveis; falhas de resolução ou
 identidade acontecem antes de criar contêiner.
 
-**Gate funcional concluído em 03/11/2026:** testes genéricos e laboratórios
-rootless passaram, incluindo a topologia MixIdentity isolada. A publicação da
-pré-release é controlada pela issue #102 e pelo workflow reproduzível de release.
+**Gate concluído em 04/11/2026:** a pré-release `v0.1.0-alpha.7` foi publicada
+no commit `af03041`; o workflow repetiu vet, testes e race detector, publicou
+artefatos AMD64/ARM64 com checksums verificados e reinstalou com sucesso o
+binário AMD64 baixado. Os laboratórios rootless incluem a topologia MixIdentity
+isolada.
 
 ## Integração opcional futura — Orisema Data
 

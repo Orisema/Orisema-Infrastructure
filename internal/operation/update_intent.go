@@ -114,6 +114,17 @@ func updatePlanFingerprintV2(application, service, resourceName, resourceID, cur
 	return sha256String(data)
 }
 
+// UpdatePlanFingerprintWithBindings canonicalizes metadata-only binding
+// evidence and returns the v2 plan fingerprint used for fresh revalidation.
+// It never accepts secret values, public environment values, or locators.
+func UpdatePlanFingerprintWithBindings(application, service, resourceName, resourceID, currentImage, targetImage string, bindings UpdateBindingEvidence) (string, error) {
+	_, configurationFingerprint, err := canonicalBindingEvidence(bindings)
+	if err != nil {
+		return "", err
+	}
+	return updatePlanFingerprintV2(application, service, resourceName, resourceID, currentImage, targetImage, configurationFingerprint), nil
+}
+
 func canonicalBindingEvidence(input UpdateBindingEvidence) (UpdateBindingEvidence, string, error) {
 	result := UpdateBindingEvidence{
 		PublicEnvironmentNames:  append([]string(nil), input.PublicEnvironmentNames...),

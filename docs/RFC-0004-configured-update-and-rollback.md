@@ -193,6 +193,11 @@ uma ação explícita posterior.
    isolado, sem tocar a instância saudável existente;
 8. reconciliar documentação, auditoria e release somente após o gate completo.
 
+A etapa 1 e as fases somente leitura da etapa 2 foram implementadas nas issues
+#107 e #109. `apply`, `verify` e rollback para serviços configurados permanecem
+bloqueados até que a entrega completa e seus limites journaled sejam
+implementados.
+
 ## Gate de conclusão
 
 - `go vet ./...`, `go test ./...` e `go test -race ./...` passam;

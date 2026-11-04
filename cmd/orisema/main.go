@@ -23,6 +23,7 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/networks"
 	"github.com/Orisema/Orisema-Infrastructure/internal/operation"
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
+	"github.com/Orisema/Orisema-Infrastructure/internal/publicconfig"
 	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
 	"github.com/Orisema/Orisema-Infrastructure/internal/remote"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
@@ -612,15 +613,10 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
 	}
-	for _, service := range m.Services {
-		if len(service.PublicEnvironment) != 0 || len(service.Networks) != 0 {
-			fmt.Fprintln(stderr, "update blocked: public configuration and network bindings are not yet supported by update/rollback; no changes made")
-			return 1
-		}
-		if len(service.Secrets) != 0 {
-			fmt.Fprintln(stderr, "update blocked: secret bindings are not yet supported by update/rollback; no changes made")
-			return 1
-		}
+	configured := !planOnly && manifestServiceHasBindings(m, args[3])
+	if configured && (apply || verify || rollback || rollbackVerify) {
+		fmt.Fprintln(stderr, "update mutation blocked: configured bindings are supported only by plan, prepare, and authorize in this increment; no changes made")
+		return 1
 	}
 	if verify {
 		return runUpdateVerify(*m, args[3], args[5], args[7], stdout, stderr)
@@ -676,12 +672,22 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		}
 	}
 	client := runtime.Client{}
+	resolvedSecrets, err := resolveManifestSecrets(context.Background(), m)
+	if err != nil {
+		fmt.Fprintf(stderr, "update blocked: secret resolution failed: %v; no changes made\n", err)
+		return 1
+	}
+	resolvedNetworks, err := resolveManifestNetworks(context.Background(), m)
+	if err != nil {
+		fmt.Fprintf(stderr, "update blocked: network resolution failed: %v; no changes made\n", err)
+		return 1
+	}
 	containers, err := client.List(context.Background())
 	if err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
 	}
-	evidence := planner.BuildInspected(context.Background(), m, containers, client)
+	evidence := planner.BuildInspectedResolvedRuntime(context.Background(), m, containers, client, resolvedSecrets, resolvedNetworks)
 	steps := updateplan.Build(m, evidence)
 	if apply {
 		service, journal, id := args[3], args[5], args[7]
@@ -703,7 +709,11 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintln(stderr, "update execution blocked: rollback slot already exists")
 			return 1
 		}
-		fingerprint := operation.UpdatePlanFingerprint(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.TargetImage)
+		fingerprint, err := updateFingerprint(m, candidate, resolvedSecrets, resolvedNetworks)
+		if err != nil {
+			fmt.Fprintf(stderr, "update authorization blocked: invalid binding evidence: %v\n", err)
+			return 1
+		}
 		observed := []operation.Resource{{Kind: "container", Name: candidate.Name, ID: candidate.CurrentID, Ownership: operation.OwnershipManaged, Application: m.Name, Service: candidate.Service}}
 		store, err := operation.OpenStore(journal)
 		if err != nil {
@@ -770,7 +780,11 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "update authorization blocked: %s\n", reason)
 			return 1
 		}
-		fingerprint := operation.UpdatePlanFingerprint(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.TargetImage)
+		fingerprint, err := updateFingerprint(m, candidate, resolvedSecrets, resolvedNetworks)
+		if err != nil {
+			fmt.Fprintf(stderr, "update authorization blocked: invalid binding evidence: %v\n", err)
+			return 1
+		}
 		observed := []operation.Resource{{Kind: "container", Name: candidate.Name, ID: candidate.CurrentID, Ownership: operation.OwnershipManaged, Application: m.Name, Service: candidate.Service}}
 		store, err := operation.OpenStore(journal)
 		if err != nil {
@@ -816,6 +830,7 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		op, err := store.CreateUpdateIntent(operation.UpdateIntentRequest{
 			ID: id, Application: m.Name, Service: candidate.Service, ResourceName: candidate.Name,
 			ResourceID: candidate.CurrentID, CurrentImage: candidate.CurrentImage, TargetImage: candidate.TargetImage,
+			Bindings: updateBindingEvidence(m, candidate.Service, resolvedSecrets, resolvedNetworks),
 		})
 		if err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
@@ -835,6 +850,54 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	}
 	fmt.Fprintln(stdout, "Candidates are guidance only. No journal created, confirmation requested, or runtime changes made.")
 	return 0
+}
+
+func manifestServiceHasBindings(m *manifest.Manifest, serviceName string) bool {
+	for _, service := range m.Services {
+		if service.Name == serviceName {
+			return len(service.PublicEnvironment) != 0 || len(service.Secrets) != 0 || len(service.Networks) != 0
+		}
+	}
+	return false
+}
+
+func updateBindingEvidence(m *manifest.Manifest, serviceName string, resolvedSecrets map[string][]secrets.ResolvedMount, resolvedNetworks map[string][]networks.ResolvedBinding) *operation.UpdateBindingEvidence {
+	var declared *manifest.Service
+	for i := range m.Services {
+		if m.Services[i].Name == serviceName {
+			declared = &m.Services[i]
+			break
+		}
+	}
+	if declared == nil || len(declared.PublicEnvironment) == 0 && len(declared.Secrets) == 0 && len(declared.Networks) == 0 {
+		return nil
+	}
+	evidence := &operation.UpdateBindingEvidence{}
+	if len(declared.PublicEnvironment) != 0 {
+		_, evidence.PublicEnvironmentDigest = publicconfig.Metadata(declared.PublicEnvironment)
+		for _, entry := range declared.PublicEnvironment {
+			evidence.PublicEnvironmentNames = append(evidence.PublicEnvironmentNames, entry.Name)
+		}
+	}
+	for _, mount := range resolvedSecrets[serviceName] {
+		evidence.Secrets = append(evidence.Secrets, operation.UpdateSecretEvidence{
+			Name: mount.Name, Provider: string(mount.Provider), Target: mount.Target, Identity: mount.Identity,
+		})
+	}
+	for _, binding := range resolvedNetworks[serviceName] {
+		evidence.Networks = append(evidence.Networks, operation.UpdateNetworkEvidence{
+			Name: binding.Name, Provider: string(binding.Provider), Identity: binding.Identity, Driver: binding.Driver,
+		})
+	}
+	return evidence
+}
+
+func updateFingerprint(m *manifest.Manifest, candidate *updateplan.Step, resolvedSecrets map[string][]secrets.ResolvedMount, resolvedNetworks map[string][]networks.ResolvedBinding) (string, error) {
+	bindings := updateBindingEvidence(m, candidate.Service, resolvedSecrets, resolvedNetworks)
+	if bindings == nil {
+		return operation.UpdatePlanFingerprint(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.TargetImage), nil
+	}
+	return operation.UpdatePlanFingerprintWithBindings(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.TargetImage, *bindings)
 }
 
 func runUpdateVerify(m manifest.Manifest, service, journal, id string, stdout, stderr io.Writer) int {

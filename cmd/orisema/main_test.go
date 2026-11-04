@@ -15,6 +15,7 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/diagnostic"
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
 	"github.com/Orisema/Orisema-Infrastructure/internal/operation"
+	"github.com/Orisema/Orisema-Infrastructure/internal/publicconfig"
 	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
 )
 
@@ -175,28 +176,97 @@ esac
 	}
 }
 
-func TestUpdateBlocksManifestWithSecretBindings(t *testing.T) {
-	manifestPath := filepath.Join(t.TempDir(), "manifest.yaml")
-	manifestData := "apiVersion: orisema.dev/v1alpha3\nkind: Application\nname: demo\nsecrets:\n  - name: token\n    source:\n      podman:\n        name: demo-token\nservices:\n  - name: web\n    image: nginx:new\n    secrets:\n      - name: token\n        target: token\n"
+func TestConfiguredUpdatePreparePersistsV2AndAuthorizeRejectsChangedIdentity(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	manifestData := "apiVersion: orisema.dev/v1alpha4\nkind: Application\nname: demo\nsecrets:\n  - name: token\n    source:\n      podman:\n        name: demo-token\nnetworks:\n  - name: private\n    source:\n      podman:\n        name: demo-private\nservices:\n  - name: web\n    image: nginx:new\n    publicEnvironment:\n      - name: APP_MODE\n        value: laboratory\n    secrets:\n      - name: token\n        target: token\n    networks:\n      - name: private\n    healthcheck:\n      command: nginx -t\n      interval: 30s\n      timeout: 5s\n      retries: 3\n"
 	if err := os.WriteFile(manifestPath, []byte(manifestData), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	secretID := "abcdef0123456789abcdef012"
+	networkID := strings.Repeat("b", 64)
+	_, environmentDigest := publicconfig.Metadata([]manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}})
+	identityChanged := filepath.Join(dir, "identity-changed")
+	podmanPath := filepath.Join(dir, "podman")
+	script := fmt.Sprintf(`#!/bin/sh
+case "$1 $2" in
+  "secret inspect")
+    if [ -f %q ]; then secret_id=abcdef0123456789abcdef013; else secret_id=%s; fi
+    printf '[{"ID":"%%s","Spec":{"Name":"demo-token"}}]\n' "$secret_id" ;;
+  "network inspect") printf '[{"name":"demo-private","id":"%s","driver":"bridge"}]\n' ;;
+  "ps -a") printf '%%s\n' '[{"Names":["orisema-demo-web"],"State":"running","Image":"nginx:old"}]' ;;
+  "inspect --type") printf '%%s\n' '[{"Id":"container-123","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:old","Env":["APP_MODE=laboratory"],"Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web","dev.orisema.public-env.names":"APP_MODE","dev.orisema.public-env.hash":"%s","dev.orisema.secret.token":"podman:%s","dev.orisema.network.private":"podman:%s:bridge"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}},"NetworkSettings":{"Networks":{"demo-private":{}}}}]' ;;
+  *) exit 91 ;;
+esac
+`, identityChanged, secretID, networkID, environmentDigest, secretID, networkID)
+	if err := os.WriteFile(podmanPath, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	journal := filepath.Join(dir, "operations")
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"update", "plan", manifestPath}, strings.NewReader(""), &stdout, &stderr)
-	if code != 1 || !strings.Contains(stderr.String(), "secret bindings are not yet supported") {
+	code := run([]string{"update", "prepare", manifestPath, "web", "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	store, err := operation.OpenExistingStore(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operations, err := store.Incomplete()
+	if err != nil || len(operations) != 1 || operations[0].Intent == nil || operations[0].Intent.Contract != "orisema-update-intent-v2" || operations[0].Intent.Bindings == nil {
+		t.Fatalf("operations=%#v err=%v", operations, err)
+	}
+	journalData, err := os.ReadFile(filepath.Join(journal, operations[0].ID+".json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"laboratory", "demo-token", "demo-private"} {
+		if strings.Contains(string(journalData), forbidden) {
+			t.Fatalf("journal exposed value or locator %q: %s", forbidden, journalData)
+		}
+	}
+	before := string(journalData)
+	if err := os.WriteFile(identityChanged, []byte("changed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "authorize", manifestPath, "web", "--journal", journal, "--operation", operations[0].ID}, strings.NewReader("AUTHORIZE UPDATE demo/web\n"), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "update authorization blocked") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	after, err := os.ReadFile(filepath.Join(journal, operations[0].ID+".json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before != string(after) {
+		t.Fatal("failed configured authorization changed journal")
+	}
+	if err := os.Remove(identityChanged); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "authorize", manifestPath, "web", "--journal", journal, "--operation", operations[0].ID}, strings.NewReader("AUTHORIZE UPDATE demo/web\n"), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "state=PREPARING") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	authorized, err := store.Load(operations[0].ID)
+	if err != nil || authorized.State != operation.Preparing || authorized.Authorization == nil || authorized.Authorization.PlanFingerprint != authorized.Intent.PlanFingerprint {
+		t.Fatalf("authorized=%#v err=%v", authorized, err)
 	}
 }
 
-func TestUpdateBlocksManifestWithAlpha4Delivery(t *testing.T) {
+func TestConfiguredUpdateMutationRemainsBlocked(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "manifest.yaml")
 	manifestData := "apiVersion: orisema.dev/v1alpha4\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:new\n    publicEnvironment:\n      - name: APP_MODE\n        value: laboratory\n"
 	if err := os.WriteFile(manifestPath, []byte(manifestData), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"update", "plan", manifestPath}, strings.NewReader(""), &stdout, &stderr)
-	if code != 1 || !strings.Contains(stderr.String(), "public configuration and network bindings are not yet supported") {
+	code := run([]string{"update", "apply", manifestPath, "web", "--journal", filepath.Join(t.TempDir(), "operations"), "--operation", "update-test"}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "supported only by plan, prepare, and authorize") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	if strings.Contains(stderr.String(), "laboratory") {

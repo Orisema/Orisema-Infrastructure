@@ -10,6 +10,7 @@ is not recommended for production**.
 | --- | --- | --- | --- |
 | Ubuntu 24.04.5 AMD64 | Linux AMD64 | CLI, packaging, quick start and extended Podman laboratory | Podman 4.9.3 observed |
 | Ubuntu 22.04.5 AMD64 | Linux AMD64 | CLI and isolated quick start | Podman 3.4.4 observed |
+| Fedora 45 AMD64 | Linux AMD64 | Manual native deploy and configured update through `apply` | Podman 6.1.3 rootless, SELinux enforcing, overlay/crun |
 | Fedora 43 AMD64 (nested lab) | Linux AMD64 | Manual CLI, deploy and configured update through `apply` | Podman 5.8.9 rootful observed; privileged disposable container, not a native host |
 | Linux ARM64 | Linux ARM64 | Cross-build and binary metadata inspection only | Native execution not yet validated |
 | Other Linux distributions | Architecture-dependent | Not continuously tested | Not established |
@@ -35,6 +36,13 @@ update through `apply` passed, preserving public configuration, external-network
 attachment and the stopped previous container. This nested privileged test is
 not evidence for a native Fedora host, SELinux enforcing or Fedora rootless;
 see the [Fedora laboratory record](ALPHA8-FEDORA-LAB.md).
+
+On the same date, a native Fedora 45 AMD64 VM completed the stronger gate with
+SELinux enforcing and Podman 6.1.3 rootless on overlay/crun. A configured update
+through `apply` preserved a validated `file` secret mount, public environment,
+external-network identity and the stopped previous container. Transient secrets
+and every scoped lab resource were absent after cleanup. This remains one
+observed environment rather than a minimum-version guarantee.
 
 ## Runtime support
 

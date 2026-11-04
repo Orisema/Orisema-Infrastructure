@@ -6,6 +6,50 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.8] - 2026-11-04
+
+### Adicionado
+
+- Intenção de update v2 com evidência canônica e fingerprints de configuração
+  pública, secrets e redes sem persistir valores ou locators de providers.
+- `update prepare`, `authorize` e `apply` para serviços configurados, incluindo
+  preparação journaled de secrets transitórios e criação do candidato com o
+  conjunto completo de bindings declarados.
+- `update verify`, `rollback` e `rollback-verify` com nova resolução das
+  identidades autorizadas, inspeção integral da configuração e restauração do
+  mesmo container anterior sem reconstrução.
+- Laboratório automatizado de falha configurada até `RECOVERY_REQUIRED` e
+  rollback manual saudável até `ROLLED_BACK`.
+
+### Segurança
+
+- Mudanças de identidade de secret, arquivo, rede ou configuração entre fases
+  falham fechado antes da decisão ou mutação dependente.
+- Recursos externos permanecem fora do lifecycle do update e rollback; nenhum
+  valor secreto ou público entra no journal operacional.
+- Concorrência na preparação de bindings e no início do rollback admite apenas
+  um escritor, com validação adicional sob race detector.
+
+### Validação
+
+- Fedora 45 AMD64 nativo com Podman 6.1.3 rootless, SELinux Enforcing,
+  `overlay`/`crun`, secret `file`, configuração pública e rede externa.
+- Fedora 43 AMD64 descartável com Podman 5.8.9 para smoke e aplicação do
+  candidato configurado.
+- MixIdentity artificial isolado com PostgreSQL, Keycloak, backend e nginx:
+  falha forçada, restauração do ID anterior e decisão `ROLLED_BACK`.
+- Suíte completa com vet, testes, race detector, CodeQL, quickstarts Ubuntu e
+  laboratórios Podman automatizados.
+
+### Limitações
+
+- O rollback continua restrito ao container da aplicação; não restaura bancos,
+  volumes, migrações ou outros dados persistentes.
+- Rotação declarativa de configuração permanece uma substituição futura; uma
+  mudança durante uma operação autorizada é bloqueada, nunca aplicada in-place.
+- Retenção/remoção do container anterior, aliases DNS, lifecycle de redes,
+  secrets por ambiente e update coordenado entre serviços permanecem futuros.
+
 ## [0.1.0-alpha.7] - 2026-11-04
 
 ### Adicionado
@@ -186,3 +230,5 @@ Primeira versão experimental instalável. **Não indicada para produção.**
 [0.1.0-alpha.4]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.4
 [0.1.0-alpha.5]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.5
 [0.1.0-alpha.6]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.6
+[0.1.0-alpha.7]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.7
+[0.1.0-alpha.8]: https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.8

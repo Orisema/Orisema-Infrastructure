@@ -4,8 +4,8 @@ Etapas propostas, sem datas prometidas.
 
 O plano verificável para as versões experimentais está em
 [docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–7 foram publicadas;
-a Alpha 8 planeja estender update/rollback às aplicações configuradas sem
-assumir lifecycle sobre secrets ou redes externos.
+a Alpha 8 concluiu os gates de update/rollback para aplicações configuradas sem
+assumir lifecycle sobre secrets ou redes externos e aguarda publicação.
 
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.

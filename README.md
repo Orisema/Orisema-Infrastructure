@@ -27,7 +27,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Governança](GOVERNANCE.md)
 - [Segurança](SECURITY.md)
 - [Changelog](CHANGELOG.md)
-- [Limitações conhecidas da Alpha 6](docs/KNOWN_LIMITATIONS.md)
+- [Limitações conhecidas](docs/KNOWN_LIMITATIONS.md)
 - [Contrato de manifesto da Alpha 2](docs/MANIFEST-V1ALPHA2.md)
 - [Contrato parcial de manifesto da Alpha 6](docs/MANIFEST-V1ALPHA3.md)
 - [Contrato parcial de manifesto da Alpha 7](docs/MANIFEST-V1ALPHA4.md)
@@ -45,7 +45,8 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Auditoria de conclusão da Fase 2](docs/PHASE2-AUDIT.md)
 - [Auditoria de conclusão da Alpha 6](docs/ALPHA6-AUDIT.md)
 - [Auditoria de conclusão da Alpha 7](docs/ALPHA7-AUDIT.md)
-- [Laboratório Fedora 43 da Alpha 8](docs/ALPHA8-FEDORA-LAB.md)
+- [Auditoria de conclusão da Alpha 8](docs/ALPHA8-AUDIT.md)
+- [Laboratórios Fedora 43/45 da Alpha 8](docs/ALPHA8-FEDORA-LAB.md)
 
 ## Versão do binário
 
@@ -57,7 +58,7 @@ go build -o orisema ./cmd/orisema
 ./orisema version
 ```
 
-O [pré-release v0.1.0-alpha.7](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.7)
+O [pré-release v0.1.0-alpha.8](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.8)
 distribui binários para Linux AMD64 e Linux ARM64. Podman
 em Linux é o único runtime suportado inicialmente; Docker, Windows e macOS não
 têm suporte oficial nesta etapa. Consulte as diferenças entre alvos compilados

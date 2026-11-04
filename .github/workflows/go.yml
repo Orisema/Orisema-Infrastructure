@@ -218,6 +218,14 @@ jobs:
           sudo chown -R "$USER":"$(id -gn)" work/alpha5-update-apply
           sudo chown -R "$USER":"$(id -gn)" work/alpha5-update-health-failure
           sudo chown -R "$USER":"$(id -gn)" work/alpha5-manual-rollback
+      - name: Exercise Alpha 8 configured update rollback
+        run: |
+          set -euo pipefail
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/alpha8-configured-rollback" \
+            scripts/alpha8-configured-rollback-lab.sh
+          sudo chown -R "$USER":"$(id -gn)" work/alpha8-configured-rollback
       - name: Exercise Phase 2 backup and restore laboratory
         run: |
           set -euo pipefail
@@ -282,6 +290,8 @@ jobs:
             work/alpha5-update-health-failure/*.txt
             work/alpha5-manual-rollback/*.json
             work/alpha5-manual-rollback/*.txt
+            work/alpha8-configured-rollback/*.json
+            work/alpha8-configured-rollback/*.txt
             work/phase2-backup-restore/*.json
             work/phase2-backup-restore/*.txt
             work/phase2-ssh-transport/*.txt

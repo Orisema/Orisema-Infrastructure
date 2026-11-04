@@ -85,8 +85,9 @@ o primeiro runtime; Docker, Windows e macOS não são suportados. O contrato mai
 recente é `orisema.dev/v1alpha4`, mantendo leitura e semântica compatíveis de
 `v1alpha1`–`v1alpha3`. Secrets externos e entrega por arquivo estão
 implementados; configuração pública e redes externas são resolvidas,
-comparadas e entregues no CREATE, mas permanecem bloqueadas em update/rollback
-e não possuem lifecycle gerenciado. Consulte
+comparadas e entregues no CREATE e no update. Verify e rollback revalidam as
+identidades autorizadas, enquanto recursos externos permanecem fora do
+lifecycle gerenciado. Consulte
 [MANIFEST-V1ALPHA4.md](MANIFEST-V1ALPHA4.md),
 [RFC-0002](RFC-0002-secure-secrets.md),
 [RFC-0003](RFC-0003-public-config-and-external-networks.md) e a

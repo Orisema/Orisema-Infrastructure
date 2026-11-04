@@ -10,7 +10,7 @@ is not recommended for production**.
 | --- | --- | --- | --- |
 | Ubuntu 24.04.5 AMD64 | Linux AMD64 | CLI, packaging, quick start and extended Podman laboratory | Podman 4.9.3 observed |
 | Ubuntu 22.04.5 AMD64 | Linux AMD64 | CLI and isolated quick start | Podman 3.4.4 observed |
-| Fedora 45 AMD64 | Linux AMD64 | Manual native deploy and configured update through `apply` | Podman 6.1.3 rootless, SELinux enforcing, overlay/crun |
+| Fedora 45 AMD64 | Linux AMD64 | Manual native deploy, configured update, verify and rollback | Podman 6.1.3 rootless, SELinux enforcing, overlay/crun |
 | Fedora 43 AMD64 (nested lab) | Linux AMD64 | Manual CLI, deploy and configured update through `apply` | Podman 5.8.9 rootful observed; privileged disposable container, not a native host |
 | Linux ARM64 | Linux ARM64 | Cross-build and binary metadata inspection only | Native execution not yet validated |
 | Other Linux distributions | Architecture-dependent | Not continuously tested | Not established |
@@ -41,7 +41,10 @@ On the same date, a native Fedora 45 AMD64 VM completed the stronger gate with
 SELinux enforcing and Podman 6.1.3 rootless on overlay/crun. A configured update
 through `apply` preserved a validated `file` secret mount, public environment,
 external-network identity and the stopped previous container. Transient secrets
-and every scoped lab resource were absent after cleanup. This remains one
+and every scoped lab resource were absent after cleanup. A subsequent forced
+candidate failure produced `RECOVERY_REQUIRED`; configured rollback restored
+the exact previous container, passed health verification and persisted
+`ROLLED_BACK`. A final audit again found no scoped resource. This remains one
 observed environment rather than a minimum-version guarantee.
 
 ## Runtime support
@@ -112,13 +115,13 @@ See [the controlled update laboratory](CONTROLLED-UPDATE-LAB.md).
 - `orisema.dev/v1alpha3` additionally validates external secret references.
   Local Podman and validated `file` references support metadata-only planning
   and file delivery; managed Podman lifecycle is supported. A Alpha 8 permite
-  plan/prepare/authorize/apply de update de imagem com bindings preservados;
-  verify e rollback configurados ainda permanecem bloqueados. See
+  o fluxo completo de update de imagem, verify e rollback manual com bindings
+  preservados e revalidados. See
   [the Alpha 6 contract](MANIFEST-V1ALPHA3.md).
 - `orisema.dev/v1alpha4` additionally validates explicitly public environment
   entries and references to pre-existing external Podman networks. Planner and
-  CREATE e o candidato de update resolvem, comparam e revalidam identidades sem
-  lifecycle de rede; verify e rollback configurados ainda permanecem bloqueados. See
+  CREATE, update, verify e rollback resolvem, comparam e revalidam identidades
+  sem assumir lifecycle de rede. See
   [the Alpha 7 contract](MANIFEST-V1ALPHA4.md).
 - Secret values in environment variables, volumes, custom permissions and JSON
   output are not supported and fail closed. See

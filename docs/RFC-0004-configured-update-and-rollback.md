@@ -200,7 +200,9 @@ implementados.
 
 A criação do candidato com bindings completos e a fronteira journaled de
 preparação transitória foram implementadas na issue #111. Verify e rollback
-configurados continuam bloqueados até a etapa seguinte.
+configurados agora resolvem novamente os bindings, exigem o fingerprint
+autorizado e inspecionam a configuração completa antes de registrar saúde ou
+iniciar qualquer mutação de rollback.
 
 ## Gate de conclusão
 

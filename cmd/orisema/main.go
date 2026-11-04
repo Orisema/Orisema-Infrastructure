@@ -614,10 +614,6 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		return 1
 	}
 	configured := !planOnly && manifestServiceHasBindings(m, args[3])
-	if configured && (verify || rollback || rollbackVerify) {
-		fmt.Fprintln(stderr, "update verification and rollback blocked: configured bindings are not yet supported by these phases; no changes made")
-		return 1
-	}
 	if verify {
 		return runUpdateVerify(*m, args[3], args[5], args[7], stdout, stderr)
 	}
@@ -951,6 +947,41 @@ func updateFingerprint(m *manifest.Manifest, candidate *updateplan.Step, resolve
 	return operation.UpdatePlanFingerprintWithBindings(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.TargetImage, *bindings)
 }
 
+func revalidateUpdateBindings(ctx context.Context, m *manifest.Manifest, op operation.Operation) (map[string][]secrets.ResolvedMount, map[string][]networks.ResolvedBinding, error) {
+	if op.Intent == nil || len(op.Resources) == 0 {
+		return nil, nil, errors.New("update intent evidence is incomplete")
+	}
+	resolvedSecrets, err := resolveManifestSecrets(ctx, m)
+	if err != nil {
+		return nil, nil, fmt.Errorf("secret resolution failed: %w", err)
+	}
+	resolvedNetworks, err := resolveManifestNetworks(ctx, m)
+	if err != nil {
+		return nil, nil, fmt.Errorf("network resolution failed: %w", err)
+	}
+	bindings := updateBindingEvidence(m, op.Intent.Service, resolvedSecrets, resolvedNetworks)
+	if op.Intent.Bindings == nil {
+		if bindings != nil {
+			return nil, nil, errors.New("configured bindings are missing from the authorized update intent")
+		}
+		return resolvedSecrets, resolvedNetworks, nil
+	}
+	if bindings == nil {
+		return nil, nil, errors.New("authorized configured bindings are missing from the manifest")
+	}
+	fingerprint, err := operation.UpdatePlanFingerprintWithBindings(op.Application, op.Intent.Service, op.IntentResourceName(), op.Resources[0].ID, op.Intent.CurrentImage, op.Intent.TargetImage, *bindings)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid binding evidence: %w", err)
+	}
+	if fingerprint != op.Intent.PlanFingerprint {
+		return nil, nil, errors.New("configured binding identity changed since authorization")
+	}
+	if err := networks.RevalidateManifest(ctx, m, networkInspectors(), resolvedNetworks); err != nil {
+		return nil, nil, fmt.Errorf("network identity changed: %w", err)
+	}
+	return resolvedSecrets, resolvedNetworks, nil
+}
+
 func runUpdateVerify(m manifest.Manifest, service, journal, id string, stdout, stderr io.Writer) int {
 	store, err := operation.OpenStore(journal)
 	if err != nil {
@@ -977,6 +1008,11 @@ func runUpdateVerify(m manifest.Manifest, service, journal, id string, stdout, s
 		fmt.Fprintln(stderr, "update verification blocked: declared service healthcheck is required")
 		return 1
 	}
+	resolvedSecrets, resolvedNetworks, err := revalidateUpdateBindings(context.Background(), &m, op)
+	if err != nil {
+		fmt.Fprintf(stderr, "update verification blocked: %v\n", err)
+		return 1
+	}
 	client := runtime.Client{}
 	containers, err := client.List(context.Background())
 	if err != nil {
@@ -984,7 +1020,7 @@ func runUpdateVerify(m manifest.Manifest, service, journal, id string, stdout, s
 		return 1
 	}
 	configurationMatches := false
-	for _, step := range planner.BuildInspected(context.Background(), &m, containers, client) {
+	for _, step := range planner.BuildInspectedResolvedRuntime(context.Background(), &m, containers, client, resolvedSecrets, resolvedNetworks) {
 		if step.Name == op.IntentResourceName() && step.Action == planner.Noop {
 			configurationMatches = true
 			break
@@ -1099,13 +1135,18 @@ func runUpdateRollback(m manifest.Manifest, service, journal, id string, stdin i
 		return 1
 	}
 	client := runtime.Client{}
+	resolvedSecrets, resolvedNetworks, err := revalidateUpdateBindings(context.Background(), &m, op)
+	if err != nil {
+		fmt.Fprintf(stderr, "rollback blocked: %v\n", err)
+		return 1
+	}
 	containers, err := client.List(context.Background())
 	if err != nil {
 		fmt.Fprintf(stderr, "rollback blocked: list runtime containers: %v\n", err)
 		return 1
 	}
 	configurationMatches := false
-	for _, step := range planner.BuildInspected(context.Background(), &m, containers, client) {
+	for _, step := range planner.BuildInspectedResolvedRuntime(context.Background(), &m, containers, client, resolvedSecrets, resolvedNetworks) {
 		if step.Name == op.IntentResourceName() && step.Action == planner.Noop {
 			configurationMatches = true
 			break
@@ -1191,6 +1232,11 @@ func runUpdateRollbackVerify(m manifest.Manifest, service, journal, id string, s
 		return 1
 	}
 	client := runtime.Client{}
+	resolvedSecrets, resolvedNetworks, err := revalidateUpdateBindings(context.Background(), &m, op)
+	if err != nil {
+		fmt.Fprintf(stderr, "rollback verification blocked: %v\n", err)
+		return 1
+	}
 	containers, err := client.List(context.Background())
 	if err != nil {
 		fmt.Fprintf(stderr, "rollback verification blocked: list runtime containers: %v\n", err)
@@ -1204,7 +1250,7 @@ func runUpdateRollbackVerify(m manifest.Manifest, service, journal, id string, s
 			oldManifest.Services[i].Image = op.Intent.CurrentImage
 		}
 	}
-	for _, step := range planner.BuildInspected(context.Background(), &oldManifest, containers, client) {
+	for _, step := range planner.BuildInspectedResolvedRuntime(context.Background(), &oldManifest, containers, client, resolvedSecrets, resolvedNetworks) {
 		if step.Name == op.IntentResourceName() && step.Action == planner.Noop {
 			matchedOldConfiguration = true
 			break

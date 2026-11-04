@@ -1,4 +1,4 @@
-# Alpha 8 — laboratório isolado Fedora 43
+# Alpha 8 — laboratórios isolados Fedora 43 e Fedora 45
 
 Data: 04/11/2026.
 
@@ -92,5 +92,26 @@ Resultado: `FEDORA45_NATIVE_ALPHA8_PASS` e
 `FEDORA45_NATIVE_CLEANUP_VERIFIED`.
 
 O material secreto usado foi exclusivamente artificial. Nenhum projeto ou
-contêiner preexistente da VM fez parte do laboratório. Verify e rollback
-configurados continuam como próximos gates funcionais da Alpha 8.
+contêiner preexistente da VM fez parte do laboratório. Naquele momento, verify
+e rollback configurados permaneceram como gates funcionais separados.
+
+## Verify e rollback configurados na VM Fedora 45
+
+Após a implementação do gate seguinte, um novo laboratório nativo repetiu o
+fluxo com Podman 6.1.3 rootless e SELinux `Enforcing`. A aplicação isolada
+combinou secret artificial pelo provider `file`, configuração pública, rede
+externa `bridge` e healthcheck. O candidato recebeu a imagem nova e todos os
+bindings declarados; em seguida foi parado deliberadamente para produzir uma
+decisão durável `RECOVERY_REQUIRED`.
+
+O rollback manual:
+
+1. resolveu novamente e comparou as identidades autorizadas;
+2. preservou o candidato com falha no slot de diagnóstico;
+3. restaurou o mesmo ID da unidade anterior, sem reconstruí-la;
+4. iniciou e verificou a unidade restaurada como saudável;
+5. persistiu `ROLLED_BACK` sem alterar a rede externa;
+6. não deixou secret transitório, contêiner, rede ou diretório de laboratório.
+
+Resultados: `FEDORA45_ALPHA8_CONFIGURED_ROLLBACK_PASS` e
+`FEDORA45_ALPHA8_CLEANUP_VERIFIED`.

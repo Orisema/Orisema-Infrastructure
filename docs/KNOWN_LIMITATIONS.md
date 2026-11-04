@@ -27,13 +27,13 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   inerte. Nenhum dado persistente, secret ou credencial é protegido.
 - `v1alpha3` resolve e monta referências Podman e arquivos locais validados por
   identidade e gerencia o ciclo de vida Podman sem revelar valores. A Alpha 8
-  já cria candidatos de update com esses bindings, mas verify e rollback desse
-  fluxo ainda permanecem bloqueados.
+  cria candidatos, revalida esses bindings no verify e preserva a unidade
+  anterior para rollback manual.
 - `v1alpha4` entrega configuração explicitamente pública e conecta CREATE a
   redes Podman externas `bridge` por identidade revalidada, sem gerenciar o
-  ciclo de vida dessas redes. O candidato de update preserva esses campos;
-  verify/rollback configurados, secrets em variáveis de ambiente, volumes,
-  limites de recursos e permissões avançadas não têm suporte.
+  ciclo de vida dessas redes. O candidato, verify e rollback preservam e
+  revalidam esses campos; secrets em variáveis de ambiente, volumes, limites
+  de recursos e permissões avançadas não têm suporte.
 - Aliases DNS de rede não fazem parte do contrato. O laboratório MixIdentity
   aplica o alias isolado `identity-app` explicitamente entre dois deploys; isso
   não representa gerenciamento de alias pelo Orisema.

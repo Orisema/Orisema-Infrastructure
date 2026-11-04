@@ -190,8 +190,8 @@ isolada.
   de habilitar qualquer mutação (#109).
 - [x] Criar candidatos com configuração pública, secrets e redes completos,
   revalidando identidades e registrando preparação transitória (#111).
-- [ ] Integrar verify e rollback à nova evidência sem recriar a unidade anterior
-  nem assumir lifecycle de recursos externos.
+- [x] Integrar verify e rollback à nova evidência sem recriar a unidade anterior
+  nem assumir lifecycle de recursos externos (#117).
 - [ ] Testar rotação entre fases, falha parcial, interrupção, concorrência,
   ausência de divulgação e compatibilidade com updates antigos.
 - [ ] Executar laboratórios Podman rootless e MixIdentity artificial isolado.

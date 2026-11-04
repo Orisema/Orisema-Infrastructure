@@ -5,11 +5,12 @@ and references to pre-existing external Podman networks. It preserves every
 validated `v1alpha3` field, including file-delivered secrets.
 
 The current increment implements schema, validation, metadata-only network
-resolution, conservative drift comparison and CREATE delivery. `plan` resolves
-every consumed network before inspecting containers. `deploy` revalidates each
-network immediately before creation and passes public environment entries and
-network IDs as separate Podman arguments. Existing containers with differences
-remain `DRIFT`; update and rollback with these fields remain blocked.
+resolution, conservative drift comparison, CREATE delivery and configured
+image update with manual application rollback. Every phase resolves consumed
+networks before inspection; mutation phases revalidate them immediately before
+their boundary. Public environment entries and network IDs are passed as
+separate Podman arguments. Existing containers with unsupported differences
+remain `DRIFT`.
 
 ## Public environment
 

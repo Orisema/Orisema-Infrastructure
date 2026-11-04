@@ -58,8 +58,8 @@ resolved immutable ID is revalidated after confirmation and is passed to
 
 The container receives a read-only file at `/run/secrets/<target>`. Orisema
 stores a provider/ID binding in a managed label so later plans can detect drift
-without hashing or reading content. Update and rollback remain blocked for
-services with secret bindings until those flows preserve the same contract.
+without hashing or reading content. Configured image update, verify and manual
+application rollback preserve and freshly revalidate the same contract.
 
 The `file` provider rejects symlinks, hardlinks, non-regular files, ownership
 mismatch, modes more permissive than `0600`, paths under group/world-writable

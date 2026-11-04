@@ -1,12 +1,13 @@
-# CLI prototype (Alpha 7 development)
+# CLI prototype (Alpha 8 development)
 
 This is an **experimental laboratory CLI**, not production-ready. `validate` works offline; `plan`, `status` and lifecycle commands query local Podman.
 
 The Alpha 7 `v1alpha4` schema accepts bounded `publicEnvironment` and external
 network references. `plan` resolves external network metadata and detects drift
 without printing public values. CREATE deploys environment entries and attaches
-pre-existing `bridge` networks by revalidated ID. Network lifecycle and
-update/rollback with these fields remain fail-closed.
+pre-existing `bridge` networks by revalidated ID. Configured update, verify and
+manual application rollback revalidate these bindings; network lifecycle
+remains external and fail-closed.
 
 ## Requirements
 
@@ -121,14 +122,18 @@ post-update observation per invocation. It freshly revalidates the candidate
 and preserved previous container, then persists `VERIFYING`. Healthy evidence
 commits `COMPLETED`; terminal non-success commits `RECOVERY_REQUIRED`; an
 inconclusive observation reports `WAIT`. It performs no polling, retry, cleanup
-or rollback, and altered identities or ownership block the decision.
+or rollback. For configured services it resolves secret and external-network
+identities again and compares the complete public configuration and binding
+fingerprint; altered identities, configuration or ownership block the decision.
 
 `update rollback` accepts only a durable `RECOVERY_REQUIRED` update and requires
 the exact confirmation `ROLLBACK UPDATE application/service operation-id`. It
 revalidates the two exact containers, preserves the failed candidate under a
 diagnostic name and restores and starts the stopped previous container. Each
-mutation boundary is persisted first. It does not restore data or remove any
-container.
+mutation boundary is persisted first. Configured bindings are freshly
+revalidated, but the preserved previous container is restored as-is rather
+than reconstructed. It does not restore data, mutate external resources or
+remove any container.
 
 `update rollback-verify` reinspects both exact containers and records the
 restored container's configured health. Only `healthy` commits `ROLLED_BACK`;

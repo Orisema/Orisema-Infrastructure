@@ -187,6 +187,7 @@ func TestConfiguredUpdatePreparePersistsV2AndAuthorizeRejectsChangedIdentity(t *
 	networkID := strings.Repeat("b", 64)
 	_, environmentDigest := publicconfig.Metadata([]manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: "laboratory"}})
 	identityChanged := filepath.Join(dir, "identity-changed")
+	candidateCreated := filepath.Join(dir, "candidate-created")
 	podmanPath := filepath.Join(dir, "podman")
 	script := fmt.Sprintf(`#!/bin/sh
 case "$1 $2" in
@@ -194,13 +195,23 @@ case "$1 $2" in
     if [ -f %q ]; then secret_id=abcdef0123456789abcdef013; else secret_id=%s; fi
     printf '[{"ID":"%%s","Spec":{"Name":"demo-token"}}]\n' "$secret_id" ;;
   "network inspect") printf '[{"name":"demo-private","id":"%s","driver":"bridge"}]\n' ;;
-  "ps -a") printf '%%s\n' '[{"Names":["orisema-demo-web"],"State":"running","Image":"nginx:old"}]' ;;
-  "inspect --type") printf '%%s\n' '[{"Id":"container-123","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:old","Env":["APP_MODE=laboratory"],"Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web","dev.orisema.public-env.names":"APP_MODE","dev.orisema.public-env.hash":"%s","dev.orisema.secret.token":"podman:%s","dev.orisema.network.private":"podman:%s:bridge"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}},"NetworkSettings":{"Networks":{"demo-private":{}}}}]' ;;
+  "ps -a")
+    if [ -f %q ]; then image=nginx:new; else image=nginx:old; fi
+    printf '[{"Names":["orisema-demo-web"],"State":"running","Image":"%%s"}]\n' "$image" ;;
+  "inspect --type")
+    if [ -f %q ] && [ "$4" = "orisema-demo-web" ]; then
+      id=candidate-configured-456 image=nginx:new status=running running=true health=',"Healthcheck":{"Status":"healthy"}'
+    elif [ -f %q ]; then
+      id=container-123 image=nginx:old status=exited running=false health=
+    else
+      id=container-123 image=nginx:old status=running running=true health=
+    fi
+    printf '[{"Id":"%%s","Name":"%%s","State":{"Status":"%%s","Running":%%s%%s},"Config":{"Image":"%%s","Env":["APP_MODE=laboratory"],"Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web","dev.orisema.public-env.names":"APP_MODE","dev.orisema.public-env.hash":"%s","dev.orisema.secret.token":"podman:%s","dev.orisema.network.private":"podman:%s:bridge"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}},"NetworkSettings":{"Networks":{"demo-private":{}}}}]\n' "$id" "$4" "$status" "$running" "$health" "$image" ;;
   "stop orisema-demo-web"|"rename orisema-demo-web") ;;
-  "run --detach") printf 'candidate-configured-456\n' ;;
+  "run --detach") touch %q; printf 'candidate-configured-456\n' ;;
   *) exit 91 ;;
 esac
-`, identityChanged, secretID, networkID, environmentDigest, secretID, networkID)
+`, identityChanged, secretID, networkID, candidateCreated, candidateCreated, candidateCreated, environmentDigest, secretID, networkID, candidateCreated)
 	if err := os.WriteFile(podmanPath, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -268,9 +279,35 @@ esac
 	if err != nil || applied.Execution == nil || !applied.Execution.BindingsPrepared || applied.Execution.CandidateID != "candidate-configured-456" {
 		t.Fatalf("applied=%#v err=%v", applied, err)
 	}
+	if err := os.WriteFile(identityChanged, []byte("changed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	beforeVerify, err := directorySnapshot(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "verify", manifestPath, "web", "--journal", journal, "--operation", operations[0].ID}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "configured binding identity changed") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	afterVerify, _ := directorySnapshot(journal)
+	if beforeVerify != afterVerify {
+		t.Fatal("failed configured verification changed journal")
+	}
+	if err := os.Remove(identityChanged); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "verify", manifestPath, "web", "--journal", journal, "--operation", operations[0].ID}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "decision: COMPLETE") || !strings.Contains(stdout.String(), "state=COMPLETED") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
 }
 
-func TestConfiguredUpdateMutationRemainsBlocked(t *testing.T) {
+func TestConfiguredUpdateVerifyRequiresIntactJournalWithoutExposingValues(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "manifest.yaml")
 	manifestData := "apiVersion: orisema.dev/v1alpha4\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:new\n    publicEnvironment:\n      - name: APP_MODE\n        value: laboratory\n"
 	if err := os.WriteFile(manifestPath, []byte(manifestData), 0o600); err != nil {
@@ -278,7 +315,7 @@ func TestConfiguredUpdateMutationRemainsBlocked(t *testing.T) {
 	}
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"update", "verify", manifestPath, "web", "--journal", filepath.Join(t.TempDir(), "operations"), "--operation", "update-test"}, strings.NewReader(""), &stdout, &stderr)
-	if code != 1 || !strings.Contains(stderr.String(), "not yet supported by these phases") {
+	if code != 1 || !strings.Contains(stderr.String(), "load operation journal") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	if strings.Contains(stderr.String(), "laboratory") {

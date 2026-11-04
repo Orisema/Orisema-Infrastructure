@@ -117,14 +117,14 @@ de lifecycle separado.
 
 ## Alpha 8 — atualização segura de aplicações configuradas
 
-- [ ] Definir intenção versionada, fingerprints e revalidação para update de
+- [x] Definir intenção versionada, fingerprints e revalidação para update de
   serviços com bindings ([RFC-0004](docs/RFC-0004-configured-update-and-rollback.md), #105).
-- [ ] Permitir update de imagem preservando configuração pública, secrets e
+- [x] Permitir update de imagem preservando configuração pública, secrets e
   redes declarados, sem persistir valores.
 - [ ] Tratar rotação suportada de configuração como substituição controlada,
   nunca mutação in-place.
-- [ ] Integrar verify e rollback à evidência de bindings, preservando a unidade
-  anterior e mantendo recursos externos fora do lifecycle.
+- [x] Integrar verify e rollback à evidência de bindings, preservando a unidade
+  anterior e mantendo recursos externos fora do lifecycle (#117).
 - [ ] Validar falhas e rollback em Podman rootless e no MixIdentity artificial
   isolado antes da release.
 

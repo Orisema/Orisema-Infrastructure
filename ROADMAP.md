@@ -3,9 +3,10 @@
 Etapas propostas, sem datas prometidas.
 
 O plano verificável para as versões experimentais está em
-[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–7 foram publicadas;
-a Alpha 8 concluiu os gates de update/rollback para aplicações configuradas sem
-assumir lifecycle sobre secrets ou redes externos e aguarda publicação.
+[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–8 foram publicadas.
+A Alpha 8 concluiu os gates de update/rollback para aplicações configuradas sem
+assumir lifecycle sobre secrets ou redes externos e foi publicada como
+[`v0.1.0-alpha.8`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.8).
 
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.

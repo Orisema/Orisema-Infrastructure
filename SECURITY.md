@@ -32,8 +32,10 @@ Princípios: menor privilégio, operações destrutivas com confirmação, regis
 
 ## Artefatos experimentais
 
-Releases incluem checksums SHA-256 e são publicadas por um workflow restrito a
-tags, usando apenas o `GITHUB_TOKEN` com permissão de conteúdo. Checksums
-detectam corrupção e troca acidental, mas não substituem assinatura criptográfica
-nem atestação de proveniência. Esses mecanismos são melhorias futuras e não
-devem ser presumidos nas Alphas.
+Alpha 8 e versões anteriores incluem apenas checksums SHA-256, que detectam
+corrupção e troca acidental, mas não autenticam o publicador. A partir da Alpha
+9, o workflow foi preparado para assinatura Sigstore keyless dos checksums e
+attestations de provenance dos arquivos. Essa garantia só existe quando a
+release contém o bundle, a assinatura passa para a identidade exata documentada
+e a attestation passa para este repositório; não deve ser inferida para releases
+anteriores nem em caso de verificação incompleta.

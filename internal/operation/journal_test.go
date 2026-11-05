@@ -138,6 +138,35 @@ func TestConcurrentTransitionAllowsOnlyOneWinner(t *testing.T) {
 	}
 }
 
+func TestCheckContinuationAllowsOnlyExactIncompleteOperation(t *testing.T) {
+	store, op, _ := fixture(t)
+	if err := store.Create(op); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CheckContinuation("demo", op.ID); err != nil {
+		t.Fatalf("exact continuation blocked: %v", err)
+	}
+	if err := store.CheckContinuation("demo", "different"); !errors.Is(err, ErrApplicationBusy) {
+		t.Fatalf("conflicting continuation error=%v", err)
+	}
+	if err := store.CheckContinuation("other", op.ID); !errors.Is(err, ErrContinuationBlocked) {
+		t.Fatalf("wrong application error=%v", err)
+	}
+}
+
+func TestCheckContinuationFailsClosedOnOtherCorruptSnapshot(t *testing.T) {
+	store, op, _ := fixture(t)
+	if err := store.Create(op); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store.root, "other.json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CheckContinuation("demo", op.ID); err == nil || !strings.Contains(err.Error(), "validate operation store") {
+		t.Fatalf("corrupt store did not block continuation: %v", err)
+	}
+}
+
 func TestAssessmentNeverAuthorizesAutomaticResume(t *testing.T) {
 	_, op, now := fixture(t)
 	op.Version, op.State, op.UpdatedAt = Version, RecoveryRequired, now

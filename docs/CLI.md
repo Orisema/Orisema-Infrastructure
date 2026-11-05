@@ -349,8 +349,17 @@ with a block or could not be completed, and `2` means invalid CLI usage. A
 `PASS` is not authorization to mutate. A missing, unsafe or corrupt journal
 fails closed and must be preserved for investigation.
 
-Secret values and locators are not printed. The command still does not inspect
-volume growth requirements or enforce the mutation guard. Both storage checks
-require at least 256 MiB available; this is an operational safety margin, not a
-capacity forecast for images or application data. See
+Secret values and locators are not printed. The command does not forecast
+volume growth or enforce a mutation guard on legacy commands without a journal.
+Both storage checks require at least 256 MiB available; this is an operational
+safety margin, not a capacity forecast for images or application data. See
 [RFC-0005](RFC-0005-operational-recovery-and-doctor.md).
+
+Update continuations that already require `--journal` validate the complete
+operation store before confirmation. Only the exact incomplete operation for
+the manifest application may continue; another pending ID, an unsafe snapshot
+or corruption blocks before runtime mutation. `update prepare` retains its
+atomic per-application exclusion when it creates the intent.
+
+Legacy `deploy`, `start` and `stop` do not yet accept an operation journal and
+therefore are not covered by this first mutation-guard slice.

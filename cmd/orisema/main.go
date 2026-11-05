@@ -743,6 +743,17 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
 	}
+	if authorize || apply || verify || rollback || rollbackVerify {
+		store, err := operation.OpenExistingStore(args[5])
+		if err != nil {
+			fmt.Fprintf(stderr, "update continuation blocked before confirmation: %v\n", err)
+			return 1
+		}
+		if err := store.CheckContinuation(m.Name, args[7]); err != nil {
+			fmt.Fprintf(stderr, "update continuation blocked before confirmation: %v\n", err)
+			return 1
+		}
+	}
 	configured := !planOnly && manifestServiceHasBindings(m, args[3])
 	if verify {
 		return runUpdateVerify(*m, args[3], args[5], args[7], stdout, stderr)

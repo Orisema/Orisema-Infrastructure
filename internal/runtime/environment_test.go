@@ -32,3 +32,21 @@ func TestEnvironmentFailsClosedOnUnknownOutput(t *testing.T) {
 		t.Fatal("expected unknown mode to fail closed")
 	}
 }
+
+func TestStoragePathRequiresCleanAbsoluteGraphRoot(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "podman")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\nprintf '/var/lib/containers/storage\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path, err := (Client{Binary: bin}).StoragePath(context.Background())
+	if err != nil || path != "/var/lib/containers/storage" {
+		t.Fatalf("path=%q err=%v", path, err)
+	}
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\nprintf '../storage\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Client{Binary: bin}).StoragePath(context.Background()); err == nil {
+		t.Fatal("expected relative graph root to fail closed")
+	}
+}

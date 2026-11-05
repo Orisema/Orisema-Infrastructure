@@ -234,6 +234,25 @@ os laboratórios Podman e o race detector passaram no CI. O laboratório Fedora
 45 AMD64 passou em modo rootless, com Podman 6.1.3 e SELinux Enforcing. Consulte
 [a auditoria da Alpha 9](ALPHA9-AUDIT.md).
 
+## v0.1.0-alpha.10 — prontidão operacional
+
+- [ ] Unificar a admissão e o journal das mutações locais `deploy`, `start` e
+  `stop` ([RFC-0007](RFC-0007-unified-local-mutation-journal.md), #145).
+- [ ] Publicar inventário verificável da CLI, contratos e limitações (#146).
+- [ ] Exercitar encerramento abrupto, reboot e disco cheio sem perda silenciosa
+  de evidência (#147).
+- [ ] Tornar os próximos passos de `doctor` acionáveis e ainda somente leitura
+  (#148).
+- [ ] Documentar fluxos equivalentes para operadores e agentes, sem atalho de
+  segurança (#149).
+- [ ] Repetir a matriz de compatibilidade, instalação, upgrade, downgrade e
+  artefatos assinados no commit exato da release (#150).
+
+**Gate:** toda mutação local suportada possui intenção durável e admissão
+atômica; concorrência e falhas abruptas permanecem diagnosticáveis; documentação
+e automação usam o mesmo contrato; upgrade ou downgrade incompatível falha sem
+substituir o binário utilizável.
+
 ## Integração opcional futura — Orisema Data
 
 O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integração será precedida por RFC e laboratório com serviço simulado. Não é requisito para as Alphas 1–6; Gera Base fica fora do escopo.

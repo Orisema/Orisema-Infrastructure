@@ -3,10 +3,10 @@
 Etapas propostas, sem datas prometidas.
 
 O plano verificável para as versões experimentais está em
-[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–8 foram publicadas.
-A Alpha 8 concluiu os gates de update/rollback para aplicações configuradas sem
-assumir lifecycle sobre secrets ou redes externos e foi publicada como
-[`v0.1.0-alpha.8`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.8).
+[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–9 foram publicadas.
+A Alpha 9 concluiu os gates de recuperação operacional, distribuição assinada
+e instalação verificável e foi publicada como
+[`v0.1.0-alpha.9`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.9).
 
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.
@@ -136,22 +136,40 @@ bloqueia mudanças de configuração; a expansão permanece planejada para a Bet
 
 ## Alpha 9 — recuperação operacional e distribuição segura
 
-- [ ] Unificar checks de host, manifesto, bindings, runtime e journals em
+- [x] Unificar checks de host, manifesto, bindings, runtime e journals em
   `orisema doctor` ([RFC-0005](docs/RFC-0005-operational-recovery-and-doctor.md),
   #124, #125).
-- [ ] Bloquear mutações conflitantes enquanto uma operação da aplicação estiver
+- [x] Bloquear mutações conflitantes enquanto uma operação da aplicação estiver
   incompleta e oferecer recuperação explícita somente para estados suportados.
-- [ ] Assinar metadados de checksum, publicar provenance e verificar novamente
+- [x] Assinar metadados de checksum, publicar provenance e verificar novamente
   os artefatos depois da publicação
   ([RFC-0006](docs/RFC-0006-signed-distribution-and-installer.md), #135).
-- [ ] Criar instalador auditável com versão explícita, destino privilegiado ou
+- [x] Criar instalador auditável com versão explícita, destino privilegiado ou
   local e rollback da CLI em upgrade mal sucedido.
-- [ ] Validar interrupção, reboot, perda de SSH, instalação, upgrade e
+- [x] Validar interrupção, reboot, perda de SSH, instalação, upgrade e
   desinstalação em Ubuntu e Fedora AMD64.
 
 **Princípio:** diagnóstico nunca autoriza mutação; evidência incompleta é
 preservada e bloqueia. Instalação só substitui um binário utilizável depois de
 autenticidade, integridade, versão e arquitetura terem sido verificadas.
+
+## Alpha 10 — prontidão operacional
+
+- [ ] Exigir journal existente e admissão atômica em toda mutação local
+  suportada, começando por `deploy`, `start` e `stop`
+  ([RFC-0007](docs/RFC-0007-unified-local-mutation-journal.md), #145).
+- [ ] Consolidar o inventário da CLI e os limites operacionais (#146).
+- [ ] Cobrir falhas abruptas, reboot e esgotamento de disco em laboratórios
+  reproduzíveis (#147).
+- [ ] Melhorar o próximo passo apresentado por `doctor` sem conceder autoridade
+  de mutação (#148).
+- [ ] Publicar um caminho manual e um caminho orientado a agentes com o mesmo
+  contrato de segurança (#149).
+- [ ] Aplicar o gate de compatibilidade, upgrade e downgrade à release (#150).
+
+**Princípio:** toda mutação é uma operação durável admitida atomicamente;
+automação e experiência de uso não podem contornar confirmação, ownership,
+revalidação ou preservação de evidência.
 
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.

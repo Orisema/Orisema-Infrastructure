@@ -11,15 +11,47 @@ identity_regexp='^https://github.com/Orisema/Orisema-Infrastructure/.github/work
 version=
 bin_dir=
 reinstall=false
+allow_downgrade=false
 system_install=false
 
 usage() {
-  echo "Usage: install.sh --version <vX.Y.Z[-prerelease]> (--user | --system | --bin-dir <absolute-path>) [--reinstall]" >&2
+  echo "Usage: install.sh --version <vX.Y.Z[-prerelease]> (--user | --system | --bin-dir <absolute-path>) [--reinstall] [--allow-downgrade]" >&2
 }
 
 fail() {
   echo "orisema installer: $*" >&2
   exit 1
+}
+
+version_is_older() {
+  requested=$1
+  current=$2
+  awk -v requested="$requested" -v current="$current" '
+    function parts(version, core, pre, values, count) {
+      sub(/^v/, "", version); count = split(version, values, "-")
+      core[1] = values[1]; pre[1] = count > 1 ? substr(version, length(values[1]) + 2) : ""
+    }
+    function older(left, right, lc, lp, rc, rp, la, ra, i, ln, rn, limit) {
+      parts(left, lc, lp); parts(right, rc, rp)
+      split(lc[1], la, "."); split(rc[1], ra, ".")
+      for (i = 1; i <= 3; i++) {
+        if ((la[i] + 0) < (ra[i] + 0)) return 1
+        if ((la[i] + 0) > (ra[i] + 0)) return 0
+      }
+      if (lp[1] == "" && rp[1] != "") return 0
+      if (lp[1] != "" && rp[1] == "") return 1
+      ln = split(lp[1], la, "."); rn = split(rp[1], ra, "."); limit = ln < rn ? ln : rn
+      for (i = 1; i <= limit; i++) {
+        if (la[i] == ra[i]) continue
+        if (la[i] ~ /^[0-9]+$/ && ra[i] !~ /^[0-9]+$/) return 1
+        if (la[i] !~ /^[0-9]+$/ && ra[i] ~ /^[0-9]+$/) return 0
+        if (la[i] ~ /^[0-9]+$/) return (la[i] + 0) < (ra[i] + 0)
+        return la[i] < ra[i]
+      }
+      return ln < rn
+    }
+    BEGIN { exit older(requested, current) ? 0 : 1 }
+  '
 }
 
 while [ "$#" -gt 0 ]; do
@@ -50,6 +82,10 @@ while [ "$#" -gt 0 ]; do
       reinstall=true
       shift
       ;;
+    --allow-downgrade)
+      allow_downgrade=true
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -78,7 +114,7 @@ case "$(uname -m)" in
   *) fail "unsupported architecture" ;;
 esac
 
-for command_name in curl cosign gh sha256sum tar mktemp install grep stat id mv cp find; do
+for command_name in curl cosign gh sha256sum tar mktemp install grep stat id mv cp find sed awk; do
   command -v "$command_name" >/dev/null 2>&1 || fail "required command is unavailable: $command_name"
 done
 if [ "$system_install" = true ]; then
@@ -145,6 +181,11 @@ if [ -f "$destination" ]; then
   current_report=$("$destination" version 2>/dev/null || true)
   if printf '%s\n' "$current_report" | grep -Fq "Version: $version" && [ "$reinstall" != true ]; then
     fail "requested version is already installed; use --reinstall to replace it explicitly"
+  fi
+  current_version=$(printf '%s\n' "$current_report" | sed -n 's/^Version: \(v[^ ]*\)$/\1/p')
+  if [ -n "$current_version" ] && version_is_older "$version" "$current_version" \
+    && [ "$allow_downgrade" != true ]; then
+    fail "requested version is older than $current_version; use --allow-downgrade explicitly"
   fi
 fi
 

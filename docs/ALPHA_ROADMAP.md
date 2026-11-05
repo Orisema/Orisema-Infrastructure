@@ -213,21 +213,26 @@ até uma substituição controlada ser projetada para a Beta.
 
 ## v0.1.0-alpha.9 — recuperação operacional e distribuição segura
 
-- [ ] Definir diagnóstico unificado, estados recuperáveis e bloqueio de mutação
+- [x] Definir diagnóstico unificado, estados recuperáveis e bloqueio de mutação
   ([RFC-0005](RFC-0005-operational-recovery-and-doctor.md), #124, #125).
-- [ ] Implementar `orisema doctor` sem mutações nem exposição de configuração.
-- [ ] Bloquear operações conflitantes e recuperar somente estados com evidência
+- [x] Implementar `orisema doctor` sem mutações nem exposição de configuração.
+- [x] Bloquear operações conflitantes e recuperar somente estados com evidência
   íntegra, lock, revalidação e confirmação explícita.
-- [ ] Assinar checksums, produzir provenance e verificar o material publicado
+- [x] Assinar checksums, produzir provenance e verificar o material publicado
   ([RFC-0006](RFC-0006-signed-distribution-and-installer.md), #135).
-- [ ] Entregar instalador auditável para destino global ou do usuário, com
+- [x] Entregar instalador auditável para destino global ou do usuário, com
   upgrade reversível e desinstalação explícita.
-- [ ] Executar laboratórios de interrupção e instalação em Ubuntu e Fedora.
+- [x] Executar laboratórios de interrupção e instalação em Ubuntu e Fedora.
 
 **Gate:** uma interrupção comum tem diagnóstico e próximo passo seguros; uma
 operação ambígua bloqueia novas mutações sem apagar evidência; artefatos
 adulterados ou incompatíveis são rejeitados; falha de upgrade mantém o binário
 anterior utilizável.
+
+O gate foi consolidado em 5 de novembro de 2026. A suíte Ubuntu 22.04/24.04,
+os laboratórios Podman e o race detector passaram no CI. O laboratório Fedora
+45 AMD64 passou em modo rootless, com Podman 6.1.3 e SELinux Enforcing. Consulte
+[a auditoria da Alpha 9](ALPHA9-AUDIT.md).
 
 ## Integração opcional futura — Orisema Data
 

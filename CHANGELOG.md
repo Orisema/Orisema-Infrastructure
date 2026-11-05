@@ -6,6 +6,43 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.9] - 2026-11-05
+
+### Adicionado
+
+- `orisema doctor` somente leitura para manifesto, boundary rootless/rootful,
+  journals, bindings, runtime declarado e margens de armazenamento.
+- Gate de continuação para operações de update e `recover operation`, restrito
+  ao rollback revalidado de updates íntegros em `RECOVERY_REQUIRED`.
+- Checksums autenticados por Sigstore keyless, provenance por GitHub artifact
+  attestations e verificação novamente após a publicação.
+- Instaladores explícitos para usuário e `/usr/local/bin`, upgrade atômico com
+  rollback, bloqueio de downgrade implícito e desinstalação conservadora.
+
+### Segurança
+
+- Journals inseguros, corrompidos, ambíguos ou conflitantes bloqueiam antes da
+  confirmação e preservam a evidência.
+- O instalador valida assinatura, checksum, attestation, formato do archive,
+  versão, arquitetura, ownership e permissões antes da troca do executável.
+- `sudo` fica restrito à mutação final do destino global; falhas não fazem
+  downgrade silencioso de verificação nem removem containers ou estado.
+
+### Validação
+
+- Suíte completa, race detector, CodeQL, quickstarts Ubuntu 22.04/24.04 e
+  laboratórios Podman automatizados.
+- Fedora 45 AMD64 nativo, Podman 6.1.3 rootless e SELinux Enforcing.
+- Laboratórios de adulteração, downgrade, upgrade inválido, rollback,
+  desinstalação e rejeição de links para destinos de usuário e sistema.
+
+### Limitações
+
+- O gate comum ainda não cobre `deploy`, `start` e `stop`, que não recebem um
+  journal explícito.
+- ARM64 é cross-build verificado, sem execução nativa; pacotes `.deb`/`.rpm`,
+  verificação Sigstore offline e recuperação distribuída permanecem futuros.
+
 ## [0.1.0-alpha.8] - 2026-11-04
 
 ### Adicionado

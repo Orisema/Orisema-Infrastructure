@@ -1,6 +1,6 @@
 # RFC-0005: diagnóstico unificado e recuperação operacional
 
-- Status: proposta para implementação incremental na Alpha 9
+- Status: implementado na Alpha 9
 - Issues: #124, #125
 - Contratos de manifesto: `orisema.dev/v1alpha1` a `orisema.dev/v1alpha4`
 - Contrato operacional inicial: `orisema-doctor-v1`
@@ -111,7 +111,7 @@ filesystem nem suposição silenciosa de um diretório global.
 
 ## Recuperação suportada
 
-`recover operation` primeiro repete os checks relevantes de `doctor` e carrega
+`recover operation` valida o store completo, carrega
 o journal pelo ID exato. Ação executável exige:
 
 1. journal íntegro e versão suportada;
@@ -123,11 +123,10 @@ o journal pelo ID exato. Ação executável exige:
 7. evento de início sincronizado antes da mutação;
 8. evento de resultado sincronizado depois dela.
 
-Inicialmente, o comando poderá encaminhar apenas para o rollback de update em
-`RECOVERY_REQUIRED` e para a reconciliação somente leitura de execução
-interrompida. `PREPARING`, `APPLYING`, `VERIFYING`, `ROLLING_BACK`, operações de
-arquivo e evidência incompleta permanecem manuais até existir prova específica
-de retomada segura.
+Na Alpha 9, o comando encaminha apenas um update íntegro em
+`RECOVERY_REQUIRED` para o rollback já revalidado. `PREPARING`, `APPLYING`,
+`VERIFYING`, `ROLLING_BACK`, operações de arquivo e evidência incompleta
+permanecem manuais até existir prova específica de retomada segura.
 
 ## Concorrência e interrupção
 

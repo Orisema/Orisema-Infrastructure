@@ -508,6 +508,34 @@ func TestOperationDiagnosisFailsClosedAndValidatesUsage(t *testing.T) {
 	}
 }
 
+func TestOperationRecoveryFailsClosedForUnsupportedState(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	manifestData := "apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n"
+	if err := os.WriteFile(manifestPath, []byte(manifestData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	journal := filepath.Join(dir, "operations")
+	store, err := operation.OpenStore(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := operation.Operation{ID: "update-unsupported", Application: "demo", Services: []string{"web"}, Type: "UPDATE", CreatedAt: time.Now().UTC()}
+	if err := store.Create(op); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"recover", "operation", manifestPath, "--journal", journal, "--operation", op.ID}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stderr.String(), "not a supported RECOVERY_REQUIRED update") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"recover", "operation"}, strings.NewReader(""), &stdout, &stderr); code != 2 {
+		t.Fatalf("usage code=%d stderr=%q", code, stderr.String())
+	}
+}
+
 func directorySnapshot(root string) (string, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {

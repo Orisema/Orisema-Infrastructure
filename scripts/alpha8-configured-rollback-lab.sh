@@ -117,7 +117,7 @@ grep -Fq 'decision: RECOVERY_REQUIRED' "$evidence/verify.txt"
 
 failed="orisema-failed-${operation_id#update-}"
 printf 'ROLLBACK UPDATE %s/web %s\n' "$app" "$operation_id" | \
-  "$binary" update rollback "$manifest" web --journal "$journal" \
+  "$binary" recover operation "$manifest" --journal "$journal" \
     --operation "$operation_id" >"$evidence/rollback.txt"
 test "$(podman inspect --format '{{.Id}}' "$target")" = "$old_id"
 test "$(podman inspect --format '{{.State.Running}}' "$target")" = true

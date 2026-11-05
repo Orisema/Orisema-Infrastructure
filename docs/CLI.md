@@ -361,5 +361,11 @@ the manifest application may continue; another pending ID, an unsafe snapshot
 or corruption blocks before runtime mutation. `update prepare` retains its
 atomic per-application exclusion when it creates the intent.
 
+`orisema recover operation <manifest.yaml> --journal <directory> --operation
+<id>` is the Alpha 9 recovery entry point. It fails closed for every unsupported
+state and delegates only an intact `RECOVERY_REQUIRED` update to the same
+revalidated, explicitly confirmed rollback implementation used by `update
+rollback`. It does not infer success, retry a runtime step or delete evidence.
+
 Legacy `deploy`, `start` and `stop` do not yet accept an operation journal and
 therefore are not covered by this first mutation-guard slice.

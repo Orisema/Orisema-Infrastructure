@@ -46,6 +46,61 @@ func TestCreateLoadAndPersistenceAcrossReopen(t *testing.T) {
 	}
 }
 
+func TestExistingStoreModesDoNotCreateOrEscalate(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "operations")
+	if _, err := OpenExistingWritableStore(root); err == nil {
+		t.Fatal("writable open created or accepted a missing store")
+	}
+	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("existing-store open changed the filesystem: %v", err)
+	}
+
+	initialized, err := OpenStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readOnly, err := OpenExistingStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := Operation{ID: "read-only", Application: "demo", Services: []string{"web"}, Type: "START"}
+	if err := readOnly.Create(op); !errors.Is(err, ErrReadOnlyStore) {
+		t.Fatalf("read-only store mutation error=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, op.ID+".json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("read-only store created a snapshot: %v", err)
+	}
+
+	writable, err := OpenExistingWritableStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writable.Create(op); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := initialized.Load(op.ID); err != nil {
+		t.Fatalf("admitted operation was not persisted: %v", err)
+	}
+}
+
+func TestExistingWritableStoreRejectsUnsafeLockWithoutRepair(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "operations")
+	if _, err := OpenStore(root); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(root, ".store.lock")
+	if err := os.Chmod(lockPath, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenExistingWritableStore(root); err == nil || !strings.Contains(err.Error(), "unsafe") {
+		t.Fatalf("unsafe writable store error=%v", err)
+	}
+	info, err := os.Stat(lockPath)
+	if err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("writable open repaired unsafe lock: %v, %v", info, err)
+	}
+}
+
 func TestRejectsInvalidTransitionAndCorruption(t *testing.T) {
 	store, op, now := fixture(t)
 	if err := store.Create(op); err != nil {

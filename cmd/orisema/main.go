@@ -751,13 +751,21 @@ func runJournaledDeploy(args []string, stdin io.Reader, stdout, stderr io.Writer
 			fmt.Fprintf(stderr, "deployment %s requires diagnosis after preparation failure\n", id)
 			return 1
 		}
-		resourceID, deployErr := client.DeployWithResolved(context.Background(), m.Name, service, prepared, freshNetworks[target.Service])
+		_, deployErr := client.DeployWithResolved(context.Background(), m.Name, service, prepared, freshNetworks[target.Service])
 		if deployErr != nil {
 			_ = cleanupSecrets(context.Background())
 			_, _ = store.Transition(id, operation.RecoveryRequired, "create", "container creation result is ambiguous", time.Now())
 			fmt.Fprintf(stderr, "deployment %s requires diagnosis; previously created services were not rolled back\n", id)
 			return 1
 		}
+		created, inspectErr := client.Inspect(context.Background(), target.ResourceName)
+		if inspectErr != nil || created.ID == "" || !runtime.Owned(created, m.Name, target.Service) {
+			_ = cleanupSecrets(context.Background())
+			_, _ = store.Transition(id, operation.RecoveryRequired, "create", "created container identity could not be verified", time.Now())
+			fmt.Fprintf(stderr, "deployment %s requires diagnosis: created identity is unverified\n", id)
+			return 1
+		}
+		resourceID := created.ID
 		if _, err := store.RecordDeployStep(id, target.Service, resourceID, time.Now()); err != nil {
 			_ = cleanupSecrets(context.Background())
 			fmt.Fprintf(stderr, "container %s was created but journal recording failed: %v\n", resourceID, err)

@@ -132,6 +132,24 @@ de lifecycle separado.
 **Princípio:** cada candidato recebe a configuração declarada completa e toda
 identidade externa é revalidada; dúvida ou mudança entre fases falha fechado.
 
+## Alpha 9 — recuperação operacional e distribuição segura
+
+- [ ] Unificar checks de host, manifesto, bindings, runtime e journals em
+  `orisema doctor` ([RFC-0005](docs/RFC-0005-operational-recovery-and-doctor.md),
+  #124, #125).
+- [ ] Bloquear mutações conflitantes enquanto uma operação da aplicação estiver
+  incompleta e oferecer recuperação explícita somente para estados suportados.
+- [ ] Assinar metadados de checksum, publicar provenance e verificar novamente
+  os artefatos depois da publicação.
+- [ ] Criar instalador auditável com versão explícita, destino privilegiado ou
+  local e rollback da CLI em upgrade mal sucedido.
+- [ ] Validar interrupção, reboot, perda de SSH, instalação, upgrade e
+  desinstalação em Ubuntu e Fedora AMD64.
+
+**Princípio:** diagnóstico nunca autoriza mutação; evidência incompleta é
+preservada e bloqueia. Instalação só substitui um binário utilizável depois de
+autenticidade, integridade, versão e arquitetura terem sido verificadas.
+
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.
 - [ ] Integração opcional com monitoramento.

@@ -65,6 +65,93 @@ func TestVersionRejectsExtraArguments(t *testing.T) {
 	}
 }
 
+func TestDoctorReportsPassWithoutChangingJournal(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	if err := os.WriteFile(manifestPath, []byte("apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	journal := filepath.Join(dir, "operations")
+	if _, err := operation.OpenStore(journal); err != nil {
+		t.Fatal(err)
+	}
+	before, err := directorySnapshot(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte("#!/bin/sh\nprintf 'true\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"doctor", manifestPath, "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	for _, expected := range []string{"orisema-doctor-v1", "[PASS] manifest.valid", "mode=rootless", "[PASS] operation.pending", "Doctor result: PASS", "No runtime or journal changes made"} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("stdout %q missing %q", stdout.String(), expected)
+		}
+	}
+	after, err := directorySnapshot(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before != after {
+		t.Fatalf("doctor changed journal\nbefore=%s\nafter=%s", before, after)
+	}
+}
+
+func TestDoctorBlocksIncompleteApplicationOperation(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	if err := os.WriteFile(manifestPath, []byte("apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	journal := filepath.Join(dir, "operations")
+	store, err := operation.OpenStore(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Create(operation.Operation{ID: "update-pending", Application: "demo", Services: []string{"web"}, Type: "UPDATE"}); err != nil {
+		t.Fatal(err)
+	}
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte("#!/bin/sh\nprintf 'false\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"doctor", manifestPath, "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "[BLOCK] operation.pending: id=update-pending type=UPDATE state=PENDING") || !strings.Contains(stdout.String(), "mode=rootful") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestDoctorFailsClosedForUnsafeJournalAndUsage(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"doctor"}, strings.NewReader(""), &stdout, &stderr); code != 2 {
+		t.Fatalf("usage code=%d stderr=%q", code, stderr.String())
+	}
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	if err := os.WriteFile(manifestPath, []byte("apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte("#!/bin/sh\nprintf 'true\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	stdout.Reset()
+	stderr.Reset()
+	code := run([]string{"doctor", manifestPath, "--journal", filepath.Join(dir, "missing")}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stdout.String(), "[BLOCK] operation.journal") || !strings.Contains(stdout.String(), "do not recreate or delete evidence") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestUpdatePlanReportsImageOnlyCandidateWithoutMutation(t *testing.T) {
 	dir := t.TempDir()
 	manifestPath := filepath.Join(dir, "manifest.yaml")

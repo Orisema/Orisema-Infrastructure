@@ -36,6 +36,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprint(stdout, buildinfo.Current().String())
 		return 0
 	}
+	if len(args) > 0 && args[0] == "doctor" {
+		return runDoctor(args, stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "recover" {
 		return runRecoveryPlan(args, stdin, stdout, stderr)
 	}
@@ -416,7 +419,70 @@ func secretConsumers(ctx context.Context, identity string) ([]string, error) {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+}
+
+func runDoctor(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 4 || args[2] != "--journal" {
+		printUsage(stderr)
+		return 2
+	}
+	fmt.Fprintln(stdout, "Orisema doctor (read-only, contract orisema-doctor-v1):")
+	m, err := manifest.Load(args[1])
+	if err != nil {
+		fmt.Fprintf(stdout, "  [BLOCK] manifest.valid: validation failed: %v\n", err)
+		fmt.Fprintln(stdout, "    next: correct the manifest and run doctor again")
+		fmt.Fprintln(stdout, "No runtime or journal changes made.")
+		return 1
+	}
+	fmt.Fprintf(stdout, "  [PASS] manifest.valid: application=%s services=%d\n", m.Name, len(m.Services))
+
+	environment, err := (runtime.Client{}).Environment(context.Background())
+	if err != nil {
+		fmt.Fprintf(stdout, "  [BLOCK] runtime.podman: unavailable: %v\n", err)
+		fmt.Fprintln(stdout, "    next: restore Podman access for the current user and run doctor again")
+		fmt.Fprintln(stdout, "No runtime or journal changes made.")
+		return 1
+	}
+	mode := "rootful"
+	if environment.Rootless {
+		mode = "rootless"
+	}
+	fmt.Fprintf(stdout, "  [PASS] runtime.podman: available mode=%s\n", mode)
+
+	store, err := operation.OpenExistingStore(args[3])
+	if err != nil {
+		fmt.Fprintf(stdout, "  [BLOCK] operation.journal: unsafe or unavailable: %v\n", err)
+		fmt.Fprintln(stdout, "    next: inspect the explicitly configured journal path; do not recreate or delete evidence")
+		fmt.Fprintln(stdout, "No runtime or journal changes made.")
+		return 1
+	}
+	operations, err := store.List()
+	if err != nil {
+		fmt.Fprintf(stdout, "  [BLOCK] operation.journal: validation failed: %v\n", err)
+		fmt.Fprintln(stdout, "    next: preserve the journal and investigate its integrity before any mutation")
+		fmt.Fprintln(stdout, "No runtime or journal changes made.")
+		return 1
+	}
+	var incomplete []operation.Operation
+	for _, op := range operations {
+		if op.Application == m.Name && !op.State.Terminal() {
+			incomplete = append(incomplete, op)
+		}
+	}
+	if len(incomplete) == 0 {
+		fmt.Fprintf(stdout, "  [PASS] operation.pending: none for application=%s\n", m.Name)
+		fmt.Fprintln(stdout, "Doctor result: PASS")
+		fmt.Fprintln(stdout, "No runtime or journal changes made.")
+		return 0
+	}
+	for _, op := range incomplete {
+		fmt.Fprintf(stdout, "  [BLOCK] operation.pending: id=%s type=%s state=%s\n", op.ID, op.Type, op.State)
+	}
+	fmt.Fprintf(stdout, "    next: orisema operation diagnose --journal %s\n", args[3])
+	fmt.Fprintln(stdout, "Doctor result: BLOCK")
+	fmt.Fprintln(stdout, "No runtime or journal changes made.")
+	return 1
 }
 
 func runRemoteCommand(args []string, stdout, stderr io.Writer) int {

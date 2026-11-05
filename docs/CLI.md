@@ -1,4 +1,4 @@
-# CLI prototype (Alpha 8 development)
+# CLI prototype (Alpha 9 development)
 
 This is an **experimental laboratory CLI**, not production-ready. `validate` works offline; `plan`, `status` and lifecycle commands query local Podman.
 
@@ -20,6 +20,7 @@ do not query Podman.
 
 ```sh
 go run ./cmd/orisema version
+go run ./cmd/orisema doctor examples/nginx.yaml --journal /secure/path/orisema-operations
 go run ./cmd/orisema operation diagnose --journal /secure/path/orisema-operations
 go run ./cmd/orisema update plan examples/nginx-health.yaml
 go run ./cmd/orisema update prepare examples/nginx-health.yaml web --journal /secure/path/orisema-operations
@@ -330,3 +331,20 @@ limitations and an Ubuntu Server rootless validation checklist.
 
 See [RECOVERY-PLANNING.md](RECOVERY-PLANNING.md) for typed actions and the
 guardrails required before any recovery execution can be designed.
+
+# Doctor
+
+`orisema doctor <manifest.yaml> --journal <directory>` performs the first
+Alpha 9 pre-operational checks without changing Podman or the journal. It
+validates the manifest, reads the current Podman rootless/rootful boundary,
+validates every operation snapshot and reports incomplete operations scoped to
+the application.
+
+Checks are reported as `PASS` or `BLOCK`. Exit code `0` means no blocking check
+was found, `1` means diagnosis completed with a block or could not be completed,
+and `2` means invalid CLI usage. A `PASS` is not authorization to mutate. A
+missing, unsafe or corrupt journal fails closed and must be preserved for
+investigation.
+
+This first slice does not yet inspect bindings, free disk space or enforce the
+mutation guard. See [RFC-0005](RFC-0005-operational-recovery-and-doctor.md).

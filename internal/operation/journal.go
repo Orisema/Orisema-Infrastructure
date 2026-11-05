@@ -65,7 +65,12 @@ type Operation struct {
 	Events        []Event                        `json:"events"`
 }
 
-type Store struct{ root string }
+var ErrReadOnlyStore = errors.New("operation journal store is read-only")
+
+type Store struct {
+	root     string
+	writable bool
+}
 
 func OpenStore(root string) (*Store, error) {
 	if root == "" {
@@ -74,7 +79,7 @@ func OpenStore(root string) (*Store, error) {
 	if err := os.Mkdir(root, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
 		return nil, fmt.Errorf("create operation journal directory: %w", err)
 	}
-	store, err := openStoreDirectory(root)
+	store, err := openStoreDirectory(root, true)
 	if err != nil {
 		return nil, err
 	}
@@ -95,11 +100,26 @@ func OpenStore(root string) (*Store, error) {
 // OpenExistingStore opens a journal without creating or changing any file.
 // It is intended for read-only diagnosis.
 func OpenExistingStore(root string) (*Store, error) {
-	store, err := openStoreDirectory(root)
+	return openExistingStore(root, false)
+}
+
+// OpenExistingWritableStore opens an initialized journal for mutation without
+// creating or repairing any file. Callers must still use Create to atomically
+// validate the complete store and admit a new operation.
+func OpenExistingWritableStore(root string) (*Store, error) {
+	return openExistingStore(root, true)
+}
+
+func openExistingStore(root string, writable bool) (*Store, error) {
+	store, err := openStoreDirectory(root, writable)
 	if err != nil {
 		return nil, err
 	}
-	lock, err := os.OpenFile(filepath.Join(root, ".store.lock"), os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	flags := os.O_RDONLY
+	if writable {
+		flags = os.O_RDWR
+	}
+	lock, err := os.OpenFile(filepath.Join(root, ".store.lock"), flags|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, fmt.Errorf("open existing operation journal lock: %w", err)
 	}
@@ -114,7 +134,7 @@ func OpenExistingStore(root string) (*Store, error) {
 	return store, nil
 }
 
-func openStoreDirectory(root string) (*Store, error) {
+func openStoreDirectory(root string, writable bool) (*Store, error) {
 	info, err := os.Lstat(root)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, errors.New("operation journal path must be a real directory")
@@ -122,7 +142,7 @@ func openStoreDirectory(root string) (*Store, error) {
 	if info.Mode().Perm()&0o077 != 0 {
 		return nil, errors.New("operation journal directory permissions must not grant group or other access")
 	}
-	return &Store{root: root}, nil
+	return &Store{root: root, writable: writable}, nil
 }
 
 func (s *Store) Create(op Operation) error {
@@ -381,6 +401,9 @@ func (s *Store) path(id string) (string, error) {
 }
 
 func (s *Store) withLock(name string, fn func() error) error {
+	if !s.writable {
+		return ErrReadOnlyStore
+	}
 	f, err := os.OpenFile(filepath.Join(s.root, name), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o600)
 	if err != nil {
 		return fmt.Errorf("open operation journal lock: %w", err)

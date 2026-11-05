@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -96,6 +97,108 @@ func TestOperationInitRequiresAbsolutePathAndDoesNotRepair(t *testing.T) {
 	info, err := os.Stat(lockPath)
 	if err != nil || info.Mode().Perm() != 0o644 {
 		t.Fatalf("init repaired unsafe lock: %v, %v", info, err)
+	}
+}
+
+func TestJournaledStartStopCompletesOnlyAfterVerification(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	if err := os.WriteFile(manifestPath, []byte("apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	journal := filepath.Join(dir, "operations")
+	if _, err := operation.InitializeStore(journal); err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(dir, "state")
+	if err := os.WriteFile(statePath, []byte("stopped\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	podman := filepath.Join(dir, "podman")
+	script := fmt.Sprintf(`#!/bin/sh
+state=$(cat %q)
+case "$1" in
+  inspect)
+    running=false
+    status=exited
+    if [ "$state" = running ]; then running=true; status=running; fi
+    printf '[{"Id":"container-1","Name":"orisema-demo-web","State":{"Status":"%%s","Running":%%s},"Config":{"Image":"nginx:stable","Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web"}},"HostConfig":{"PortBindings":{},"RestartPolicy":{}},"NetworkSettings":{"Networks":{}}}]\n' "$status" "$running"
+    ;;
+  start) printf 'running\n' > %q ;;
+  stop) printf 'stopped\n' > %q ;;
+  *) exit 1 ;;
+esac
+`, statePath, statePath, statePath)
+	if err := os.WriteFile(podman, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"start", "--journal", journal, manifestPath, "web"}, strings.NewReader("START\n"), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "completed and verified") {
+		t.Fatalf("start code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"stop", "--journal", journal, manifestPath, "web"}, strings.NewReader("STOP\n"), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "completed and verified") {
+		t.Fatalf("stop code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	store, err := operation.OpenExistingStore(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operations, err := store.List()
+	if err != nil || len(operations) != 2 {
+		t.Fatalf("operations=%#v err=%v", operations, err)
+	}
+	for _, op := range operations {
+		if op.State != operation.Completed || op.Control == nil || len(op.Events) != 5 {
+			t.Fatalf("incomplete control evidence: %#v", op)
+		}
+	}
+}
+
+func TestJournaledControlCancellationAndMissingStoreDoNotTouchRuntime(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	if err := os.WriteFile(manifestPath, []byte("apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(dir, "mutated")
+	podman := filepath.Join(dir, "podman")
+	script := fmt.Sprintf("#!/bin/sh\nif [ \"$1\" = inspect ]; then printf '[{\"Id\":\"container-1\",\"State\":{\"Running\":false},\"Config\":{\"Labels\":{\"dev.orisema.managed\":\"true\",\"dev.orisema.app\":\"demo\",\"dev.orisema.service\":\"web\"}}}]\\n'; else touch %q; fi\n", marker)
+	if err := os.WriteFile(podman, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var stdout, stderr bytes.Buffer
+	missing := filepath.Join(dir, "missing")
+	if code := run([]string{"start", "--journal", missing, manifestPath, "web"}, strings.NewReader("START\n"), &stdout, &stderr); code != 1 {
+		t.Fatalf("missing store code=%d stderr=%q", code, stderr.String())
+	}
+	if _, err := os.Stat(missing); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing store was created: %v", err)
+	}
+	journal := filepath.Join(dir, "operations")
+	if _, err := operation.InitializeStore(journal); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"start", "--journal", journal, manifestPath, "web"}, strings.NewReader("NO\n"), &stdout, &stderr); code != 1 {
+		t.Fatalf("cancel code=%d stderr=%q", code, stderr.String())
+	}
+	store, err := operation.OpenExistingStore(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if operations, err := store.List(); err != nil || len(operations) != 0 {
+		t.Fatalf("cancellation admitted operation: %#v, %v", operations, err)
+	}
+	if _, err := os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("runtime mutation occurred: %v", err)
 	}
 }
 

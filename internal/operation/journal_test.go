@@ -103,6 +103,34 @@ func TestInitializeStoreCreatesOnceAndDoesNotRepair(t *testing.T) {
 	}
 }
 
+func TestControlIntentRejectsTampering(t *testing.T) {
+	store, _, _ := fixture(t)
+	intent := &ControlIntent{
+		Contract: ControlContract, Action: "START", ResourceName: "orisema-demo-web", ResourceID: "container-1",
+		InitialRunning: false, ExpectedRunning: true,
+	}
+	intent.PlanFingerprint = ControlPlanFingerprint("demo", "web", "START", intent.ResourceName, intent.ResourceID, false, true)
+	op := Operation{
+		ID: "start-1", Application: "demo", Services: []string{"web"}, Type: "START", Control: intent,
+		Resources: []Resource{{Kind: "container", Name: intent.ResourceName, ID: intent.ResourceID, Ownership: OwnershipManaged, Application: "demo", Service: "web"}},
+	}
+	if err := store.Create(op); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(store.root, op.ID+".json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tampered := strings.Replace(string(data), `"expectedRunning": true`, `"expectedRunning": false`, 1)
+	if err := os.WriteFile(path, []byte(tampered), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Load(op.ID); err == nil || !strings.Contains(err.Error(), "intent") {
+		t.Fatalf("tampered control intent error=%v", err)
+	}
+}
+
 func TestExistingWritableStoreRejectsUnsafeLockWithoutRepair(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "operations")
 	if _, err := OpenStore(root); err != nil {

@@ -68,12 +68,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "secret" {
 		return runSecretCommand(args, stdin, stdout, stderr)
 	}
+	if len(args) > 0 && (args[0] == "start" || args[0] == "stop") {
+		return runJournaledControl(args, stdin, stdout, stderr)
+	}
 	if len(args) < 2 {
 		printUsage(stderr)
 		return 2
 	}
 	operation := args[0]
-	needsService := operation == "logs" || operation == "start" || operation == "stop"
+	needsService := operation == "logs"
 	if (needsService && len(args) != 3) || (!needsService && (len(args) != 2 || (operation != "validate" && operation != "plan" && operation != "status" && operation != "diagnose" && operation != "deploy"))) {
 		printUsage(stderr)
 		return 2
@@ -106,19 +109,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			_, _ = stdout.Write(out)
 			return 0
 		}
-		fmt.Fprintf(stdout, "Operation: %s orisema-%s-%s\n", operation, m.Name, service)
-		fmt.Fprintf(stdout, "Type %s to confirm: ", strings.ToUpper(operation))
-		answer, err := bufio.NewReader(stdin).ReadString('\n')
-		if err != nil || strings.TrimSpace(answer) != strings.ToUpper(operation) {
-			fmt.Fprintln(stderr, "cancelled")
-			return 1
-		}
-		if err := client.Control(context.Background(), m.Name, service, operation); err != nil {
-			fmt.Fprintf(stderr, "error: %v\n", err)
-			return 1
-		}
-		fmt.Fprintf(stdout, "%s completed for %s\n", operation, service)
-		return 0
 	}
 	switch args[0] {
 	case "validate":
@@ -454,7 +444,7 @@ func secretConsumers(ctx context.Context, identity string) ([]string, error) {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema recover operation <manifest.yaml> --journal <directory> --operation <id> OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation <init|diagnose> --journal <absolute-directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema recover operation <manifest.yaml> --journal <directory> --operation <id> OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema logs <manifest.yaml> <service> OR orisema <start|stop> --journal <absolute-directory> <manifest.yaml> <service> OR orisema operation <init|diagnose> --journal <absolute-directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
 func runOperationInit(args []string, stdout, stderr io.Writer) int {
@@ -468,6 +458,123 @@ func runOperationInit(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "Operation journal initialized: %s\n", args[3])
 	fmt.Fprintln(stdout, "No manifest loaded and no runtime changes made.")
+	return 0
+}
+
+func runJournaledControl(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) != 5 || args[1] != "--journal" || !filepath.IsAbs(args[2]) {
+		printUsage(stderr)
+		return 2
+	}
+	action, journal, manifestPath, service := args[0], args[2], args[3], args[4]
+	store, err := operation.OpenExistingWritableStore(journal)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s blocked before runtime inspection: %v\n", action, err)
+		return 1
+	}
+	if _, err := store.List(); err != nil {
+		fmt.Fprintf(stderr, "%s blocked by invalid journal evidence: %v\n", action, err)
+		return 1
+	}
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s blocked: %v\n", action, err)
+		return 1
+	}
+	found := false
+	for _, candidate := range m.Services {
+		if candidate.Name == service {
+			found = true
+			break
+		}
+	}
+	if !found {
+		fmt.Fprintf(stderr, "error: service %q not declared in manifest\n", service)
+		return 1
+	}
+	client := runtime.Client{}
+	name := "orisema-" + m.Name + "-" + service
+	planned, err := client.Inspect(context.Background(), name)
+	if err != nil || !runtime.Owned(planned, m.Name, service) {
+		fmt.Fprintf(stderr, "%s blocked: container identity or ownership could not be verified\n", action)
+		return 1
+	}
+	expectedRunning := action == "start"
+	if planned.State.Running == expectedRunning {
+		fmt.Fprintf(stdout, "%s already has the requested state; no operation admitted and no changes made.\n", name)
+		return 0
+	}
+	fmt.Fprintf(stdout, "Journaled operation: %s %s (id=%s)\n", strings.ToUpper(action), name, planned.ID)
+	fmt.Fprintf(stdout, "Type %s to confirm: ", strings.ToUpper(action))
+	answer, readErr := bufio.NewReader(stdin).ReadString('\n')
+	if readErr != nil || strings.TrimSpace(answer) != strings.ToUpper(action) {
+		fmt.Fprintln(stderr, "cancelled; no operation admitted and no runtime changes made")
+		return 1
+	}
+	store, err = operation.OpenExistingWritableStore(journal)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s blocked after confirmation: %v\n", action, err)
+		return 1
+	}
+	fresh, err := client.Inspect(context.Background(), name)
+	if err != nil || !runtime.Owned(fresh, m.Name, service) || fresh.ID != planned.ID || fresh.State.Running != planned.State.Running {
+		fmt.Fprintln(stderr, "control plan changed after confirmation; no operation admitted and no runtime changes made")
+		return 1
+	}
+	id, err := newTypedOperationID(action)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s blocked: generate operation ID: %v\n", action, err)
+		return 1
+	}
+	upper := strings.ToUpper(action)
+	intent := &operation.ControlIntent{
+		Contract: operation.ControlContract, Action: upper, ResourceName: name, ResourceID: fresh.ID,
+		InitialRunning: fresh.State.Running, ExpectedRunning: expectedRunning,
+	}
+	intent.PlanFingerprint = operation.ControlPlanFingerprint(m.Name, service, upper, name, fresh.ID, fresh.State.Running, expectedRunning)
+	op := operation.Operation{
+		ID: id, Application: m.Name, Services: []string{service}, Type: upper,
+		Resources: []operation.Resource{{Kind: "container", Name: name, ID: fresh.ID, Ownership: operation.OwnershipManaged, Application: m.Name, Service: service}},
+		Control:   intent,
+	}
+	if err := store.Create(op); err != nil {
+		fmt.Fprintf(stderr, "%s admission blocked: %v; no runtime changes made\n", action, err)
+		return 1
+	}
+	if _, err := store.Transition(id, operation.Preparing, "revalidate", "revalidating container identity before runtime control", time.Now()); err != nil {
+		fmt.Fprintf(stderr, "%s blocked after admission: %v\n", action, err)
+		return 1
+	}
+	fresh, err = client.Inspect(context.Background(), name)
+	if err != nil || !runtime.Owned(fresh, m.Name, service) || fresh.ID != planned.ID || fresh.State.Running != planned.State.Running {
+		_, _ = store.Transition(id, operation.Failed, "revalidate", "container identity or state changed after admission", time.Now())
+		fmt.Fprintf(stderr, "%s blocked after admission; operation %s remains incomplete for diagnosis\n", action, id)
+		return 1
+	}
+	if _, err := store.Transition(id, operation.Applying, "runtime-control", "runtime mutation is about to begin", time.Now()); err != nil {
+		fmt.Fprintf(stderr, "%s blocked before runtime mutation: %v\n", action, err)
+		return 1
+	}
+	if err := client.ControlExact(context.Background(), m.Name, service, fresh.ID, action); err != nil {
+		_, _ = store.Transition(id, operation.Interrupted, "runtime-control", "runtime result is not verified", time.Now())
+		fmt.Fprintf(stderr, "%s result is unverified: %v; operation %s blocks further mutation\n", action, err, id)
+		return 1
+	}
+	if _, err := store.Transition(id, operation.Verifying, "inspect", "verifying container identity and final state", time.Now()); err != nil {
+		fmt.Fprintf(stderr, "%s executed but journal verification boundary failed: %v\n", action, err)
+		return 1
+	}
+	verified, err := client.Inspect(context.Background(), name)
+	if err != nil || !runtime.Owned(verified, m.Name, service) || verified.ID != fresh.ID || verified.State.Running != expectedRunning {
+		_, _ = store.Transition(id, operation.RecoveryRequired, "inspect", "runtime result could not be verified", time.Now())
+		fmt.Fprintf(stderr, "%s executed but final state is unverified; operation %s requires diagnosis\n", action, id)
+		return 1
+	}
+	if _, err := store.Transition(id, operation.Completed, "complete", "container identity and requested state verified", time.Now()); err != nil {
+		fmt.Fprintf(stderr, "%s state verified but journal completion failed: %v\n", action, err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "%s completed and verified for %s (operation %s)\n", action, service, id)
 	return 0
 }
 
@@ -1544,11 +1651,15 @@ func firstEvidenceIssue(evidence operation.ResourceEvidence) string {
 }
 
 func newOperationID() (string, error) {
+	return newTypedOperationID("update")
+}
+
+func newTypedOperationID(kind string) (string, error) {
 	random := make([]byte, 12)
 	if _, err := rand.Read(random); err != nil {
 		return "", err
 	}
-	return "update-" + hex.EncodeToString(random), nil
+	return kind + "-" + hex.EncodeToString(random), nil
 }
 
 func runOperationDiagnosis(args []string, stdout, stderr io.Writer) int {

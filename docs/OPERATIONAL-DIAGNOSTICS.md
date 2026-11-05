@@ -37,7 +37,8 @@ name and host port to values reserved for a disposable test. Continue only if
 printf 'DEPLOY\n' | ./orisema deploy /path/to/isolated-manifest.yaml
 podman healthcheck run orisema-<test-app>-web
 ./orisema diagnose /path/to/isolated-manifest.yaml
-printf 'STOP\n' | ./orisema stop /path/to/isolated-manifest.yaml web
+./orisema operation init --journal /path/to/private-operation-journal
+printf 'STOP\n' | ./orisema stop --journal /path/to/private-operation-journal /path/to/isolated-manifest.yaml web
 ./orisema diagnose /path/to/isolated-manifest.yaml
 podman inspect --type container orisema-<test-app>-web
 ```

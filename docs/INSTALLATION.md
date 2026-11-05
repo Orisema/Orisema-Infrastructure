@@ -67,11 +67,11 @@ The version report includes the release tag, source commit, reproducible build
 timestamp, Go toolchain and target OS/architecture. An ordinary local build
 reports `Version: development`, `Commit: unknown` and `Built: unknown`.
 
-## Alpha 9 user installer
+## Alpha 9 installer
 
-The versioned installer automates the same fail-closed checks and installs only
-to a directory owned by the current user. Download it from the release tag so
-the reviewed script and requested binary version remain aligned:
+The versioned installer automates the same fail-closed checks. Download it from
+the release tag so the reviewed script and requested binary version remain
+aligned:
 
 ```sh
 version=v0.1.0-alpha.9
@@ -88,8 +88,12 @@ It does not edit shell configuration, start containers or touch Orisema state.
 Use `--bin-dir /absolute/user-owned/path` for another unprivileged destination.
 Reinstalling the same version requires `--reinstall`. If post-install version
 or architecture validation fails during an upgrade, the previous executable is
-restored. Privileged installation and an explicit uninstall command remain the
-next Alpha 9 increment; use the manual flow above for `/usr/local/bin` meanwhile.
+restored. For a system installation, use `--system`; verification remains
+unprivileged and `sudo` is restricted to the final mutation in `/usr/local/bin`:
+
+```sh
+sh install.sh --version "$version" --system
+```
 
 ## Runtime requirement
 
@@ -100,11 +104,15 @@ of containers. Read [Podman integration](PODMAN.md) and the CLI limitations in
 
 ## Uninstall
 
-Removing the executable does not remove containers or other Podman resources:
+Download and inspect `uninstall.sh` from the same release tag as the installer.
+Then select the installation destination explicitly:
 
 ```sh
-sudo rm /usr/local/bin/orisema
+sh uninstall.sh --user
+sh uninstall.sh --system
 ```
 
-Inspect and remove runtime resources separately and explicitly. Orisema does
-not perform automatic cleanup, replacement or rollback.
+The uninstaller refuses links, special files and executables that do not report
+the Orisema identity and version. Removing the executable does not remove
+containers, journals, manifests or application data. Inspect and remove runtime
+resources separately and explicitly.

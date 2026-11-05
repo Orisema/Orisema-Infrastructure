@@ -7,7 +7,11 @@ set -eu
 
 repository_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 lab_root=$(mktemp -d "${TMPDIR:-/tmp}/orisema-installer-lab.XXXXXX")
-cleanup() { rm -rf -- "$lab_root"; }
+system_created=false
+cleanup() {
+  if [ "$system_created" = true ]; then PATH="$fakebin:$PATH" sudo rm -f -- /usr/local/bin/orisema; fi
+  rm -rf -- "$lab_root"
+}
 trap cleanup EXIT HUP INT TERM
 
 case "$(uname -m)" in
@@ -84,17 +88,21 @@ printf '%s\n' '#!/bin/sh' 'echo gh >>"${INSTALLER_LAB_LOG:?}"' 'exit 0' >"$fakeb
 chmod 0755 "$fakebin/cosign" "$fakebin/gh"
 write_wrapper sha256sum /usr/bin/sha256sum
 write_wrapper tar /usr/bin/tar
+if [ "${ORISEMA_SYSTEM_LAB:-0}" = 1 ] && [ "$(id -u)" = 0 ]; then
+  printf '%s\n' '#!/bin/sh' 'exec "$@"' >"$fakebin/sudo"
+  chmod 0755 "$fakebin/sudo"
+fi
 
 run_installer() {
   PATH="$fakebin:$PATH" HOME="$home_dir" XDG_BIN_HOME="$home_dir/.local/bin" \
     INSTALLER_FIXTURES="$fixtures" INSTALLER_LAB_LOG="$log" \
     INSTALLER_CANDIDATE_STATE="$lab_root/candidate-state" \
-    sh "$repository_root/install.sh" --version "$version" --user
+    sh "$repository_root/install.sh" --version "$version" "$@"
 }
 
 publish_fixture normal
 : >"$log"
-run_installer
+run_installer --user
 "$home_dir/.local/bin/orisema" version | grep -Fq "Version: $version"
 test "$(sed -n '4p' "$log")" = cosign
 test "$(sed -n '5p' "$log")" = sha256sum
@@ -105,7 +113,7 @@ cp "$fixtures/$archive" "$lab_root/original-archive"
 printf '%s\n' tampered >>"$fixtures/$archive"
 rm -rf -- "$home_dir/.local/bin"
 : >"$log"
-if run_installer >"$lab_root/tamper.out" 2>&1; then
+if run_installer --user >"$lab_root/tamper.out" 2>&1; then
   echo "installer lab: tampered archive was accepted" >&2
   exit 1
 fi
@@ -118,13 +126,13 @@ mv "$lab_root/original-archive" "$fixtures/$archive"
 
 mkdir -p "$home_dir/.local/bin"
 chmod 0755 "$home_dir/.local/bin"
-printf '%s\n' '#!/bin/sh' 'echo "Version: v0.1.0-alpha.8"' \
+printf '%s\n' '#!/bin/sh' 'echo "Orisema Infrastructure"' 'echo "Version: v0.1.0-alpha.8"' \
   "echo \"OS/Arch: linux/$arch\"" >"$home_dir/.local/bin/orisema"
 chmod 0755 "$home_dir/.local/bin/orisema"
 publish_fixture fail_after_first
 : >"$lab_root/candidate-state"
 : >"$log"
-if run_installer >"$lab_root/rollback.out" 2>&1; then
+if run_installer --user >"$lab_root/rollback.out" 2>&1; then
   echo "installer lab: invalid post-install candidate was accepted" >&2
   exit 1
 fi
@@ -133,6 +141,50 @@ if ! grep -Fq 'previous executable was restored' "$lab_root/rollback.out"; then
   echo "installer lab: rollback diagnostic was not emitted" >&2
   sed -n '1,20p' "$lab_root/rollback.out" >&2
   exit 1
+fi
+cp "$home_dir/.local/bin/orisema" "$lab_root/old-orisema"
+
+HOME="$home_dir" XDG_BIN_HOME="$home_dir/.local/bin" \
+  sh "$repository_root/uninstall.sh" --user
+[ ! -e "$home_dir/.local/bin/orisema" ]
+
+printf '%s\n' untouched >"$lab_root/not-orisema"
+ln -s "$lab_root/not-orisema" "$home_dir/.local/bin/orisema"
+if HOME="$home_dir" XDG_BIN_HOME="$home_dir/.local/bin" \
+  sh "$repository_root/uninstall.sh" --user >"$lab_root/link.out" 2>&1; then
+  echo "installer lab: uninstaller accepted a symbolic link" >&2
+  exit 1
+fi
+grep -Fq untouched "$lab_root/not-orisema"
+rm -- "$home_dir/.local/bin/orisema"
+
+if [ "${ORISEMA_SYSTEM_LAB:-0}" = 1 ]; then
+  [ ! -e /usr/local/bin/orisema ] || {
+    echo "installer lab: refusing to replace an existing system executable" >&2
+    exit 1
+  }
+  publish_fixture normal
+  : >"$log"
+  run_installer --system
+  system_created=true
+  /usr/local/bin/orisema version | grep -Fq "Version: $version"
+  PATH="$fakebin:$PATH" sh "$repository_root/uninstall.sh" --system
+  system_created=false
+  [ ! -e /usr/local/bin/orisema ]
+
+  PATH="$fakebin:$PATH" sudo install -m 0755 "$lab_root/old-orisema" /usr/local/bin/orisema
+  system_created=true
+  publish_fixture fail_after_first
+  : >"$lab_root/candidate-state"
+  : >"$log"
+  if run_installer --system >"$lab_root/system-rollback.out" 2>&1; then
+    echo "installer lab: invalid privileged upgrade was accepted" >&2
+    exit 1
+  fi
+  /usr/local/bin/orisema version | grep -Fq 'Version: v0.1.0-alpha.8'
+  grep -Fq 'previous executable was restored' "$lab_root/system-rollback.out"
+  PATH="$fakebin:$PATH" sh "$repository_root/uninstall.sh" --system
+  system_created=false
 fi
 
 echo "Alpha 9 installer lab passed: verified install, tamper rejection and rollback"

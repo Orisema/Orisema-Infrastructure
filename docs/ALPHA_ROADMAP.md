@@ -218,7 +218,8 @@ até uma substituição controlada ser projetada para a Beta.
 - [ ] Implementar `orisema doctor` sem mutações nem exposição de configuração.
 - [ ] Bloquear operações conflitantes e recuperar somente estados com evidência
   íntegra, lock, revalidação e confirmação explícita.
-- [ ] Assinar checksums, produzir provenance e verificar o material publicado.
+- [ ] Assinar checksums, produzir provenance e verificar o material publicado
+  ([RFC-0006](RFC-0006-signed-distribution-and-installer.md), #135).
 - [ ] Entregar instalador auditável para destino global ou do usuário, com
   upgrade reversível e desinstalação explícita.
 - [ ] Executar laboratórios de interrupção e instalação em Ubuntu e Fedora.

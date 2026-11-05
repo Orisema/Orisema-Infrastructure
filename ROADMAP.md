@@ -142,7 +142,8 @@ bloqueia mudanças de configuração; a expansão permanece planejada para a Bet
 - [ ] Bloquear mutações conflitantes enquanto uma operação da aplicação estiver
   incompleta e oferecer recuperação explícita somente para estados suportados.
 - [ ] Assinar metadados de checksum, publicar provenance e verificar novamente
-  os artefatos depois da publicação.
+  os artefatos depois da publicação
+  ([RFC-0006](docs/RFC-0006-signed-distribution-and-installer.md), #135).
 - [ ] Criar instalador auditável com versão explícita, destino privilegiado ou
   local e rollback da CLI em upgrade mal sucedido.
 - [ ] Validar interrupção, reboot, perda de SSH, instalação, upgrade e

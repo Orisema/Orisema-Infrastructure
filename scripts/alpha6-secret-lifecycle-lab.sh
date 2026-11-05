@@ -53,7 +53,9 @@ test -n "$secret_id"
 grep -Fq "name=$secret_name id=$secret_id" "$evidence_dir/list.txt"
 grep -Fq "managed: true" "$evidence_dir/inspect.txt"
 
-printf 'DEPLOY\n' | "$binary" deploy "$manifest" >"$evidence_dir/deploy.txt"
+journal="$evidence_dir/operations"
+"$binary" operation init --journal "$journal" >"$evidence_dir/journal-init.txt"
+printf 'DEPLOY\n' | "$binary" deploy --journal "$journal" "$manifest" >"$evidence_dir/deploy.txt"
 remove_status=0
 "$binary" secret remove "$secret_name" >"$evidence_dir/remove-consumed.out" \
   2>"$evidence_dir/remove-consumed.err" || remove_status=$?

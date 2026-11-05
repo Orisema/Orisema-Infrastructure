@@ -49,7 +49,9 @@ chmod 0600 "$manifest"
 "$binary" validate "$manifest" >"$evidence_dir/validate.txt"
 "$binary" plan "$manifest" >"$evidence_dir/plan-before.txt"
 grep -Fq '[CREATE]' "$evidence_dir/plan-before.txt"
-printf 'DEPLOY\n' | "$binary" deploy "$manifest" >"$evidence_dir/deploy.txt"
+journal="$evidence_dir/operations"
+"$binary" operation init --journal "$journal" >"$evidence_dir/journal-init.txt"
+printf 'DEPLOY\n' | "$binary" deploy --journal "$journal" "$manifest" >"$evidence_dir/deploy.txt"
 
 podman exec "$container_name" stat -c \
   'mode=%a uid=%u gid=%g size=%s' /run/secrets/file-token \

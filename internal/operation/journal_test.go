@@ -131,6 +131,54 @@ func TestControlIntentRejectsTampering(t *testing.T) {
 	}
 }
 
+func TestDeployProgressIsDurableAndOrdered(t *testing.T) {
+	store, _, now := fixture(t)
+	targets := []DeployTarget{
+		{Service: "web", ResourceName: "orisema-demo-web", Image: "nginx:stable", BindingsFingerprint: strings.Repeat("a", 64)},
+		{Service: "worker", ResourceName: "orisema-demo-worker", Image: "busybox:stable", BindingsFingerprint: strings.Repeat("b", 64)},
+	}
+	op := Operation{ID: "deploy-1", Application: "demo", Services: []string{"web", "worker"}, Type: "DEPLOY", CreatedAt: now,
+		Deploy: &DeployIntent{Contract: DeployContract, Targets: targets, PlanFingerprint: DeployPlanFingerprint("demo", targets)}}
+	if err := store.Create(op); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Transition(op.ID, Preparing, "revalidate", "", now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Transition(op.ID, Applying, "deploy", "", now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PrepareDeployStep(op.ID, "worker", now.Add(3*time.Second)); err == nil {
+		t.Fatal("out-of-order deploy step accepted")
+	}
+	if _, err := store.PrepareDeployStep(op.ID, "web", now.Add(3*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RecordDeployStep(op.ID, "web", "container-web", now.Add(4*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PrepareDeployStep(op.ID, "worker", now.Add(5*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RecordDeployStep(op.ID, "worker", "container-worker", now.Add(6*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Transition(op.ID, Verifying, "inspect", "", now.Add(7*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Transition(op.ID, Completed, "complete", "", now.Add(8*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := OpenExistingStore(store.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := loaded.Load(op.ID)
+	if err != nil || got.State != Completed || len(got.Deploy.Completed) != 2 || len(got.Resources) != 2 {
+		t.Fatalf("deploy evidence=%#v err=%v", got, err)
+	}
+}
+
 func TestExistingWritableStoreRejectsUnsafeLockWithoutRepair(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "operations")
 	if _, err := OpenStore(root); err != nil {

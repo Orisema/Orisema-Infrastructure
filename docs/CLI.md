@@ -191,7 +191,8 @@ no arbitrary remote command facility and no remote mutation.
 **Use only on a disposable test host.** Run `validate` and inspect the manifest first.
 
 ```sh
-go run ./cmd/orisema deploy examples/nginx.yaml
+go run ./cmd/orisema operation init --journal /secure/path/orisema-operations
+go run ./cmd/orisema deploy --journal /secure/path/orisema-operations examples/nginx.yaml
 # Type DEPLOY when prompted.
 go run ./cmd/orisema status examples/nginx.yaml
 curl -I http://127.0.0.1:8080/
@@ -222,7 +223,7 @@ podman rm orisema-hello-orisema-web
 
 ## Conservative repeated deployment (experimental)
 
-After the first deployment, rerunning `go run ./cmd/orisema deploy examples/nginx.yaml` should classify the existing owned container as `NOOP` and exit without a confirmation prompt or modifications, **provided its configured image reference and published ports match**.
+After the first deployment, rerunning `go run ./cmd/orisema deploy --journal /secure/path/orisema-operations examples/nginx.yaml` should classify the existing owned container as `NOOP` and exit without a confirmation prompt or modifications, **provided its configured image reference and published ports match**.
 
 If any service is `DRIFT` or `REVIEW`, deployment is blocked for the entire manifest before creating any containers. `CREATE` services still require typing `DEPLOY`. A second check for name collisions happens immediately before each creation.
 
@@ -282,7 +283,7 @@ The separate `examples/nginx-health.yaml` app uses port 8081 and does not modify
 ```sh
 go run ./cmd/orisema validate examples/nginx-health.yaml
 go run ./cmd/orisema plan examples/nginx-health.yaml
-go run ./cmd/orisema deploy examples/nginx-health.yaml
+go run ./cmd/orisema deploy --journal /secure/path/orisema-operations examples/nginx-health.yaml
 # Type DEPLOY to create it.
 sleep 35
 go run ./cmd/orisema status examples/nginx-health.yaml
@@ -386,6 +387,6 @@ state and delegates only an intact `RECOVERY_REQUIRED` update to the same
 revalidated, explicitly confirmed rollback implementation used by `update
 rollback`. It does not infer success, retry a runtime step or delete evidence.
 
-Legacy `deploy` does not yet accept an operation journal. `start` and `stop`
-require one and are covered by the Alpha 10 mutation guard; the old syntax is
-rejected before runtime inspection.
+`deploy`, `start` and `stop` require an explicit initialized operation journal
+and are covered by the Alpha 10 mutation guard. Their old syntax is rejected
+before runtime inspection.

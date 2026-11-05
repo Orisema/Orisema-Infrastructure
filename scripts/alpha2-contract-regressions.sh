@@ -29,7 +29,9 @@ grep -Fq 'hostIP is not part of v1alpha1' "$evidence/rejected-v1alpha1-hostip.tx
 
 "$binary" plan "$manifest" | tee "$evidence/plan-before.txt"
 grep -Fq '[CREATE]' "$evidence/plan-before.txt"
-printf 'DEPLOY\n' | "$binary" deploy "$manifest" | tee "$evidence/deploy.txt"
+journal="$evidence/operations"
+"$binary" operation init --journal "$journal" > "$evidence/journal-init.txt"
+printf 'DEPLOY\n' | "$binary" deploy --journal "$journal" "$manifest" | tee "$evidence/deploy.txt"
 host_ip="$(podman inspect --format '{{(index (index .HostConfig.PortBindings "80/tcp") 0).HostIP}}' "$target")"
 test "$host_ip" = 127.0.0.1
 printf 'HostIP=%s\n' "$host_ip" | tee "$evidence/inspect-bind.txt"

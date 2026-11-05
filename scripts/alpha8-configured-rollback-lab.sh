@@ -83,7 +83,8 @@ YAML
 
 write_manifest "$old_image" "$old_manifest"
 write_manifest "$new_image" "$manifest"
-printf 'DEPLOY\n' | "$binary" deploy "$old_manifest" >"$evidence/deploy.txt"
+"$binary" operation init --journal "$journal" >"$evidence/journal-init.txt"
+printf 'DEPLOY\n' | "$binary" deploy --journal "$journal" "$old_manifest" >"$evidence/deploy.txt"
 old_id=$(podman inspect --format '{{.Id}}' "$target")
 
 "$binary" update prepare "$manifest" web --journal "$journal" >"$evidence/prepare.txt"

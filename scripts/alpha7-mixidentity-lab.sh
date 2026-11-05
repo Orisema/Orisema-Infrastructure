@@ -8,6 +8,7 @@ umask 077
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 binary=${ORISEMA_BINARY:-"$repo_root/work/orisema"}
 evidence_dir=${ORISEMA_EVIDENCE_DIR:-"$repo_root/work/alpha7-mixidentity"}
+deploy_journal="$evidence_dir/deploy-operations"
 app_image=${MIXIDENTITY_APP_IMAGE:-localhost/mix-identity_identity-app:latest}
 web_image=${MIXIDENTITY_WEB_IMAGE:-localhost/mix-identity-web:1.0.0}
 web_old_image=localhost/orisema-alpha8-mixidentity-web:previous
@@ -158,7 +159,8 @@ YAML
 "$binary" validate "$app_manifest" >"$evidence_dir/app-validate.txt"
 "$binary" plan "$app_manifest" >"$evidence_dir/app-plan-before.txt"
 grep -Fq '[CREATE]' "$evidence_dir/app-plan-before.txt"
-printf 'DEPLOY\n' | "$binary" deploy "$app_manifest" >"$evidence_dir/app-deploy.txt"
+"$binary" operation init --journal "$deploy_journal" >"$evidence_dir/journal-init.txt"
+printf 'DEPLOY\n' | "$binary" deploy --journal "$deploy_journal" "$app_manifest" >"$evidence_dir/app-deploy.txt"
 wait_healthy "$managed_app" 30
 
 # DNS aliases are deliberately outside the Alpha 7 contract. Reconnect only the
@@ -200,7 +202,7 @@ write_web_manifest "$web_image" "$web_manifest"
 "$binary" validate "$web_old_manifest" >"$evidence_dir/web-validate.txt"
 "$binary" plan "$web_old_manifest" >"$evidence_dir/web-plan-before.txt"
 grep -Fq '[CREATE]' "$evidence_dir/web-plan-before.txt"
-printf 'DEPLOY\n' | "$binary" deploy "$web_old_manifest" >"$evidence_dir/web-deploy.txt"
+printf 'DEPLOY\n' | "$binary" deploy --journal "$deploy_journal" "$web_old_manifest" >"$evidence_dir/web-deploy.txt"
 wait_healthy "$managed_web" 30
 podman exec "$managed_web" wget -q -O /dev/null http://127.0.0.1:8080/health/live
 printf 'real app/web health endpoint reachable\n' >"$evidence_dir/reachability.txt"

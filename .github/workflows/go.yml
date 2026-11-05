@@ -88,7 +88,9 @@ jobs:
           work/orisema validate examples/nginx-health.yaml
           sudo work/orisema plan examples/nginx-health.yaml | tee work/plan-before.txt
           grep -q CREATE work/plan-before.txt
-          printf 'DEPLOY\n' | sudo work/orisema deploy examples/nginx-health.yaml
+          journal="$PWD/work/health-operations"
+          sudo work/orisema operation init --journal "$journal"
+          printf 'DEPLOY\n' | sudo work/orisema deploy --journal "$journal" examples/nginx-health.yaml
           sudo work/orisema status examples/nginx-health.yaml
           sudo podman healthcheck run orisema-health-lab-web
           sudo work/orisema status examples/nginx-health.yaml | tee work/status-after-probe.txt
@@ -128,7 +130,6 @@ jobs:
         run: |
           set -euo pipefail
           journal="$PWD/work/health-operations"
-          sudo work/orisema operation init --journal "$journal"
           printf 'STOP\n' | sudo work/orisema stop --journal "$journal" examples/nginx-health.yaml web
           sudo work/orisema status examples/nginx-health.yaml | tee work/status-stopped.txt
           grep -Fq 'health: unavailable (container not running)' work/status-stopped.txt
@@ -343,7 +344,9 @@ jobs:
           work/orisema validate examples/nginx.yaml
           sudo work/orisema plan examples/nginx.yaml | tee work/plan-before.txt
           grep -Fq '[CREATE]' work/plan-before.txt
-          printf 'DEPLOY\n' | sudo work/orisema deploy examples/nginx.yaml
+          journal="$PWD/work/quickstart-operations"
+          sudo work/orisema operation init --journal "$journal"
+          printf 'DEPLOY\n' | sudo work/orisema deploy --journal "$journal" examples/nginx.yaml
           sudo work/orisema status examples/nginx.yaml | tee work/status.txt
           sudo work/orisema plan examples/nginx.yaml | tee work/plan-after.txt
           grep -Fq '[NOOP]' work/plan-after.txt

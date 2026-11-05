@@ -63,6 +63,7 @@ type Operation struct {
 	Rollback      *UpdateRollback                `json:"rollback,omitempty"`
 	FileOperation *FileOperation                 `json:"fileOperation,omitempty"`
 	Control       *ControlIntent                 `json:"control,omitempty"`
+	Deploy        *DeployIntent                  `json:"deploy,omitempty"`
 	Events        []Event                        `json:"events"`
 }
 
@@ -552,6 +553,9 @@ func validate(op Operation) error {
 		return err
 	}
 	if err := validateControlIntent(op); err != nil {
+		return err
+	}
+	if err := validateDeployIntent(op); err != nil {
 		return err
 	}
 	return nil

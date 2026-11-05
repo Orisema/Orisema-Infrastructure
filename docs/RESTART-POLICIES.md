@@ -64,7 +64,8 @@ go test ./...
 go vet ./...
 go run ./cmd/orisema validate examples/nginx-restart.yaml
 go run ./cmd/orisema plan examples/nginx-restart.yaml
-go run ./cmd/orisema deploy examples/nginx-restart.yaml
+go run ./cmd/orisema operation init --journal /tmp/orisema-restart-operations
+go run ./cmd/orisema deploy --journal /tmp/orisema-restart-operations examples/nginx-restart.yaml
 # Type DEPLOY only when the plan is CREATE.
 podman inspect --type container orisema-restart-lab-web \
   --format '{{json .HostConfig.RestartPolicy}}'

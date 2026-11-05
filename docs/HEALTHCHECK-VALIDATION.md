@@ -23,7 +23,8 @@ Approve the plan before running deploy. Only proceed if the isolated service is
 `CREATE`; if it exists, inspect it and do not remove or replace it implicitly.
 
 ```sh
-go run ./cmd/orisema deploy examples/nginx-health.yaml
+go run ./cmd/orisema operation init --journal /tmp/orisema-health-operations
+go run ./cmd/orisema deploy --journal /tmp/orisema-health-operations examples/nginx-health.yaml
 go run ./cmd/orisema status examples/nginx-health.yaml
 podman healthcheck run orisema-health-lab-web
 podman inspect --type container orisema-health-lab-web

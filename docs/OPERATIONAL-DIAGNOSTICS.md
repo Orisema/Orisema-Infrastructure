@@ -34,10 +34,10 @@ name and host port to values reserved for a disposable test. Continue only if
 `plan` reports `CREATE`; never remove or replace a name collision automatically.
 
 ```sh
-printf 'DEPLOY\n' | ./orisema deploy /path/to/isolated-manifest.yaml
+./orisema operation init --journal /path/to/private-operation-journal
+printf 'DEPLOY\n' | ./orisema deploy --journal /path/to/private-operation-journal /path/to/isolated-manifest.yaml
 podman healthcheck run orisema-<test-app>-web
 ./orisema diagnose /path/to/isolated-manifest.yaml
-./orisema operation init --journal /path/to/private-operation-journal
 printf 'STOP\n' | ./orisema stop --journal /path/to/private-operation-journal /path/to/isolated-manifest.yaml web
 ./orisema diagnose /path/to/isolated-manifest.yaml
 podman inspect --type container orisema-<test-app>-web

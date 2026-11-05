@@ -40,7 +40,7 @@ podman run --detach --name "$name_target" docker.io/library/nginx:1.27 \
 unmanaged_id="$(podman inspect --format '{{.Id}}' "$name_target")"
 "$binary" plan "$name_manifest" | tee "$evidence/name-review.txt"
 grep -Fq '[REVIEW]' "$evidence/name-review.txt"
-if printf 'DEPLOY\n' | "$binary" deploy "$name_manifest" \
+if printf 'DEPLOY\n' | "$binary" deploy --journal "$journal" "$name_manifest" \
     > "$evidence/name-deploy.txt" 2>&1; then
   echo 'deploy unexpectedly accepted an unmanaged name collision' >&2
   exit 1
@@ -67,7 +67,7 @@ podman run --detach --name "$name_target" \
 managed_id="$(podman inspect --format '{{.Id}}' "$name_target")"
 "$binary" plan "$name_manifest" | tee "$evidence/name-drift.txt"
 grep -Fq '[DRIFT]' "$evidence/name-drift.txt"
-if printf 'DEPLOY\n' | "$binary" deploy "$name_manifest" \
+if printf 'DEPLOY\n' | "$binary" deploy --journal "$journal" "$name_manifest" \
     > "$evidence/drift-deploy.txt" 2>&1; then
   echo 'deploy unexpectedly accepted drift' >&2
   exit 1
@@ -79,12 +79,12 @@ test "$(podman inspect --format '{{.Id}}' "$name_target")" = "$managed_id"
 podman run --detach --name "$port_holder" --publish 18084:80 \
   docker.io/library/nginx:1.27 > "$evidence/port-holder-create.txt"
 holder_id="$(podman inspect --format '{{.Id}}' "$port_holder")"
-if printf 'DEPLOY\n' | "$binary" deploy "$port_manifest" \
+if printf 'DEPLOY\n' | "$binary" deploy --journal "$journal" "$port_manifest" \
     > "$evidence/port-deploy.txt" 2>&1; then
   echo 'deploy unexpectedly accepted an occupied host port' >&2
   exit 1
 fi
-grep -Fq 'deployment stopped' "$evidence/port-deploy.txt"
+grep -Fq 'requires diagnosis' "$evidence/port-deploy.txt"
 test "$(podman inspect --format '{{.Id}}' "$port_holder")" = "$holder_id"
 test "$(podman inspect --format '{{.State.Running}}' "$port_holder")" = true
 if podman container exists "$port_target"; then
@@ -93,7 +93,7 @@ if podman container exists "$port_target"; then
 fi
 
 # Refusing confirmation must not create anything.
-if printf 'CANCEL\n' | "$binary" deploy "$cancel_manifest" \
+if printf 'CANCEL\n' | "$binary" deploy --journal "$journal" "$cancel_manifest" \
     > "$evidence/cancelled-deploy.txt" 2>&1; then
   echo 'deploy unexpectedly accepted a cancelled confirmation' >&2
   exit 1

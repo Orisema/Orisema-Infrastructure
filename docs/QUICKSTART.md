@@ -42,7 +42,8 @@ On a clean host, expect `CREATE`. `plan` is read-only. Stop if the result is
 ## 3. Deploy with explicit approval
 
 ```sh
-orisema deploy examples/nginx.yaml
+orisema operation init --journal /tmp/orisema-quickstart-operations
+orisema deploy --journal /tmp/orisema-quickstart-operations examples/nginx.yaml
 # Review the plan, then type exactly: DEPLOY
 ```
 

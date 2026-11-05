@@ -54,7 +54,9 @@ YAML
 "$ORISEMA_BINARY" validate "$PRIMARY_MANIFEST" >"$EVIDENCE_DIR/validate.txt"
 "$ORISEMA_BINARY" plan "$PRIMARY_MANIFEST" >"$EVIDENCE_DIR/plan-before.txt"
 grep -q 'CREATE' "$EVIDENCE_DIR/plan-before.txt"
-printf 'DEPLOY\n' | "$ORISEMA_BINARY" deploy "$PRIMARY_MANIFEST" >"$EVIDENCE_DIR/deploy.txt"
+JOURNAL="$EVIDENCE_DIR/operations"
+"$ORISEMA_BINARY" operation init --journal "$JOURNAL" >"$EVIDENCE_DIR/journal-init.txt"
+printf 'DEPLOY\n' | "$ORISEMA_BINARY" deploy --journal "$JOURNAL" "$PRIMARY_MANIFEST" >"$EVIDENCE_DIR/deploy.txt"
 
 podman exec "$CONTAINER" sh -c 'test "$APP_MODE" = laboratory'
 podman inspect --format '{{range .Config.Env}}{{if eq . "APP_MODE=laboratory"}}present{{end}}{{end}}' "$CONTAINER" >"$EVIDENCE_DIR/public-config-present.txt"

@@ -7,7 +7,9 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -70,6 +72,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if len(args) > 0 && (args[0] == "start" || args[0] == "stop") {
 		return runJournaledControl(args, stdin, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "deploy" {
+		return runJournaledDeploy(args, stdin, stdout, stderr)
 	}
 	if len(args) < 2 {
 		printUsage(stderr)
@@ -444,7 +449,7 @@ func secretConsumers(ctx context.Context, identity string) ([]string, error) {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema recover operation <manifest.yaml> --journal <directory> --operation <id> OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema logs <manifest.yaml> <service> OR orisema <start|stop> --journal <absolute-directory> <manifest.yaml> <service> OR orisema operation <init|diagnose> --journal <absolute-directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema recover operation <manifest.yaml> --journal <directory> --operation <id> OR orisema <validate|plan|status|diagnose> <manifest.yaml> OR orisema deploy --journal <absolute-directory> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema logs <manifest.yaml> <service> OR orisema <start|stop> --journal <absolute-directory> <manifest.yaml> <service> OR orisema operation <init|diagnose> --journal <absolute-directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
 func runOperationInit(args []string, stdout, stderr io.Writer) int {
@@ -575,6 +580,227 @@ func runJournaledControl(args []string, stdin io.Reader, stdout, stderr io.Write
 		return 1
 	}
 	fmt.Fprintf(stdout, "%s completed and verified for %s (operation %s)\n", action, service, id)
+	return 0
+}
+
+func deployTargets(m *manifest.Manifest, steps []planner.Step, resolved map[string][]secrets.ResolvedMount, resolvedNetworks map[string][]networks.ResolvedBinding) []operation.DeployTarget {
+	targets := make([]operation.DeployTarget, 0)
+	for i, step := range steps {
+		if step.Action != planner.Create {
+			continue
+		}
+		service := m.Services[i]
+		bindingData, _ := json.Marshal(struct {
+			APIVersion string                            `json:"apiVersion"`
+			Ports      []manifest.Port                   `json:"ports"`
+			Health     *manifest.Healthcheck             `json:"healthcheck"`
+			Restart    *manifest.Restart                 `json:"restart"`
+			Public     []manifest.PublicEnvironmentEntry `json:"public"`
+			Secrets    []secrets.ResolvedMount           `json:"secrets"`
+			Networks   []networks.ResolvedBinding        `json:"networks"`
+		}{m.APIVersion, service.Ports, service.Healthcheck, service.Restart, service.PublicEnvironment, resolved[service.Name], resolvedNetworks[service.Name]})
+		hash := sha256.Sum256(bindingData)
+		targets = append(targets, operation.DeployTarget{Service: service.Name, ResourceName: step.Name, Image: service.Image, BindingsFingerprint: hex.EncodeToString(hash[:])})
+	}
+	return targets
+}
+
+func runJournaledDeploy(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) != 4 || args[1] != "--journal" || !filepath.IsAbs(args[2]) {
+		printUsage(stderr)
+		return 2
+	}
+	journal, manifestPath := args[2], args[3]
+	store, err := operation.OpenExistingWritableStore(journal)
+	if err != nil {
+		fmt.Fprintf(stderr, "deployment blocked before runtime inspection: %v\n", err)
+		return 1
+	}
+	if _, err := store.List(); err != nil {
+		fmt.Fprintf(stderr, "deployment blocked by invalid journal evidence: %v\n", err)
+		return 1
+	}
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "deployment blocked: %v\n", err)
+		return 1
+	}
+	client := runtime.Client{}
+	resolved, err := resolveManifestSecrets(context.Background(), m)
+	if err != nil {
+		fmt.Fprintf(stderr, "secret resolution blocked: %v; no changes made\n", err)
+		return 1
+	}
+	resolvedNetworks, err := resolveManifestNetworks(context.Background(), m)
+	if err != nil {
+		fmt.Fprintf(stderr, "network resolution blocked: %v; no changes made\n", err)
+		return 1
+	}
+	containers, err := client.List(context.Background())
+	if err != nil {
+		fmt.Fprintf(stderr, "deployment blocked: %v\n", err)
+		return 1
+	}
+	steps := planner.BuildInspectedResolvedRuntime(context.Background(), m, containers, client, resolved, resolvedNetworks)
+	blocked := false
+	fmt.Fprintf(stdout, "Journaled deployment plan for %q:\n", m.Name)
+	for _, step := range steps {
+		fmt.Fprintf(stdout, "  [%s] %s (%s)\n", step.Action, step.Name, step.Reason)
+		if step.Action != planner.Create && step.Action != planner.Noop {
+			blocked = true
+		}
+	}
+	if blocked {
+		fmt.Fprintln(stderr, "deployment blocked: DRIFT or REVIEW requires manual investigation; no changes made")
+		return 1
+	}
+	targets := deployTargets(m, steps, resolved, resolvedNetworks)
+	if len(targets) == 0 {
+		fmt.Fprintln(stdout, "No containers to create. No operation admitted and no changes made.")
+		return 0
+	}
+	fingerprint := operation.DeployPlanFingerprint(m.Name, targets)
+	fmt.Fprintln(stdout, "Only CREATE services will be started. Existing containers will not be changed.")
+	fmt.Fprint(stdout, "Type DEPLOY to continue: ")
+	answer, readErr := bufio.NewReader(stdin).ReadString('\n')
+	if readErr != nil || strings.TrimSpace(answer) != "DEPLOY" {
+		fmt.Fprintln(stderr, "cancelled; no operation admitted and no runtime changes made")
+		return 1
+	}
+	freshSecrets, err := resolveManifestSecrets(context.Background(), m)
+	if err != nil {
+		fmt.Fprintln(stderr, "deployment plan changed after confirmation; no operation admitted")
+		return 1
+	}
+	freshNetworks, err := resolveManifestNetworks(context.Background(), m)
+	if err != nil {
+		fmt.Fprintln(stderr, "deployment plan changed after confirmation; no operation admitted")
+		return 1
+	}
+	freshContainers, err := client.List(context.Background())
+	if err != nil {
+		fmt.Fprintln(stderr, "deployment plan could not be revalidated after confirmation; no operation admitted")
+		return 1
+	}
+	freshSteps := planner.BuildInspectedResolvedRuntime(context.Background(), m, freshContainers, client, freshSecrets, freshNetworks)
+	freshTargets := deployTargets(m, freshSteps, freshSecrets, freshNetworks)
+	if operation.DeployPlanFingerprint(m.Name, freshTargets) != fingerprint {
+		fmt.Fprintln(stderr, "deployment plan changed after confirmation; no operation admitted")
+		return 1
+	}
+	id, err := newTypedOperationID("deploy")
+	if err != nil {
+		fmt.Fprintf(stderr, "deployment blocked: generate operation ID: %v\n", err)
+		return 1
+	}
+	services := make([]string, len(targets))
+	for i := range targets {
+		services[i] = targets[i].Service
+	}
+	op := operation.Operation{ID: id, Application: m.Name, Services: services, Type: "DEPLOY", Deploy: &operation.DeployIntent{Contract: operation.DeployContract, PlanFingerprint: fingerprint, Targets: targets}}
+	if err := store.Create(op); err != nil {
+		fmt.Fprintf(stderr, "deployment admission blocked: %v; no runtime changes made\n", err)
+		return 1
+	}
+	if _, err := store.Transition(id, operation.Preparing, "revalidate", "revalidating deployment plan after admission", time.Now()); err != nil {
+		fmt.Fprintf(stderr, "deployment blocked after admission: %v\n", err)
+		return 1
+	}
+	latestContainers, err := client.List(context.Background())
+	if err != nil {
+		_, _ = store.Transition(id, operation.Failed, "revalidate", "runtime plan became unavailable", time.Now())
+		fmt.Fprintf(stderr, "deployment %s remains incomplete: runtime plan became unavailable\n", id)
+		return 1
+	}
+	latestSteps := planner.BuildInspectedResolvedRuntime(context.Background(), m, latestContainers, client, freshSecrets, freshNetworks)
+	if operation.DeployPlanFingerprint(m.Name, deployTargets(m, latestSteps, freshSecrets, freshNetworks)) != fingerprint {
+		_, _ = store.Transition(id, operation.Failed, "revalidate", "deployment plan changed after admission", time.Now())
+		fmt.Fprintf(stderr, "deployment %s remains incomplete: plan changed after admission\n", id)
+		return 1
+	}
+	if _, err := store.Transition(id, operation.Applying, "deploy", "service creation is about to begin", time.Now()); err != nil {
+		fmt.Fprintf(stderr, "deployment blocked before runtime mutation: %v\n", err)
+		return 1
+	}
+	for _, target := range targets {
+		var service manifest.Service
+		for _, candidate := range m.Services {
+			if candidate.Name == target.Service {
+				service = candidate
+				break
+			}
+		}
+		currentSecrets, err := resolveManifestSecrets(context.Background(), m)
+		if err != nil || !secrets.SameMounts(freshSecrets[target.Service], currentSecrets[target.Service]) {
+			_, _ = store.Transition(id, operation.RecoveryRequired, "bindings", "secret identity changed before service creation", time.Now())
+			fmt.Fprintf(stderr, "deployment %s requires diagnosis: secret identity changed\n", id)
+			return 1
+		}
+		if err := networks.RevalidateManifest(context.Background(), m, networkInspectors(), freshNetworks); err != nil {
+			_, _ = store.Transition(id, operation.RecoveryRequired, "bindings", "network identity changed before service creation", time.Now())
+			fmt.Fprintf(stderr, "deployment %s requires diagnosis: network identity changed\n", id)
+			return 1
+		}
+		if _, err := store.PrepareDeployStep(id, target.Service, time.Now()); err != nil {
+			fmt.Fprintf(stderr, "deployment journal boundary failed: %v\n", err)
+			return 1
+		}
+		prepared, cleanupSecrets, err := (secrets.Preparer{}).PrepareService(context.Background(), m.Name, target.Service, currentSecrets[target.Service])
+		if err != nil {
+			_, _ = store.Transition(id, operation.RecoveryRequired, "prepare", "secret preparation result is ambiguous", time.Now())
+			fmt.Fprintf(stderr, "deployment %s requires diagnosis after preparation failure\n", id)
+			return 1
+		}
+		_, deployErr := client.DeployWithResolved(context.Background(), m.Name, service, prepared, freshNetworks[target.Service])
+		if deployErr != nil {
+			_ = cleanupSecrets(context.Background())
+			_, _ = store.Transition(id, operation.RecoveryRequired, "create", "container creation result is ambiguous", time.Now())
+			fmt.Fprintf(stderr, "deployment %s requires diagnosis; previously created services were not rolled back\n", id)
+			return 1
+		}
+		created, inspectErr := client.Inspect(context.Background(), target.ResourceName)
+		if inspectErr != nil || created.ID == "" || !runtime.Owned(created, m.Name, target.Service) {
+			_ = cleanupSecrets(context.Background())
+			_, _ = store.Transition(id, operation.RecoveryRequired, "create", "created container identity could not be verified", time.Now())
+			fmt.Fprintf(stderr, "deployment %s requires diagnosis: created identity is unverified\n", id)
+			return 1
+		}
+		resourceID := created.ID
+		if _, err := store.RecordDeployStep(id, target.Service, resourceID, time.Now()); err != nil {
+			_ = cleanupSecrets(context.Background())
+			fmt.Fprintf(stderr, "container %s was created but journal recording failed: %v\n", resourceID, err)
+			return 1
+		}
+		cleanupErr := cleanupSecrets(context.Background())
+		fmt.Fprintf(stdout, "created %s: %s\n", target.ResourceName, resourceID)
+		if cleanupErr != nil {
+			_, _ = store.Transition(id, operation.RecoveryRequired, "cleanup", "transient secret cleanup failed", time.Now())
+			fmt.Fprintf(stderr, "deployment %s requires diagnosis after transient cleanup failure\n", id)
+			return 1
+		}
+	}
+	if _, err := store.Transition(id, operation.Verifying, "inspect", "verifying all created container identities", time.Now()); err != nil {
+		fmt.Fprintf(stderr, "deployment executed but verification boundary failed: %v\n", err)
+		return 1
+	}
+	loaded, err := store.Load(id)
+	if err != nil {
+		fmt.Fprintf(stderr, "deployment evidence could not be loaded: %v\n", err)
+		return 1
+	}
+	for _, result := range loaded.Deploy.Completed {
+		item, err := client.Inspect(context.Background(), result.ResourceName)
+		if err != nil || item.ID != result.ResourceID || !runtime.Owned(item, m.Name, result.Service) {
+			_, _ = store.Transition(id, operation.RecoveryRequired, "inspect", "created container identity could not be verified", time.Now())
+			fmt.Fprintf(stderr, "deployment %s requires diagnosis: final identity verification failed\n", id)
+			return 1
+		}
+	}
+	if _, err := store.Transition(id, operation.Completed, "complete", "all created container identities verified", time.Now()); err != nil {
+		fmt.Fprintf(stderr, "deployment verification passed but journal completion failed: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "deployment completed and verified (operation %s)\n", id)
 	return 0
 }
 

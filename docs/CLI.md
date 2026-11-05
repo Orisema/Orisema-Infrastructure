@@ -21,6 +21,7 @@ do not query Podman.
 ```sh
 go run ./cmd/orisema version
 go run ./cmd/orisema doctor examples/nginx.yaml --journal /secure/path/orisema-operations
+go run ./cmd/orisema operation init --journal /secure/path/orisema-operations
 go run ./cmd/orisema operation diagnose --journal /secure/path/orisema-operations
 go run ./cmd/orisema update plan examples/nginx-health.yaml
 go run ./cmd/orisema update prepare examples/nginx-health.yaml web --journal /secure/path/orisema-operations
@@ -333,6 +334,16 @@ See [RECOVERY-PLANNING.md](RECOVERY-PLANNING.md) for typed actions and the
 guardrails required before any recovery execution can be designed.
 
 # Doctor
+
+Initialize an operation store deliberately before using journaled commands:
+
+```bash
+orisema operation init --journal /secure/path/orisema-operations
+```
+
+The path must be absolute. Initialization creates a private store when it is
+absent and is idempotent only for an already safe store. It does not repair
+permissions, replace a missing lock, load a manifest or contact Podman.
 
 `orisema doctor <manifest.yaml> --journal <directory>` performs the first
 Alpha 9 pre-operational checks without changing Podman or the journal. It

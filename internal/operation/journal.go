@@ -72,6 +72,50 @@ type Store struct {
 	writable bool
 }
 
+// InitializeStore deliberately creates a new private store or validates an
+// existing initialized store. It never repairs permissions or missing files.
+func InitializeStore(root string) (*Store, error) {
+	if root == "" {
+		return nil, errors.New("operation journal directory is required")
+	}
+	if _, err := os.Lstat(root); err == nil {
+		return OpenExistingWritableStore(root)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("inspect operation journal directory: %w", err)
+	}
+	if err := os.Mkdir(root, 0o700); err != nil {
+		return nil, fmt.Errorf("create operation journal directory: %w", err)
+	}
+	lockPath := filepath.Join(root, ".store.lock")
+	lock, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_RDWR|syscall.O_NOFOLLOW, 0o600)
+	if err != nil {
+		_ = os.Remove(root)
+		return nil, fmt.Errorf("initialize operation journal lock: %w", err)
+	}
+	if err := lock.Sync(); err != nil {
+		lock.Close()
+		_ = os.Remove(lockPath)
+		_ = os.Remove(root)
+		return nil, fmt.Errorf("sync operation journal lock: %w", err)
+	}
+	if err := lock.Close(); err != nil {
+		return nil, err
+	}
+	dir, err := os.Open(root)
+	if err != nil {
+		return nil, err
+	}
+	syncErr := dir.Sync()
+	closeErr := dir.Close()
+	if syncErr != nil {
+		return nil, fmt.Errorf("sync operation journal directory: %w", syncErr)
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	return OpenExistingWritableStore(root)
+}
+
 func OpenStore(root string) (*Store, error) {
 	if root == "" {
 		return nil, errors.New("operation journal directory is required")

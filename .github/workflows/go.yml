@@ -27,8 +27,15 @@ jobs:
         run: |
           scripts/build-release.sh
           scripts/verify-release.sh
-      - name: Exercise Alpha 9 user installer safety contract
-        run: scripts/alpha9-installer-lab.sh
+      - name: Exercise Alpha 9 installer safety contract
+        run: |
+          scripts/alpha9-installer-lab.sh
+          docker run --rm \
+            -e ORISEMA_SYSTEM_LAB=1 \
+            -v "$PWD:/src" \
+            -w /src \
+            golang:1.23-bookworm@sha256:167053a2bb901972bf2c1611f8f52c44d5fe7e762e5cab213708d82c421614db \
+            sh -c scripts/alpha9-installer-lab.sh
   podman-healthcheck:
     runs-on: ubuntu-24.04
     timeout-minutes: 10

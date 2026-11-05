@@ -1,6 +1,6 @@
 # RFC-0006: distribuição assinada e instalação reversível
 
-- Status: proposta para implementação incremental na Alpha 9
+- Status: implementado na Alpha 9
 - Issues: #124, #135
 - Artefatos: Linux AMD64 e ARM64
 - Assinatura proposta: Sigstore keyless bundle

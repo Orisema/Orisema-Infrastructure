@@ -41,6 +41,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runDoctor(args, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "recover" {
+		if len(args) > 1 && args[1] == "operation" {
+			return runOperationRecovery(args, stdin, stdout, stderr)
+		}
 		return runRecoveryPlan(args, stdin, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "operation" {
@@ -281,6 +284,33 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func runOperationRecovery(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) != 7 || args[3] != "--journal" || args[5] != "--operation" {
+		printUsage(stderr)
+		return 2
+	}
+	m, err := manifest.Load(args[2])
+	if err != nil {
+		fmt.Fprintf(stderr, "recovery blocked: %v\n", err)
+		return 1
+	}
+	store, err := operation.OpenExistingStore(args[4])
+	if err != nil {
+		fmt.Fprintf(stderr, "recovery blocked before confirmation: %v\n", err)
+		return 1
+	}
+	if err := store.CheckContinuation(m.Name, args[6]); err != nil {
+		fmt.Fprintf(stderr, "recovery blocked before confirmation: %v\n", err)
+		return 1
+	}
+	op, err := store.Load(args[6])
+	if err != nil || op.Intent == nil || op.Type != "UPDATE" || op.State != operation.RecoveryRequired {
+		fmt.Fprintln(stderr, "recovery blocked: operation is not a supported RECOVERY_REQUIRED update; journal and runtime unchanged")
+		return 1
+	}
+	return runUpdateRollback(*m, op.Intent.Service, args[4], args[6], stdin, stdout, stderr)
+}
+
 func resolveManifestSecrets(ctx context.Context, m *manifest.Manifest) (map[string][]secrets.ResolvedMount, error) {
 	return secrets.ResolveManifest(ctx, m, map[secrets.Provider]secrets.Inspector{
 		secrets.ProviderPodman: secrets.PodmanInspector{},
@@ -420,7 +450,7 @@ func secretConsumers(ctx context.Context, identity string) ([]string, error) {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema recover operation <manifest.yaml> --journal <directory> --operation <id> OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
 }
 
 func runDoctor(args []string, stdout, stderr io.Writer) int {

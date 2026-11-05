@@ -109,6 +109,18 @@ test "$(sed -n '5p' "$log")" = sha256sum
 test "$(sed -n '6p' "$log")" = gh
 test "$(sed -n '7p' "$log")" = tar
 
+printf '%s\n' '#!/bin/sh' 'echo "Orisema Infrastructure"' \
+  'echo "Version: v0.1.0-alpha.10"' "echo \"OS/Arch: linux/$arch\"" \
+  >"$home_dir/.local/bin/orisema"
+chmod 0755 "$home_dir/.local/bin/orisema"
+if run_installer --user >"$lab_root/downgrade.out" 2>&1; then
+  echo "installer lab: downgrade without explicit authorization was accepted" >&2
+  exit 1
+fi
+grep -Fq 'use --allow-downgrade explicitly' "$lab_root/downgrade.out"
+run_installer --user --allow-downgrade
+"$home_dir/.local/bin/orisema" version | grep -Fq "Version: $version"
+
 cp "$fixtures/$archive" "$lab_root/original-archive"
 printf '%s\n' tampered >>"$fixtures/$archive"
 rm -rf -- "$home_dir/.local/bin"

@@ -337,14 +337,17 @@ guardrails required before any recovery execution can be designed.
 `orisema doctor <manifest.yaml> --journal <directory>` performs the first
 Alpha 9 pre-operational checks without changing Podman or the journal. It
 validates the manifest, reads the current Podman rootless/rootful boundary,
-validates every operation snapshot and reports incomplete operations scoped to
-the application.
+validates every operation snapshot, reports incomplete operations scoped to
+the application, resolves metadata-only secret and network identities and
+compares declared containers through the conservative planner.
 
-Checks are reported as `PASS` or `BLOCK`. Exit code `0` means no blocking check
-was found, `1` means diagnosis completed with a block or could not be completed,
-and `2` means invalid CLI usage. A `PASS` is not authorization to mutate. A
-missing, unsafe or corrupt journal fails closed and must be preserved for
-investigation.
+Checks are reported as `PASS`, `WARN` or `BLOCK`. A missing container is a
+`WARN`, while drift, ownership ambiguity and unavailable bindings are `BLOCK`.
+Exit code `0` means no blocking check was found, `1` means diagnosis completed
+with a block or could not be completed, and `2` means invalid CLI usage. A
+`PASS` is not authorization to mutate. A missing, unsafe or corrupt journal
+fails closed and must be preserved for investigation.
 
-This first slice does not yet inspect bindings, free disk space or enforce the
-mutation guard. See [RFC-0005](RFC-0005-operational-recovery-and-doctor.md).
+Secret values and locators are not printed. The command still does not inspect
+free disk space or enforce the mutation guard. See
+[RFC-0005](RFC-0005-operational-recovery-and-doctor.md).

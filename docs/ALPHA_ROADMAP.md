@@ -207,6 +207,9 @@ Fedora 45 rootless com SELinux Enforcing e no MixIdentity artificial isolado.
 A issue de release #121 foi encerrada pelo PR #122 após todos os checks passarem.
 A pré-release `v0.1.0-alpha.8` foi publicada a partir do commit `c12ebb2` e seus
 artefatos foram baixados e verificados novamente pelo workflow de release.
+Rotação declarativa de configuração permaneceu explicitamente fora da release:
+somente drift de imagem é elegível, e mudanças de configuração falham fechado
+até uma substituição controlada ser projetada para a Beta.
 
 ## v0.1.0-alpha.9 — recuperação operacional e distribuição segura
 

@@ -80,7 +80,7 @@ func TestDoctorReportsPassWithoutChangingJournal(t *testing.T) {
 		t.Fatal(err)
 	}
 	podman := filepath.Join(dir, "podman")
-	if err := os.WriteFile(podman, []byte("#!/bin/sh\nprintf 'true\\n'\n"), 0o700); err != nil {
+	if err := os.WriteFile(podman, []byte("#!/bin/sh\ncase \"$1\" in\n  info) printf 'true\\n' ;;\n  ps) printf '[]\\n' ;;\n  *) exit 1 ;;\nesac\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -89,7 +89,7 @@ func TestDoctorReportsPassWithoutChangingJournal(t *testing.T) {
 	if code != 0 || stderr.Len() != 0 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	for _, expected := range []string{"orisema-doctor-v1", "[PASS] manifest.valid", "mode=rootless", "[PASS] operation.pending", "Doctor result: PASS", "No runtime or journal changes made"} {
+	for _, expected := range []string{"orisema-doctor-v1", "[PASS] manifest.valid", "mode=rootless", "[PASS] operation.pending", "[PASS] binding.secrets", "[PASS] binding.networks", "[WARN] runtime.application", "Doctor result: PASS", "No runtime or journal changes made"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("stdout %q missing %q", stdout.String(), expected)
 		}
@@ -118,7 +118,7 @@ func TestDoctorBlocksIncompleteApplicationOperation(t *testing.T) {
 		t.Fatal(err)
 	}
 	podman := filepath.Join(dir, "podman")
-	if err := os.WriteFile(podman, []byte("#!/bin/sh\nprintf 'false\\n'\n"), 0o700); err != nil {
+	if err := os.WriteFile(podman, []byte("#!/bin/sh\ncase \"$1\" in\n  info) printf 'false\\n' ;;\n  ps) printf '[]\\n' ;;\n  *) exit 1 ;;\nesac\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -126,6 +126,33 @@ func TestDoctorBlocksIncompleteApplicationOperation(t *testing.T) {
 	code := run([]string{"doctor", manifestPath, "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
 	if code != 1 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "[BLOCK] operation.pending: id=update-pending type=UPDATE state=PENDING") || !strings.Contains(stdout.String(), "mode=rootful") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestDoctorDoesNotExposeSecretLocator(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	canary := "doctor-secret-locator-canary"
+	manifestData := "apiVersion: orisema.dev/v1alpha3\nkind: Application\nname: demo\nsecrets:\n  - name: token\n    source:\n      file:\n        path: /private/" + canary + "\nservices:\n  - name: web\n    image: nginx:stable\n    secrets:\n      - name: token\n        target: token\n"
+	if err := os.WriteFile(manifestPath, []byte(manifestData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	journal := filepath.Join(dir, "operations")
+	if _, err := operation.OpenStore(journal); err != nil {
+		t.Fatal(err)
+	}
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte("#!/bin/sh\ncase \"$1\" in\n  info) printf 'true\\n' ;;\n  ps) printf '[]\\n' ;;\n  *) exit 1 ;;\nesac\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"doctor", manifestPath, "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stdout.String(), "[BLOCK] binding.secrets") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if strings.Contains(stdout.String(), canary) || strings.Contains(stderr.String(), canary) {
+		t.Fatalf("doctor exposed secret locator: stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
 

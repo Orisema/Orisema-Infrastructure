@@ -32,9 +32,27 @@ curl -fLO "https://github.com/Orisema/Orisema-Infrastructure/releases/download/$
 grep " orisema_linux_${arch}.tar.gz$" checksums.txt | sha256sum --check
 ```
 
-Do not install the archive if checksum verification fails. SHA-256 detects a
-damaged or mismatched download, but this alpha pipeline does not yet sign
-artifacts or provide provenance attestations.
+Do not install the archive if checksum verification fails. Alpha 8 and older
+have SHA-256 only. Beginning with Alpha 9, the release workflow is designed to
+publish `checksums.txt.sigstore.json`, authenticate the checksum metadata with
+Sigstore and create GitHub artifact attestations. The Alpha 9 instructions will
+require those checks rather than silently falling back to an unsigned checksum.
+
+The future Alpha 9 manual verification is:
+
+```sh
+curl -fLO "https://github.com/Orisema/Orisema-Infrastructure/releases/download/${version}/checksums.txt.sigstore.json"
+cosign verify-blob checksums.txt \
+  --bundle checksums.txt.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github.com/Orisema/Orisema-Infrastructure/.github/workflows/release.yml@refs/(heads/main|tags/v[0-9].*)$'
+grep " orisema_linux_${arch}.tar.gz$" checksums.txt | sha256sum --check
+gh attestation verify "orisema_linux_${arch}.tar.gz" \
+  --repo Orisema/Orisema-Infrastructure
+```
+
+This verification is online and requires current Cosign and GitHub CLI
+versions. It is not a guarantee attached retroactively to Alpha 8.
 
 Extract and inspect the binary before installing it:
 

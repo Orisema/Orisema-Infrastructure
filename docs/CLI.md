@@ -234,13 +234,21 @@ Commands require the service to be declared in the provided manifest and the exi
 
 ```sh
 go run ./cmd/orisema logs examples/nginx.yaml web
-go run ./cmd/orisema stop examples/nginx.yaml web
+go run ./cmd/orisema stop --journal /secure/path/orisema-operations examples/nginx.yaml web
 # Type STOP to confirm
-go run ./cmd/orisema start examples/nginx.yaml web
+go run ./cmd/orisema start --journal /secure/path/orisema-operations examples/nginx.yaml web
 # Type START to confirm
 ```
 
-`logs` returns only the last 100 lines and does not follow. `start` and `stop` require interactive confirmation, inspect ownership before issuing Podman commands, and never remove containers. They do not check desired image/ports, application health, or service dependencies. **Do not run stop on critical workloads.** The earlier `deploy` command still treats a stopped matching container as `NOOP` and will not automatically restart it.
+`logs` returns only the last 100 lines and does not follow. `start` and `stop`
+require an initialized absolute journal path and interactive confirmation. They
+admit a durable operation atomically, revalidate the exact container identity,
+persist `APPLYING` before issuing Podman commands and reach `COMPLETED` only
+after inspecting the requested final state. An error or ambiguous result leaves
+blocking evidence for diagnosis. They never remove containers and do not check
+desired image/ports, application health or service dependencies. **Do not run
+stop on critical workloads.** The earlier `deploy` command still treats a
+stopped matching container as `NOOP` and will not automatically restart it.
 
 ## Detailed status and integration smoke test
 
@@ -378,5 +386,6 @@ state and delegates only an intact `RECOVERY_REQUIRED` update to the same
 revalidated, explicitly confirmed rollback implementation used by `update
 rollback`. It does not infer success, retry a runtime step or delete evidence.
 
-Legacy `deploy`, `start` and `stop` do not yet accept an operation journal and
-therefore are not covered by this first mutation-guard slice.
+Legacy `deploy` does not yet accept an operation journal. `start` and `stop`
+require one and are covered by the Alpha 10 mutation guard; the old syntax is
+rejected before runtime inspection.

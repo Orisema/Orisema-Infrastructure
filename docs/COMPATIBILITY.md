@@ -80,7 +80,7 @@ observed environment rather than a minimum-version guarantee.
 | `status`, `diagnose` | Yes | No | Present distinct runtime and health observations |
 | `logs` | Yes | No | Returns the last 100 lines; does not follow |
 | `deploy` | Yes | Yes | Creates only `CREATE` services after confirmation |
-| `start`, `stop` | Yes | Yes | Require ownership and exact confirmation |
+| `start`, `stop` | Yes | Yes | Require explicit journal, atomic admission, ownership, exact confirmation and final-state verification |
 | `recover plan`, `history`, `verify` | Some | No | Journal commands can require local journal access |
 | `recover prepare` | Yes | Journal only | Reserves an eligible START; does not start it |
 | `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |

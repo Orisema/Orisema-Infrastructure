@@ -10,6 +10,7 @@ evidence="${ORISEMA_EVIDENCE_DIR:-$root/work/alpha1-negative}"
 name_manifest="$root/testdata/alpha1/name-conflict.yaml"
 port_manifest="$root/testdata/alpha1/port-conflict.yaml"
 cancel_manifest="$root/testdata/alpha1/cancelled.yaml"
+journal="$evidence/operations"
 
 name_target=orisema-regression-name-web
 port_target=orisema-regression-port-web
@@ -30,6 +31,7 @@ cleanup
 test -x "$binary"
 podman version > "$evidence/podman-version.txt"
 "$binary" version > "$evidence/orisema-version.txt"
+"$binary" operation init --journal "$journal" > "$evidence/journal-init.txt"
 
 # An unmanaged container with the expected name must yield REVIEW. Deploy and
 # lifecycle commands must leave its identity and running state unchanged.
@@ -44,12 +46,12 @@ if printf 'DEPLOY\n' | "$binary" deploy "$name_manifest" \
   exit 1
 fi
 grep -Fq 'deployment blocked' "$evidence/name-deploy.txt"
-if printf 'STOP\n' | "$binary" stop "$name_manifest" web \
+if printf 'STOP\n' | "$binary" stop --journal "$journal" "$name_manifest" web \
     > "$evidence/name-stop.txt" 2>&1; then
   echo 'stop unexpectedly accepted an unmanaged container' >&2
   exit 1
 fi
-grep -Fq 'not verified as an Orisema-owned container' "$evidence/name-stop.txt"
+grep -Fq 'container identity or ownership could not be verified' "$evidence/name-stop.txt"
 test "$(podman inspect --format '{{.Id}}' "$name_target")" = "$unmanaged_id"
 test "$(podman inspect --format '{{.State.Running}}' "$name_target")" = true
 

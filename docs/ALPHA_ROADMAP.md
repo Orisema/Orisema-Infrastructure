@@ -1,6 +1,6 @@
 # Orisema Infrastructure — Alpha release plan
 
-Status: **plano ativo, atualizado em 04/11/2026**. Não representa promessa de
+Status: **plano ativo, atualizado em 05/11/2026**. Não representa promessa de
 datas nem declara funcionalidade de produção.
 
 ## Base existente
@@ -207,6 +207,23 @@ Fedora 45 rootless com SELinux Enforcing e no MixIdentity artificial isolado.
 A issue de release #121 foi encerrada pelo PR #122 após todos os checks passarem.
 A pré-release `v0.1.0-alpha.8` foi publicada a partir do commit `c12ebb2` e seus
 artefatos foram baixados e verificados novamente pelo workflow de release.
+
+## v0.1.0-alpha.9 — recuperação operacional e distribuição segura
+
+- [ ] Definir diagnóstico unificado, estados recuperáveis e bloqueio de mutação
+  ([RFC-0005](RFC-0005-operational-recovery-and-doctor.md), #124, #125).
+- [ ] Implementar `orisema doctor` sem mutações nem exposição de configuração.
+- [ ] Bloquear operações conflitantes e recuperar somente estados com evidência
+  íntegra, lock, revalidação e confirmação explícita.
+- [ ] Assinar checksums, produzir provenance e verificar o material publicado.
+- [ ] Entregar instalador auditável para destino global ou do usuário, com
+  upgrade reversível e desinstalação explícita.
+- [ ] Executar laboratórios de interrupção e instalação em Ubuntu e Fedora.
+
+**Gate:** uma interrupção comum tem diagnóstico e próximo passo seguros; uma
+operação ambígua bloqueia novas mutações sem apagar evidência; artefatos
+adulterados ou incompatíveis são rejeitados; falha de upgrade mantém o binário
+anterior utilizável.
 
 ## Integração opcional futura — Orisema Data
 

@@ -127,7 +127,9 @@ jobs:
       - name: Verify stopped containers do not report healthy
         run: |
           set -euo pipefail
-          printf 'STOP\n' | sudo work/orisema stop examples/nginx-health.yaml web
+          journal="$PWD/work/health-operations"
+          sudo work/orisema operation init --journal "$journal"
+          printf 'STOP\n' | sudo work/orisema stop --journal "$journal" examples/nginx-health.yaml web
           sudo work/orisema status examples/nginx-health.yaml | tee work/status-stopped.txt
           grep -Fq 'health: unavailable (container not running)' work/status-stopped.txt
           sudo work/orisema plan examples/nginx-health.yaml | tee work/plan-stopped.txt

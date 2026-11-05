@@ -339,7 +339,8 @@ Alpha 9 pre-operational checks without changing Podman or the journal. It
 validates the manifest, reads the current Podman rootless/rootful boundary,
 validates every operation snapshot, reports incomplete operations scoped to
 the application, resolves metadata-only secret and network identities and
-compares declared containers through the conservative planner.
+compares declared containers through the conservative planner and measures free
+space for both the journal and Podman graph root.
 
 Checks are reported as `PASS`, `WARN` or `BLOCK`. A missing container is a
 `WARN`, while drift, ownership ambiguity and unavailable bindings are `BLOCK`.
@@ -349,5 +350,7 @@ with a block or could not be completed, and `2` means invalid CLI usage. A
 fails closed and must be preserved for investigation.
 
 Secret values and locators are not printed. The command still does not inspect
-free disk space or enforce the mutation guard. See
+volume growth requirements or enforce the mutation guard. Both storage checks
+require at least 256 MiB available; this is an operational safety margin, not a
+capacity forecast for images or application data. See
 [RFC-0005](RFC-0005-operational-recovery-and-doctor.md).

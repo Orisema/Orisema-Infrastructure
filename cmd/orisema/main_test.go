@@ -65,6 +65,10 @@ func TestVersionRejectsExtraArguments(t *testing.T) {
 	}
 }
 
+func doctorPodmanScript(storagePath string, rootless bool) string {
+	return fmt.Sprintf("#!/bin/sh\ncase \"$1:$3\" in\n  *Rootless*) printf '%t\\n' ;;\n  *GraphRoot*) printf '%%s\\n' %q ;;\n  ps:*) printf '[]\\n' ;;\n  *) exit 1 ;;\nesac\n", rootless, storagePath)
+}
+
 func TestDoctorReportsPassWithoutChangingJournal(t *testing.T) {
 	dir := t.TempDir()
 	manifestPath := filepath.Join(dir, "manifest.yaml")
@@ -80,7 +84,7 @@ func TestDoctorReportsPassWithoutChangingJournal(t *testing.T) {
 		t.Fatal(err)
 	}
 	podman := filepath.Join(dir, "podman")
-	if err := os.WriteFile(podman, []byte("#!/bin/sh\ncase \"$1\" in\n  info) printf 'true\\n' ;;\n  ps) printf '[]\\n' ;;\n  *) exit 1 ;;\nesac\n"), 0o700); err != nil {
+	if err := os.WriteFile(podman, []byte(doctorPodmanScript(dir, true)), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -118,7 +122,7 @@ func TestDoctorBlocksIncompleteApplicationOperation(t *testing.T) {
 		t.Fatal(err)
 	}
 	podman := filepath.Join(dir, "podman")
-	if err := os.WriteFile(podman, []byte("#!/bin/sh\ncase \"$1\" in\n  info) printf 'false\\n' ;;\n  ps) printf '[]\\n' ;;\n  *) exit 1 ;;\nesac\n"), 0o700); err != nil {
+	if err := os.WriteFile(podman, []byte(doctorPodmanScript(dir, false)), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -142,7 +146,7 @@ func TestDoctorDoesNotExposeSecretLocator(t *testing.T) {
 		t.Fatal(err)
 	}
 	podman := filepath.Join(dir, "podman")
-	if err := os.WriteFile(podman, []byte("#!/bin/sh\ncase \"$1\" in\n  info) printf 'true\\n' ;;\n  ps) printf '[]\\n' ;;\n  *) exit 1 ;;\nesac\n"), 0o700); err != nil {
+	if err := os.WriteFile(podman, []byte(doctorPodmanScript(dir, true)), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))

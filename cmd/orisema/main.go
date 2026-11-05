@@ -28,6 +28,7 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/remote"
 	"github.com/Orisema/Orisema-Infrastructure/internal/runtime"
 	"github.com/Orisema/Orisema-Infrastructure/internal/secrets"
+	"github.com/Orisema/Orisema-Infrastructure/internal/storagecheck"
 	"github.com/Orisema/Orisema-Infrastructure/internal/updateplan"
 )
 
@@ -479,6 +480,26 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "  [BLOCK] operation.pending: id=%s type=%s state=%s\n", op.ID, op.Type, op.State)
 		}
 		fmt.Fprintf(stdout, "    next: orisema operation diagnose --journal %s\n", args[3])
+	}
+	journalAvailable, err := storagecheck.Available(args[3])
+	if err != nil || !storagecheck.Sufficient(journalAvailable) {
+		blocked = true
+		fmt.Fprintln(stdout, "  [BLOCK] storage.journal: capacity is unavailable or below 256 MiB")
+		fmt.Fprintln(stdout, "    next: restore safe free space on the journal filesystem and run doctor again")
+	} else {
+		fmt.Fprintf(stdout, "  [PASS] storage.journal: available=%d MiB\n", journalAvailable>>20)
+	}
+	storagePath, err := (runtime.Client{}).StoragePath(context.Background())
+	if err != nil {
+		blocked = true
+		fmt.Fprintln(stdout, "  [BLOCK] storage.runtime: Podman storage metadata is unavailable")
+		fmt.Fprintln(stdout, "    next: restore Podman storage access and run doctor again")
+	} else if runtimeAvailable, measureErr := storagecheck.Available(storagePath); measureErr != nil || !storagecheck.Sufficient(runtimeAvailable) {
+		blocked = true
+		fmt.Fprintln(stdout, "  [BLOCK] storage.runtime: capacity is unavailable or below 256 MiB")
+		fmt.Fprintln(stdout, "    next: restore safe free space on the Podman storage filesystem and run doctor again")
+	} else {
+		fmt.Fprintf(stdout, "  [PASS] storage.runtime: available=%d MiB\n", runtimeAvailable>>20)
 	}
 
 	resolvedSecrets, err := resolveManifestSecrets(context.Background(), m)

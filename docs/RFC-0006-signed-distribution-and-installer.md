@@ -98,7 +98,7 @@ checksum não autenticado.
 O instalador será um arquivo versionado e revisável, baixado antes de executar:
 
 ```sh
-curl -fSLO https://raw.githubusercontent.com/Orisema/Orisema-Infrastructure/main/install.sh
+curl -fSLO https://raw.githubusercontent.com/Orisema/Orisema-Infrastructure/v0.1.0-alpha.9/install.sh
 less install.sh
 sh install.sh --version v0.1.0-alpha.9 --user
 ```

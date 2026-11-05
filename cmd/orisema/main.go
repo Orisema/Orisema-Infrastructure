@@ -464,6 +464,7 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "No runtime or journal changes made.")
 		return 1
 	}
+	blocked := false
 	var incomplete []operation.Operation
 	for _, op := range operations {
 		if op.Application == m.Name && !op.State.Terminal() {
@@ -472,17 +473,59 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	}
 	if len(incomplete) == 0 {
 		fmt.Fprintf(stdout, "  [PASS] operation.pending: none for application=%s\n", m.Name)
-		fmt.Fprintln(stdout, "Doctor result: PASS")
-		fmt.Fprintln(stdout, "No runtime or journal changes made.")
-		return 0
+	} else {
+		blocked = true
+		for _, op := range incomplete {
+			fmt.Fprintf(stdout, "  [BLOCK] operation.pending: id=%s type=%s state=%s\n", op.ID, op.Type, op.State)
+		}
+		fmt.Fprintf(stdout, "    next: orisema operation diagnose --journal %s\n", args[3])
 	}
-	for _, op := range incomplete {
-		fmt.Fprintf(stdout, "  [BLOCK] operation.pending: id=%s type=%s state=%s\n", op.ID, op.Type, op.State)
+
+	resolvedSecrets, err := resolveManifestSecrets(context.Background(), m)
+	if err != nil {
+		blocked = true
+		fmt.Fprintln(stdout, "  [BLOCK] binding.secrets: one or more references are unavailable or unsafe")
+		fmt.Fprintln(stdout, "    next: inspect declared secret metadata and permissions; values and locators were not printed")
+	} else {
+		fmt.Fprintf(stdout, "  [PASS] binding.secrets: resolved metadata for %d service(s)\n", len(resolvedSecrets))
 	}
-	fmt.Fprintf(stdout, "    next: orisema operation diagnose --journal %s\n", args[3])
-	fmt.Fprintln(stdout, "Doctor result: BLOCK")
+	resolvedNetworks, err := resolveManifestNetworks(context.Background(), m)
+	if err != nil {
+		blocked = true
+		fmt.Fprintln(stdout, "  [BLOCK] binding.networks: one or more references are unavailable or unsafe")
+		fmt.Fprintln(stdout, "    next: inspect declared network metadata; locators were not printed")
+	} else {
+		fmt.Fprintf(stdout, "  [PASS] binding.networks: resolved metadata for %d service(s)\n", len(resolvedNetworks))
+	}
+	if resolvedSecrets != nil && resolvedNetworks != nil {
+		containers, listErr := (runtime.Client{}).List(context.Background())
+		if listErr != nil {
+			blocked = true
+			fmt.Fprintln(stdout, "  [BLOCK] runtime.application: container inventory is unavailable")
+			fmt.Fprintln(stdout, "    next: restore read-only Podman inspection and run doctor again")
+		} else {
+			for _, step := range planner.BuildInspectedResolvedRuntime(context.Background(), m, containers, runtime.Client{}, resolvedSecrets, resolvedNetworks) {
+				switch step.Action {
+				case planner.Noop:
+					fmt.Fprintf(stdout, "  [PASS] runtime.application: name=%s declared fields match\n", step.Name)
+				case planner.Create:
+					fmt.Fprintf(stdout, "  [WARN] runtime.application: name=%s container not found; deploy review required\n", step.Name)
+				default:
+					blocked = true
+					fmt.Fprintf(stdout, "  [BLOCK] runtime.application: name=%s action=%s reason=%s\n", step.Name, step.Action, step.Reason)
+				}
+			}
+		}
+	}
+	result := "PASS"
+	code := 0
+	if blocked {
+		result = "BLOCK"
+		code = 1
+	}
+	fmt.Fprintf(stdout, "Doctor result: %s\n", result)
 	fmt.Fprintln(stdout, "No runtime or journal changes made.")
-	return 1
+	return code
 }
 
 func runRemoteCommand(args []string, stdout, stderr io.Writer) int {

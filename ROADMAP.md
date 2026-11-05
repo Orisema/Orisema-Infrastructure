@@ -122,8 +122,6 @@ de lifecycle separado.
   serviços com bindings ([RFC-0004](docs/RFC-0004-configured-update-and-rollback.md), #105).
 - [x] Permitir update de imagem preservando configuração pública, secrets e
   redes declarados, sem persistir valores.
-- [ ] Tratar rotação suportada de configuração como substituição controlada,
-  nunca mutação in-place.
 - [x] Integrar verify e rollback à evidência de bindings, preservando a unidade
   anterior e mantendo recursos externos fora do lifecycle (#117).
 - [x] Validar falhas e rollback em Podman rootless e no MixIdentity artificial
@@ -131,6 +129,10 @@ de lifecycle separado.
 
 **Princípio:** cada candidato recebe a configuração declarada completa e toda
 identidade externa é revalidada; dúvida ou mudança entre fases falha fechado.
+
+**Adiado:** rotação declarativa de configuração por substituição controlada não
+fez parte da release. A Alpha 8 aceita somente drift exclusivo de imagem e
+bloqueia mudanças de configuração; a expansão permanece planejada para a Beta.
 
 ## Alpha 9 — recuperação operacional e distribuição segura
 

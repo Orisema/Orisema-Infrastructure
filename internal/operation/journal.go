@@ -21,6 +21,8 @@ const Version = 1
 
 var ErrApplicationBusy = errors.New("application already has an incomplete operation")
 
+var ErrContinuationBlocked = errors.New("operation continuation is not the application's current incomplete operation")
+
 var safeID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
 type Resource struct {
@@ -205,6 +207,32 @@ func (s *Store) Incomplete() ([]Operation, error) {
 		}
 	}
 	return result, nil
+}
+
+// CheckContinuation validates the entire store and allows only the exact
+// incomplete operation for an application to continue. It performs no writes.
+func (s *Store) CheckContinuation(application, id string) error {
+	if application == "" || !safeID.MatchString(id) {
+		return ErrContinuationBlocked
+	}
+	operations, err := s.List()
+	if err != nil {
+		return fmt.Errorf("validate operation store before continuation: %w", err)
+	}
+	matched := false
+	for _, op := range operations {
+		if op.Application != application || op.State.Terminal() {
+			continue
+		}
+		if op.ID != id {
+			return fmt.Errorf("%w: %s (%s)", ErrApplicationBusy, op.ID, op.State)
+		}
+		matched = true
+	}
+	if !matched {
+		return ErrContinuationBlocked
+	}
+	return nil
 }
 
 func (s *Store) listUnlocked() ([]Operation, error) {

@@ -433,7 +433,7 @@ func TestConfiguredUpdateVerifyRequiresIntactJournalWithoutExposingValues(t *tes
 	}
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"update", "verify", manifestPath, "web", "--journal", filepath.Join(t.TempDir(), "operations"), "--operation", "update-test"}, strings.NewReader(""), &stdout, &stderr)
-	if code != 1 || !strings.Contains(stderr.String(), "load operation journal") {
+	if code != 1 || !strings.Contains(stderr.String(), "update continuation blocked before confirmation") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	if strings.Contains(stderr.String(), "laboratory") {

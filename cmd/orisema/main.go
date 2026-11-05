@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -47,6 +48,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runRecoveryPlan(args, stdin, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "operation" {
+		if len(args) > 1 && args[1] == "init" {
+			return runOperationInit(args, stdout, stderr)
+		}
 		return runOperationDiagnosis(args, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "update" {
@@ -450,7 +454,21 @@ func secretConsumers(ctx context.Context, identity string) ([]string, error) {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema recover operation <manifest.yaml> --journal <directory> --operation <id> OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation diagnose --journal <directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema recover operation <manifest.yaml> --journal <directory> --operation <id> OR orisema <validate|plan|status|diagnose|deploy> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema <logs|start|stop> <manifest.yaml> <service> OR orisema operation <init|diagnose> --journal <absolute-directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+}
+
+func runOperationInit(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 4 || args[2] != "--journal" || !filepath.IsAbs(args[3]) {
+		printUsage(stderr)
+		return 2
+	}
+	if _, err := operation.InitializeStore(args[3]); err != nil {
+		fmt.Fprintf(stderr, "operation journal initialization failed: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Operation journal initialized: %s\n", args[3])
+	fmt.Fprintln(stdout, "No manifest loaded and no runtime changes made.")
+	return 0
 }
 
 func runDoctor(args []string, stdout, stderr io.Writer) int {

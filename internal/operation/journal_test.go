@@ -83,6 +83,26 @@ func TestExistingStoreModesDoNotCreateOrEscalate(t *testing.T) {
 	}
 }
 
+func TestInitializeStoreCreatesOnceAndDoesNotRepair(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "operations")
+	if _, err := InitializeStore(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InitializeStore(root); err != nil {
+		t.Fatalf("safe initialization is not idempotent: %v", err)
+	}
+	if err := os.Chmod(filepath.Join(root, ".store.lock"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InitializeStore(root); err == nil || !strings.Contains(err.Error(), "unsafe") {
+		t.Fatalf("initialization repaired unsafe state: %v", err)
+	}
+	info, err := os.Stat(filepath.Join(root, ".store.lock"))
+	if err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("initialization changed unsafe lock: %v, %v", info, err)
+	}
+}
+
 func TestExistingWritableStoreRejectsUnsafeLockWithoutRepair(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "operations")
 	if _, err := OpenStore(root); err != nil {

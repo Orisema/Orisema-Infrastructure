@@ -65,6 +65,40 @@ func TestVersionRejectsExtraArguments(t *testing.T) {
 	}
 }
 
+func TestOperationInitRequiresAbsolutePathAndDoesNotRepair(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"operation", "init", "--journal", "relative"}, strings.NewReader(""), &stdout, &stderr); code != 2 {
+		t.Fatalf("relative path code=%d stderr=%q", code, stderr.String())
+	}
+
+	root := filepath.Join(t.TempDir(), "operations")
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"operation", "init", "--journal", root}, strings.NewReader(""), &stdout, &stderr); code != 0 || stderr.Len() != 0 {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "No manifest loaded and no runtime changes made") {
+		t.Fatalf("stdout=%q", stdout.String())
+	}
+	if _, err := operation.OpenExistingWritableStore(root); err != nil {
+		t.Fatalf("initialized journal is unusable: %v", err)
+	}
+
+	lockPath := filepath.Join(root, ".store.lock")
+	if err := os.Chmod(lockPath, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"operation", "init", "--journal", root}, strings.NewReader(""), &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "unsafe") {
+		t.Fatalf("unsafe state code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	info, err := os.Stat(lockPath)
+	if err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("init repaired unsafe lock: %v, %v", info, err)
+	}
+}
+
 func doctorPodmanScript(storagePath string, rootless bool) string {
 	return fmt.Sprintf("#!/bin/sh\ncase \"$1:$3\" in\n  *Rootless*) printf '%t\\n' ;;\n  *GraphRoot*) printf '%%s\\n' %q ;;\n  ps:*) printf '[]\\n' ;;\n  *) exit 1 ;;\nesac\n", rootless, storagePath)
 }

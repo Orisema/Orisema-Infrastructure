@@ -27,6 +27,8 @@ jobs:
         run: |
           scripts/build-release.sh
           scripts/verify-release.sh
+      - name: Exercise Alpha 9 user installer safety contract
+        run: scripts/alpha9-installer-lab.sh
   podman-healthcheck:
     runs-on: ubuntu-24.04
     timeout-minutes: 10

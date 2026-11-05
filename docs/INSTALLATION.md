@@ -38,7 +38,7 @@ publish `checksums.txt.sigstore.json`, authenticate the checksum metadata with
 Sigstore and create GitHub artifact attestations. The Alpha 9 instructions will
 require those checks rather than silently falling back to an unsigned checksum.
 
-The future Alpha 9 manual verification is:
+The Alpha 9 manual verification contract is:
 
 ```sh
 curl -fLO "https://github.com/Orisema/Orisema-Infrastructure/releases/download/${version}/checksums.txt.sigstore.json"
@@ -66,6 +66,30 @@ orisema version
 The version report includes the release tag, source commit, reproducible build
 timestamp, Go toolchain and target OS/architecture. An ordinary local build
 reports `Version: development`, `Commit: unknown` and `Built: unknown`.
+
+## Alpha 9 user installer
+
+The versioned installer automates the same fail-closed checks and installs only
+to a directory owned by the current user. Download it from the release tag so
+the reviewed script and requested binary version remain aligned:
+
+```sh
+version=v0.1.0-alpha.9
+curl -fSLO "https://raw.githubusercontent.com/Orisema/Orisema-Infrastructure/${version}/install.sh"
+less install.sh
+sh install.sh --version "$version" --user
+```
+
+The initial installer requires `curl`, Cosign, GitHub CLI, `sha256sum` and
+standard Linux archive utilities. It verifies the signed checksum metadata,
+the selected archive checksum and its GitHub attestation before extraction.
+It does not edit shell configuration, start containers or touch Orisema state.
+
+Use `--bin-dir /absolute/user-owned/path` for another unprivileged destination.
+Reinstalling the same version requires `--reinstall`. If post-install version
+or architecture validation fails during an upgrade, the previous executable is
+restored. Privileged installation and an explicit uninstall command remain the
+next Alpha 9 increment; use the manual flow above for `/usr/local/bin` meanwhile.
 
 ## Runtime requirement
 

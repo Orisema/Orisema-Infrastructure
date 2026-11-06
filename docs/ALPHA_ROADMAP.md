@@ -246,8 +246,9 @@ os laboratórios Podman e o race detector passaram no CI. O laboratório Fedora
   ([contrato do CLI](CLI.md#doctor), #148).
 - [x] Documentar fluxos equivalentes para operadores e agentes, sem atalho de
   segurança ([manual e laboratórios](OPERATOR-AGENT-LABS.md), #149).
-- [ ] Repetir a matriz de compatibilidade, instalação, upgrade, downgrade e
-  artefatos assinados no commit exato da release (#150).
+- [x] Repetir a matriz de compatibilidade, instalação, upgrade, downgrade e
+  artefatos assinados no commit exato da release
+  ([gate reproduzível](ALPHA10-RELEASE-GATE.md), #150).
 
 **Gate:** toda mutação local suportada possui intenção durável e admissão
 atômica; concorrência e falhas abruptas permanecem diagnosticáveis; documentação

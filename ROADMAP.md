@@ -174,6 +174,10 @@ autenticidade, integridade, versão e arquitetura terem sido verificadas.
 automação e experiência de uso não podem contornar confirmação, ownership,
 revalidação ou preservação de evidência.
 
+O gate de release foi concluído em 6 de novembro de 2026 no commit
+`3db74f1b090d31336555e80d0574feb6e484f755`. Consulte a
+[auditoria da Alpha 10](docs/ALPHA10-AUDIT.md).
+
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.
 - [ ] Integração opcional com monitoramento.

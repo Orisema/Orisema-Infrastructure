@@ -6,6 +6,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.10] - 2026-11-06
+
 ### Adicionado
 
 - Gate reproduzível da Alpha 10 que separa cross-build, CI, laboratório aninhado

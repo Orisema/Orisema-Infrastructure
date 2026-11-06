@@ -244,8 +244,8 @@ os laboratórios Podman e o race detector passaram no CI. O laboratório Fedora
   de evidência ([laboratório Alpha 10](ALPHA10-FAILURE-LAB.md), #147).
 - [x] Tornar os próximos passos de `doctor` acionáveis e ainda somente leitura
   ([contrato do CLI](CLI.md#doctor), #148).
-- [ ] Documentar fluxos equivalentes para operadores e agentes, sem atalho de
-  segurança (#149).
+- [x] Documentar fluxos equivalentes para operadores e agentes, sem atalho de
+  segurança ([manual e laboratórios](OPERATOR-AGENT-LABS.md), #149).
 - [ ] Repetir a matriz de compatibilidade, instalação, upgrade, downgrade e
   artefatos assinados no commit exato da release (#150).
 

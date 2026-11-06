@@ -164,8 +164,9 @@ autenticidade, integridade, versão e arquitetura terem sido verificadas.
   reproduzíveis ([laboratório Alpha 10](docs/ALPHA10-FAILURE-LAB.md), #147).
 - [x] Melhorar o próximo passo apresentado por `doctor` sem conceder autoridade
   de mutação ([contrato do CLI](docs/CLI.md#doctor), #148).
-- [ ] Publicar um caminho manual e um caminho orientado a agentes com o mesmo
-  contrato de segurança (#149).
+- [x] Publicar um caminho manual e um caminho orientado a agentes com o mesmo
+  contrato de segurança ([manual e laboratórios](docs/OPERATOR-AGENT-LABS.md),
+  #149).
 - [ ] Aplicar o gate de compatibilidade, upgrade e downgrade à release (#150).
 
 **Princípio:** toda mutação é uma operação durável admitida atomicamente;

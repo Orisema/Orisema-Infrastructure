@@ -15,8 +15,14 @@ real_podman="$(command -v podman)"
 journal="$mountpoint/operations"
 unrelated=orisema-alpha10-unrelated
 deploy_pid=""
+phase=setup
 
 cleanup() {
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    printf 'phase=%s line=%s status=%s\n' "$phase" "${BASH_LINENO[0]:-unknown}" "$status" \
+      > "$evidence/failure.txt" 2>/dev/null || true
+  fi
   if [ -n "$deploy_pid" ]; then kill -9 "$deploy_pid" >/dev/null 2>&1 || true; fi
   if [ -f "$wrapper/run.pid" ]; then kill -9 "$(cat "$wrapper/run.pid")" >/dev/null 2>&1 || true; fi
   "$real_podman" rm --force "$unrelated" >/dev/null 2>&1 || true
@@ -52,6 +58,7 @@ chmod 755 "$wrapper/podman"
 unrelated_id="$("$real_podman" inspect --format '{{.Id}}' "$unrelated")"
 
 # Kill the CLI after it durably records the pending create and enters Podman.
+phase=abrupt-deploy
 set +e
 printf 'DEPLOY\n' | PATH="$wrapper:$PATH" "$binary" deploy --journal "$journal" "$manifest" \
   > "$evidence/abrupt-deploy.txt" 2>&1 &
@@ -70,6 +77,7 @@ kill -9 "$(cat "$wrapper/run.pid")" >/dev/null 2>&1 || true
 
 # A fresh process (the persistence boundary used by reboot recovery) must report
 # the incomplete operation and must never infer that it can resume.
+phase=fresh-process-diagnosis
 "$binary" operation diagnose --journal "$journal" > "$evidence/after-restart-diagnosis.txt"
 grep -Fq 'automatic resume safe: false' "$evidence/after-restart-diagnosis.txt"
 grep -Fq 'intervention required: true' "$evidence/after-restart-diagnosis.txt"
@@ -77,6 +85,7 @@ cp "$journal"/*.json "$evidence/"
 
 # Exhaust the isolated filesystem. Admission of another application must fail
 # before a Podman run; the already committed snapshot must remain readable.
+phase=storage-pressure
 rm -f "$wrapper/run-reached" "$wrapper/run.pid"
 dd if=/dev/zero of="$mountpoint/fill" bs=4096 status=none 2>/dev/null || true
 if printf 'DEPLOY\n' | PATH="$wrapper:$PATH" "$binary" deploy --journal "$journal" "$second_manifest" \
@@ -91,6 +100,7 @@ rm -f "$mountpoint/fill"
 grep -Fq 'automatic resume safe: false' "$evidence/after-storage-recovery.txt"
 
 # Corrupt and insecure copies fail closed and are never repaired implicitly.
+phase=corrupt-journal
 cp -a "$journal" "$mountpoint/corrupt"
 printf '{\n' > "$mountpoint/corrupt/broken.json"
 if "$binary" operation diagnose --journal "$mountpoint/corrupt" \
@@ -101,6 +111,7 @@ fi
 grep -Fq 'decode operation journal' "$evidence/corrupt-journal.txt"
 
 cp -a "$journal" "$mountpoint/insecure"
+phase=insecure-journal
 chmod 0755 "$mountpoint/insecure"
 if "$binary" operation diagnose --journal "$mountpoint/insecure" \
     > "$evidence/insecure-journal.txt" 2>&1; then
@@ -112,6 +123,7 @@ test "$(stat -c '%a' "$mountpoint/insecure")" = 755
 
 test "$("$real_podman" inspect --format '{{.Id}}' "$unrelated")" = "$unrelated_id"
 test "$("$real_podman" inspect --format '{{.State.Running}}' "$unrelated")" = true
+phase=complete
 printf '%s\n' \
   'abrupt-boundary=PASS' \
   'fresh-process-diagnosis=PASS' \

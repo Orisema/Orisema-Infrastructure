@@ -167,11 +167,13 @@ jobs:
       - name: Exercise Alpha 10 abrupt and storage failure boundaries
         run: |
           set -euo pipefail
+          status=0
           sudo env \
             ORISEMA_BINARY="$PWD/work/orisema" \
             ORISEMA_EVIDENCE_DIR="$PWD/work/alpha10-failure-lab" \
-            scripts/alpha10-failure-lab.sh
-          sudo chown -R "$USER":"$(id -gn)" work/alpha10-failure-lab
+            scripts/alpha10-failure-lab.sh || status=$?
+          sudo chown -R "$USER":"$(id -gn)" work/alpha10-failure-lab || true
+          exit "$status"
       - name: Exercise Alpha 10 journal concurrency under the race detector
         run: |
           go test -race ./internal/operation -run \

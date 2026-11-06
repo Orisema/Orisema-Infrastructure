@@ -164,6 +164,18 @@ jobs:
             ORISEMA_EVIDENCE_DIR="$PWD/work/alpha1-negative" \
             scripts/alpha1-negative-regressions.sh
           sudo chown -R "$USER":"$(id -gn)" work/alpha1-negative
+      - name: Exercise Alpha 10 abrupt and storage failure boundaries
+        run: |
+          set -euo pipefail
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/alpha10-failure-lab" \
+            scripts/alpha10-failure-lab.sh
+          sudo chown -R "$USER":"$(id -gn)" work/alpha10-failure-lab
+      - name: Exercise Alpha 10 journal concurrency under the race detector
+        run: |
+          go test -race ./internal/operation -run \
+            'TestConcurrent(CreateAllowsOneActiveOperationPerApplication|TransitionAllowsOnlyOneWinner)'
       - name: Exercise recovery concurrency under the race detector
         run: |
           go test -race ./internal/recovery \
@@ -286,6 +298,8 @@ jobs:
             work/*.jsonl
             work/*.txt
             work/alpha1-negative/*.txt
+            work/alpha10-failure-lab/*.txt
+            work/alpha10-failure-lab/*.json
             work/alpha2-contract/*.txt
             work/alpha6-podman-secrets/*.txt
             work/alpha6-file-secrets/*.txt

@@ -1,0 +1,6 @@
+apiVersion: orisema.dev/v1alpha2
+kind: Application
+name: alpha10-abrupt
+services:
+  - name: web
+    image: docker.io/library/nginx:1.27

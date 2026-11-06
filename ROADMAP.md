@@ -155,7 +155,7 @@ autenticidade, integridade, versão e arquitetura terem sido verificadas.
 
 ## Alpha 10 — prontidão operacional
 
-- [ ] Exigir journal existente e admissão atômica em toda mutação local
+- [x] Exigir journal existente e admissão atômica em toda mutação local
   suportada, começando por `deploy`, `start` e `stop`
   ([RFC-0007](docs/RFC-0007-unified-local-mutation-journal.md), #145).
 - [ ] Consolidar o inventário da CLI e os limites operacionais (#146).

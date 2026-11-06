@@ -236,7 +236,7 @@ os laboratórios Podman e o race detector passaram no CI. O laboratório Fedora
 
 ## v0.1.0-alpha.10 — prontidão operacional
 
-- [ ] Unificar a admissão e o journal das mutações locais `deploy`, `start` e
+- [x] Unificar a admissão e o journal das mutações locais `deploy`, `start` e
   `stop` ([RFC-0007](RFC-0007-unified-local-mutation-journal.md), #145).
 - [ ] Publicar inventário verificável da CLI, contratos e limitações (#146).
 - [ ] Exercitar encerramento abrupto, reboot e disco cheio sem perda silenciosa

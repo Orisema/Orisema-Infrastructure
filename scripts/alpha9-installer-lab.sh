@@ -20,7 +20,11 @@ case "$(uname -m)" in
   *) echo "installer lab: unsupported architecture" >&2; exit 1 ;;
 esac
 
-version=v0.1.0-alpha.9
+version=${ORISEMA_LAB_VERSION:-v0.1.0-alpha.10}
+case "$version" in
+  v[0-9]*.[0-9]*.[0-9]*-*) ;;
+  *) echo "installer lab: invalid ORISEMA_LAB_VERSION" >&2; exit 1 ;;
+esac
 archive=orisema_linux_${arch}.tar.gz
 fixtures=$lab_root/fixtures
 fakebin=$lab_root/fakebin
@@ -110,7 +114,7 @@ test "$(sed -n '6p' "$log")" = gh
 test "$(sed -n '7p' "$log")" = tar
 
 printf '%s\n' '#!/bin/sh' 'echo "Orisema Infrastructure"' \
-  'echo "Version: v0.1.0-alpha.10"' "echo \"OS/Arch: linux/$arch\"" \
+  'echo "Version: v0.1.0-alpha.11"' "echo \"OS/Arch: linux/$arch\"" \
   >"$home_dir/.local/bin/orisema"
 chmod 0755 "$home_dir/.local/bin/orisema"
 if run_installer --user >"$lab_root/downgrade.out" 2>&1; then
@@ -199,4 +203,4 @@ if [ "${ORISEMA_SYSTEM_LAB:-0}" = 1 ]; then
   system_created=false
 fi
 
-echo "Alpha 9 installer lab passed: verified install, tamper rejection and rollback"
+echo "Installer lifecycle lab passed: verified install, downgrade, tamper rejection and rollback"

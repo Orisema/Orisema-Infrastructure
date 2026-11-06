@@ -4,15 +4,16 @@ This document distinguishes an artifact that is produced from an environment
 that is actually exercised. Orisema Infrastructure remains **experimental and
 is not recommended for production**.
 
-## Distribution and runtime
+## Distribution and runtime claim matrix
 
-| Environment | Artifact | Automated execution | Runtime coverage |
+| Environment | Evidence class | Artifact/execution | Runtime coverage |
 | --- | --- | --- | --- |
-| Ubuntu 24.04.5 AMD64 | Linux AMD64 | CLI, packaging, quick start and extended Podman laboratory | Podman 4.9.3 observed |
-| Ubuntu 22.04.5 AMD64 | Linux AMD64 | CLI and isolated quick start | Podman 3.4.4 observed |
-| Fedora 45 AMD64 | Linux AMD64 | Manual native deploy, configured update, verify and rollback | Podman 6.1.3 rootless, SELinux enforcing, overlay/crun |
-| Fedora 43 AMD64 (nested lab) | Linux AMD64 | Manual CLI, deploy and configured update through `apply` | Podman 5.8.9 rootful observed; privileged disposable container, not a native host |
-| Linux ARM64 | Linux ARM64 | Cross-build and binary metadata inspection only | Native execution not yet validated |
+| Ubuntu 24.04 AMD64 runner | Continuous CI | Native AMD64 CLI, packaging, quickstart, installer and extended Podman laboratory | Rootful Podman package installed by each run; exact version is in its artifact |
+| Ubuntu 22.04 AMD64 runner | Continuous CI | Native AMD64 CLI, quickstart and installer | Rootless quickstart; exact Podman version is in its artifact |
+| Fedora 43/45 AMD64 container | Continuous distribution CI | User/system install, upgrade rollback, explicit downgrade and uninstall fixtures | No Podman runtime claim; container is not a native host |
+| Fedora 45 AMD64 | Historical native laboratory | Release-shaped AMD64 CLI, deploy, configured update, verify and rollback | Podman 6.1.3 rootless, SELinux enforcing, overlay/crun |
+| Fedora 43 AMD64 | Historical nested laboratory | Native AMD64 CLI in privileged disposable userspace | Podman 5.8.9 rootful with vfs; not native-host evidence |
+| Linux ARM64 | Cross-build only | Archive build and Go binary metadata inspection | Native execution not validated |
 | Other Linux distributions | Architecture-dependent | Not continuously tested | Not established |
 | macOS | None | Not tested | Not supported |
 | Windows | None | Not tested | Not supported |
@@ -23,6 +24,11 @@ matrix uses fresh, independent GitHub-hosted runners and records
 artifacts. Package versions can change when runner images or Ubuntu repositories
 change; the workflow evidence for a commit is authoritative. These observations
 are not minimum-version guarantees.
+
+The evidence classes, reproducible commands and post-publication checks are
+defined by the [Alpha 10 release gate](ALPHA10-RELEASE-GATE.md). A compiled
+artifact, a container lab and a native runtime test are deliberately not
+treated as interchangeable evidence.
 
 The local development laboratory has also exercised Ubuntu 24.04.5 LTS AMD64,
 Linux kernel 6.8 and rootless Podman 4.9.3. On 2026-10-31 an isolated rootless

@@ -27,15 +27,33 @@ jobs:
         run: |
           scripts/build-release.sh
           scripts/verify-release.sh
-      - name: Exercise Alpha 9 installer safety contract
+      - name: Exercise installer safety contract
         run: |
-          scripts/alpha9-installer-lab.sh
+          ORISEMA_LAB_VERSION=v0.1.0-alpha.10 scripts/alpha9-installer-lab.sh
           docker run --rm \
             -e ORISEMA_SYSTEM_LAB=1 \
+            -e ORISEMA_LAB_VERSION=v0.1.0-alpha.10 \
             -v "$PWD:/src" \
             -w /src \
             golang:1.23-bookworm@sha256:167053a2bb901972bf2c1611f8f52c44d5fe7e762e5cab213708d82c421614db \
             sh -c scripts/alpha9-installer-lab.sh
+  fedora-installer:
+    name: installer (fedora-${{ matrix.release }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ['43', '45']
+    container: fedora:${{ matrix.release }}
+    steps:
+      - name: Install checkout and laboratory dependencies
+        run: dnf install -y git-core tar gzip findutils coreutils shadow-utils
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Exercise user and privileged installer lifecycle
+        env:
+          ORISEMA_SYSTEM_LAB: '1'
+          ORISEMA_LAB_VERSION: v0.1.0-alpha.10
+        run: scripts/alpha9-installer-lab.sh
   podman-healthcheck:
     runs-on: ubuntu-24.04
     timeout-minutes: 10

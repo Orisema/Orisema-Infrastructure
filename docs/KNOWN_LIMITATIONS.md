@@ -1,6 +1,6 @@
-# Limitações conhecidas — v0.1.0-alpha.8
+# Limitações conhecidas — desenvolvimento v0.1.0-alpha.10
 
-A Alpha 8 é um protótipo operacional para hosts Linux descartáveis. **Não é
+A branch `main` é um protótipo operacional para hosts Linux descartáveis. **Não é
 indicada para produção** e não possui garantia de estabilidade ou continuidade.
 
 ## Escopo suportado
@@ -43,8 +43,10 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 - Identidade autenticada do operador ou journal resistente a adulteração.
 - O audit local remoto é durável e privado, mas não é assinado nem resistente a
   adulteração por um usuário com acesso ao arquivo.
-- Assinatura criptográfica e atestação de proveniência dos artefatos; há apenas
-  checksums SHA-256.
+- O journal operacional local e o audit remoto não são assinados nem
+  resistentes a adulteração por um usuário com acesso aos arquivos. Artefatos
+  de release da Alpha 9 em diante possuem verificação separada por SHA-256,
+  Sigstore keyless e GitHub artifact attestation.
 
 ## Comportamentos intencionais
 
@@ -57,5 +59,6 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 - Uma implantação com vários serviços não é transacional. Se um serviço
   posterior falhar, serviços anteriores já criados não são revertidos.
 
-Veja o [plano Alpha](ALPHA_ROADMAP.md) para o que está proposto nas versões
-seguintes; itens futuros não são contratos da Alpha 6.
+Veja o [inventário verificável da CLI](CLI-INVENTORY.md) para efeitos e
+recuperação de cada comando e o [plano Alpha](ALPHA_ROADMAP.md) para itens
+futuros, que não constituem contratos implementados.

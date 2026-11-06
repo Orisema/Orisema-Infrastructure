@@ -36,6 +36,10 @@ import (
 )
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) == 1 && (args[0] == "help" || args[0] == "--help" || args[0] == "-h") {
+		printUsage(stdout)
+		return 0
+	}
 	if len(args) == 1 && args[0] == "version" {
 		fmt.Fprint(stdout, buildinfo.Current().String())
 		return 0
@@ -450,6 +454,19 @@ func secretConsumers(ctx context.Context, identity string) ([]string, error) {
 
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage: orisema version OR orisema doctor <manifest.yaml> --journal <directory> OR orisema recover operation <manifest.yaml> --journal <directory> --operation <id> OR orisema <validate|plan|status|diagnose> <manifest.yaml> OR orisema deploy --journal <absolute-directory> <manifest.yaml> OR orisema secret <create|list|inspect|remove> ... OR orisema update <plan|prepare|authorize|apply|verify|rollback|rollback-verify> ... OR orisema backup <create|verify|restore> ... OR orisema host check <registry.yaml> <alias> OR orisema remote <status|logs> ... --audit <absolute-path> OR orisema logs <manifest.yaml> <service> OR orisema <start|stop> --journal <absolute-directory> <manifest.yaml> <service> OR orisema operation <init|diagnose> --journal <absolute-directory> OR orisema recover <init|history|plan|prepare|apply|verify|reconcile|record> ...")
+	fmt.Fprintln(w, "Public command paths:")
+	for _, command := range publicCommandPaths {
+		fmt.Fprintf(w, "  %s\n", command)
+	}
+}
+
+var publicCommandPaths = []string{
+	"help", "version", "validate", "plan", "status", "diagnose", "logs", "doctor",
+	"deploy", "start", "stop", "operation init", "operation diagnose",
+	"secret create", "secret list", "secret inspect", "secret remove",
+	"update plan", "update prepare", "update authorize", "update apply", "update verify", "update rollback", "update rollback-verify",
+	"backup create", "backup verify", "backup restore", "host check", "remote status", "remote logs",
+	"recover operation", "recover init", "recover history", "recover plan", "recover prepare", "recover apply", "recover verify", "recover reconcile", "recover record",
 }
 
 func runOperationInit(args []string, stdout, stderr io.Writer) int {

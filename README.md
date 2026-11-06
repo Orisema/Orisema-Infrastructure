@@ -42,6 +42,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Instalação e verificação de releases](docs/INSTALLATION.md)
 - [Quick start em host Linux descartável](docs/QUICKSTART.md)
 - [Compatibilidade e comandos suportados](docs/COMPATIBILITY.md)
+- [Inventário operacional verificável da CLI](docs/CLI-INVENTORY.md)
 - [Auditoria de conclusão da Fase 2](docs/PHASE2-AUDIT.md)
 - [Auditoria de conclusão da Alpha 6](docs/ALPHA6-AUDIT.md)
 - [Auditoria de conclusão da Alpha 7](docs/ALPHA7-AUDIT.md)

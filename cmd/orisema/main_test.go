@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,37 @@ import (
 	"github.com/Orisema/Orisema-Infrastructure/internal/publicconfig"
 	"github.com/Orisema/Orisema-Infrastructure/internal/recovery"
 )
+
+func TestHelpAndOperationalInventoryCoverEveryPublicCommand(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	for _, arg := range []string{"help", "--help", "-h"} {
+		stdout.Reset()
+		stderr.Reset()
+		if code := run([]string{arg}, strings.NewReader(""), &stdout, &stderr); code != 0 || stderr.Len() != 0 {
+			t.Fatalf("%s code=%d stderr=%q", arg, code, stderr.String())
+		}
+		for _, command := range publicCommandPaths {
+			if !strings.Contains(stdout.String(), "  "+command+"\n") {
+				t.Fatalf("help missing public command %q", command)
+			}
+		}
+	}
+	_, source, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot locate test source")
+	}
+	inventoryPath := filepath.Join(filepath.Dir(source), "..", "..", "docs", "CLI-INVENTORY.md")
+	inventory, err := os.ReadFile(inventoryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range publicCommandPaths {
+		marker := "<!-- command: " + command + " -->"
+		if strings.Count(string(inventory), marker) != 1 {
+			t.Fatalf("inventory marker %q must occur exactly once", marker)
+		}
+	}
+}
 
 func TestRecoveryRecordWritesScopedHistoryWithoutRuntime(t *testing.T) {
 	dir := t.TempDir()

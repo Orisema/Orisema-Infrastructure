@@ -1,4 +1,4 @@
-# CLI prototype (Alpha 9 development)
+# CLI prototype (Alpha 10 development)
 
 This is an **experimental laboratory CLI**, not production-ready. `validate` works offline; `plan`, `status` and lifecycle commands query local Podman.
 
@@ -45,8 +45,10 @@ go run ./cmd/orisema recover reconcile examples/nginx-restart.yaml web --history
 go run ./cmd/orisema recover record examples/nginx-restart.yaml web START failed --history /secure/path/orisema-recovery.jsonl
 ```
 
-See [COMPATIBILITY.md](COMPATIBILITY.md) for a compact command/mutation matrix
-and [QUICKSTART.md](QUICKSTART.md) for the reviewed end-to-end laboratory.
+See [CLI-INVENTORY.md](CLI-INVENTORY.md) for every public syntax, effect, exit
+class and recovery boundary, [COMPATIBILITY.md](COMPATIBILITY.md) for a compact
+command/mutation matrix and [QUICKSTART.md](QUICKSTART.md) for the reviewed
+end-to-end laboratory.
 
 The `validate` command checks the versioned manifest structure, service
 identifiers, images, port ranges and version-specific bind rules. See the
@@ -203,16 +205,13 @@ Deployment uses `podman run --detach` with managed labels and
 never uses `--replace`. `v1alpha2` requires loopback-only binds; legacy
 `v1alpha1` ports retain their all-interface behavior.
 
-**Known limitations:** No rollback, automatic updates, volume support, health
-verification, preflight reservation of ports, image digest enforcement or
-transaction across multiple services. Podman detects conflicts when creating
-containers; a partially created owned container is removed only after its
-ownership labels are verified. Do not use this command for sensitive workloads.
-
-Alpha 3 separately specifies and exercises controlled update and application
-rollback in a disposable [laboratory](CONTROLLED-UPDATE-LAB.md). That workflow
-is deliberately not exposed as a supported CLI command and does not restore
-application data.
+**Known deploy limitations:** No automatic rollback, volume support,
+application-readiness verification, preflight reservation of ports, image
+digest enforcement or transaction across multiple services. Podman detects
+conflicts when creating containers; previously completed services are never
+rolled back automatically after a later failure. Controlled update and
+container rollback are separate public commands and do not restore application
+data. Do not use this command for sensitive workloads.
 
 To clean up the test manually after confirming its identity:
 

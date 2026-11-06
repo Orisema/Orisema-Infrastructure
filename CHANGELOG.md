@@ -8,6 +8,9 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ### Adicionado
 
+- Contrato único para contribuições humanas e assistidas por IA, com template
+  de PR, regras fail-closed, manual completo do mantenedor e laboratórios que
+  preservam os mesmos gates de confirmação, journal e revisão humana.
 - Inventário operacional de todos os comandos públicos, `orisema help` com
   caminhos canônicos e teste de CI que exige uma ficha para cada comando.
 - `orisema-doctor-v2` com códigos estáveis por causa, orientação separada para

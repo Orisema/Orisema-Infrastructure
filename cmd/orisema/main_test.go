@@ -52,6 +52,44 @@ func TestHelpAndOperationalInventoryCoverEveryPublicCommand(t *testing.T) {
 	}
 }
 
+func TestMaintainerAndAgentContractDocumentsStayConnected(t *testing.T) {
+	_, source, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot locate test source")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(source), "..", ".."))
+	required := map[string][]string{
+		"AGENTS.md": {
+			"Não invente resultados", "Preserve o comportamento fail-closed",
+			"Uma revisão humana é obrigatória", "docs/MAINTAINER-MANUAL.md",
+		},
+		filepath.Join(".github", "pull_request_template.md"): {
+			"## Problema e escopo", "## Módulos e contratos afetados",
+			"## Riscos, efeitos e recuperação", "## Evidência de validação",
+			"## Contrato de segurança", "## Revisão humana",
+		},
+		filepath.Join("docs", "MAINTAINER-MANUAL.md"): {
+			"## Invariantes", "## Fluxo de um comando", "## Mapa dos subsistemas",
+			"## Validação proporcional ao risco", "## Incidente e recuperação",
+		},
+		filepath.Join("docs", "OPERATOR-AGENT-LABS.md"): {
+			"## Pré-requisitos comuns", "## Laboratório 1", "## Laboratório 2",
+			"## Laboratório 3", "## Registro de evidência",
+		},
+	}
+	for name, markers := range required {
+		data, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		for _, marker := range markers {
+			if !bytes.Contains(data, []byte(marker)) {
+				t.Errorf("%s is missing contract marker %q", name, marker)
+			}
+		}
+	}
+}
+
 func TestRecoveryRecordWritesScopedHistoryWithoutRuntime(t *testing.T) {
 	dir := t.TempDir()
 	manifestPath := filepath.Join(dir, "manifest.yaml")

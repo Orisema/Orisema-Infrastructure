@@ -837,13 +837,13 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	store, err := operation.OpenExistingStore(args[3])
 	if err != nil {
 		blocked = true
-		fmt.Fprintf(stdout, "  [BLOCK] operation.journal code=%s: configured journal is unavailable or unsafe\n", doctorJournalCode(err))
+		fmt.Fprintf(stdout, "  [BLOCK] operation.journal code=%s: configured journal is unavailable or unsafe\n", doctorJournalCode(args[3], err))
 		fmt.Fprintln(stdout, "    next: preserve the configured path and inspect its existence, ownership and mode; do not recreate or delete evidence")
 	} else {
 		operations, listErr := store.List()
 		if listErr != nil {
 			blocked = true
-			fmt.Fprintf(stdout, "  [BLOCK] operation.journal code=%s: journal snapshots failed integrity validation\n", doctorJournalCode(listErr))
+			fmt.Fprintf(stdout, "  [BLOCK] operation.journal code=%s: journal snapshots failed integrity validation\n", doctorJournalCode(args[3], listErr))
 			fmt.Fprintln(stdout, "    next: preserve the complete journal and inspect the reported snapshots offline before any mutation")
 		} else {
 			fmt.Fprintf(stdout, "  [PASS] operation.journal code=OK: validated snapshots=%d\n", len(operations))
@@ -953,7 +953,10 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	return code
 }
 
-func doctorJournalCode(err error) string {
+func doctorJournalCode(path string, err error) string {
+	if _, statErr := os.Lstat(path); errors.Is(statErr, os.ErrNotExist) {
+		return "JOURNAL_UNAVAILABLE"
+	}
 	message := strings.ToLower(err.Error())
 	if strings.Contains(message, "decode") || strings.Contains(message, "invalid operation journal") || strings.Contains(message, "trailing json") {
 		return "JOURNAL_CORRUPT"

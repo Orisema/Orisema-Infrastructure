@@ -14,11 +14,11 @@ permissions:
 
 jobs:
   release:
-    if: github.event_name == 'push' || contains(fromJSON('[14, 27, 28, 46, 73, 89, 102, 121, 124]'), github.event.issue.number)
+    if: github.event_name == 'push' || contains(fromJSON('[14, 27, 28, 46, 73, 89, 102, 121, 124, 150]'), github.event.issue.number)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.issue.number == 27 && 'v0.1.0-alpha.2' || github.event.issue.number == 28 && 'v0.1.0-alpha.3' || github.event.issue.number == 46 && 'v0.1.0-alpha.4' || github.event.issue.number == 73 && 'v0.1.0-alpha.5' || github.event.issue.number == 89 && 'v0.1.0-alpha.6' || github.event.issue.number == 102 && 'v0.1.0-alpha.7' || github.event.issue.number == 121 && 'v0.1.0-alpha.8' || github.event.issue.number == 124 && 'v0.1.0-alpha.9' || 'v0.1.0-alpha.1' }}
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.issue.number == 27 && 'v0.1.0-alpha.2' || github.event.issue.number == 28 && 'v0.1.0-alpha.3' || github.event.issue.number == 46 && 'v0.1.0-alpha.4' || github.event.issue.number == 73 && 'v0.1.0-alpha.5' || github.event.issue.number == 89 && 'v0.1.0-alpha.6' || github.event.issue.number == 102 && 'v0.1.0-alpha.7' || github.event.issue.number == 121 && 'v0.1.0-alpha.8' || github.event.issue.number == 124 && 'v0.1.0-alpha.9' || github.event.issue.number == 150 && 'v0.1.0-alpha.10' || 'v0.1.0-alpha.1' }}
       COMMIT: ${{ github.event_name == 'push' && github.sha || github.event.issue.number == 27 && 'a33e930025247e801c2b57799a8c77aa821e8e3e' || github.sha }}
       CERTIFICATE_IDENTITY: https://github.com/${{ github.workflow_ref }}
     steps:
@@ -46,6 +46,7 @@ jobs:
             102) test "$VERSION" = v0.1.0-alpha.7 ;;
             121) test "$VERSION" = v0.1.0-alpha.8 ;;
             124) test "$VERSION" = v0.1.0-alpha.9 ;;
+            150) test "$VERSION" = v0.1.0-alpha.10 ;;
             *) exit 1 ;;
           esac
           existing="$(git ls-remote --refs origin "refs/tags/$VERSION" \
@@ -70,6 +71,19 @@ jobs:
           go vet ./...
           go test ./...
           go test -race ./...
+      - name: Record reproducible Alpha 10 source gate
+        if: env.VERSION == 'v0.1.0-alpha.10'
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/alpha10-release-gate
+        run: scripts/alpha10-release-gate.sh
+      - name: Upload Alpha 10 source-gate evidence
+        if: env.VERSION == 'v0.1.0-alpha.10'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: alpha10-release-gate-${{ github.sha }}
+          path: ${{ runner.temp }}/alpha10-release-gate
+          if-no-files-found: error
+          retention-days: 30
       - name: Build and verify release archives
         run: |
           scripts/build-release.sh
@@ -136,16 +150,51 @@ jobs:
           gh attestation verify checksums.txt --repo "$GITHUB_REPOSITORY"
           gh attestation verify orisema_linux_amd64.tar.gz --repo "$GITHUB_REPOSITORY"
           gh attestation verify orisema_linux_arm64.tar.gz --repo "$GITHUB_REPOSITORY"
+          cp orisema_linux_amd64.tar.gz tampered.tar.gz
+          printf tampered >> tampered.tar.gz
+          if gh attestation verify tampered.tar.gz --repo "$GITHUB_REPOSITORY"; then
+            echo 'tampered archive unexpectedly passed attestation verification' >&2
+            exit 1
+          fi
+          checksum_line="$(grep ' orisema_linux_amd64.tar.gz$' checksums.txt)"
+          cp orisema_linux_amd64.tar.gz original-amd64.tar.gz
+          printf tampered >> orisema_linux_amd64.tar.gz
+          if printf '%s\n' "$checksum_line" | sha256sum --check --strict; then
+            echo 'tampered archive unexpectedly passed checksum verification' >&2
+            exit 1
+          fi
+          mv original-amd64.tar.gz orisema_linux_amd64.tar.gz
+          cp checksums.txt tampered-checksums.txt
+          printf '# tampered\n' >> tampered-checksums.txt
+          if cosign verify-blob tampered-checksums.txt \
+            --bundle checksums.txt.sigstore.json \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity "$CERTIFICATE_IDENTITY"; then
+            echo 'tampered checksum metadata unexpectedly passed signature verification' >&2
+            exit 1
+          fi
           tar -xzf orisema_linux_amd64.tar.gz
           ./orisema version | tee installed-version.txt
           grep -Fq "Version: $VERSION" installed-version.txt
           grep -Fq "Commit: $COMMIT" installed-version.txt
-          sh "$GITHUB_WORKSPACE/install.sh" \
-            --version "$VERSION" \
+          sh "$GITHUB_WORKSPACE/install.sh" --version v0.1.0-alpha.9 \
+            --bin-dir "$install_dir/bin"
+          sh "$GITHUB_WORKSPACE/install.sh" --version "$VERSION" \
             --bin-dir "$install_dir/bin"
           "$install_dir/bin/orisema" version | tee installer-version.txt
           grep -Fq "Version: $VERSION" installer-version.txt
           grep -Fq "Commit: $COMMIT" installer-version.txt
+          if sh "$GITHUB_WORKSPACE/install.sh" --version v0.1.0-alpha.9 \
+            --bin-dir "$install_dir/bin"; then
+            echo 'implicit downgrade unexpectedly succeeded' >&2
+            exit 1
+          fi
+          "$install_dir/bin/orisema" version | grep -Fq "Version: $VERSION"
+          sh "$GITHUB_WORKSPACE/install.sh" --version v0.1.0-alpha.9 \
+            --bin-dir "$install_dir/bin" --allow-downgrade
+          "$install_dir/bin/orisema" version | grep -Fq 'Version: v0.1.0-alpha.9'
+          sh "$GITHUB_WORKSPACE/install.sh" --version "$VERSION" \
+            --bin-dir "$install_dir/bin"
           HOME="$install_dir/home" XDG_BIN_HOME="$install_dir/bin" \
             sh "$GITHUB_WORKSPACE/uninstall.sh" --user
           test ! -e "$install_dir/bin/orisema"

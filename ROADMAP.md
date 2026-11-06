@@ -167,7 +167,8 @@ autenticidade, integridade, versão e arquitetura terem sido verificadas.
 - [x] Publicar um caminho manual e um caminho orientado a agentes com o mesmo
   contrato de segurança ([manual e laboratórios](docs/OPERATOR-AGENT-LABS.md),
   #149).
-- [ ] Aplicar o gate de compatibilidade, upgrade e downgrade à release (#150).
+- [x] Aplicar o gate de compatibilidade, upgrade e downgrade à release
+  ([gate reproduzível](docs/ALPHA10-RELEASE-GATE.md), #150).
 
 **Princípio:** toda mutação é uma operação durável admitida atomicamente;
 automação e experiência de uso não podem contornar confirmação, ownership,

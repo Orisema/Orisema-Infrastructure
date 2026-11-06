@@ -8,6 +8,9 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ### Adicionado
 
+- Gate reproduzível da Alpha 10 que separa cross-build, CI, laboratório aninhado
+  e teste nativo, inclui instalação Fedora e revalida assinatura, checksum,
+  attestations, upgrade, downgrade explícito e uninstall após a publicação.
 - Contrato único para contribuições humanas e assistidas por IA, com template
   de PR, regras fail-closed, manual completo do mantenedor e laboratórios que
   preservam os mesmos gates de confirmação, journal e revisão humana.

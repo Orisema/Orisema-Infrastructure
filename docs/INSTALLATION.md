@@ -54,6 +54,13 @@ gh attestation verify "orisema_linux_${arch}.tar.gz" \
 This verification is online and requires current Cosign and GitHub CLI
 versions. It is not a guarantee attached retroactively to Alpha 8.
 
+The Alpha 10 candidate retains this trust path and adds a release gate that
+downloads the published assets again, rejects altered signature/checksum/
+attestation inputs and exercises authenticated Alpha 9 -> Alpha 10 upgrade,
+blocked implicit downgrade, explicit downgrade and uninstall. See the
+[reproducible gate](ALPHA10-RELEASE-GATE.md). Do not treat Alpha 10 as published
+until its release workflow and asset verification have succeeded.
+
 Extract and inspect the binary before installing it:
 
 ```sh

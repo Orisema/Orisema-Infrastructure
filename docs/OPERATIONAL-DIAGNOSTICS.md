@@ -1,5 +1,11 @@
 # Operational diagnostics (experimental)
 
+For host readiness, `orisema doctor <manifest> --journal <directory>` emits the
+`orisema-doctor-v2` contract. Search for `code=<CODE>` rather than matching
+prose. `PASS` and `WARN` are informational, `BLOCK` exits `1`, and no result is
+authorization to mutate. The complete code table and exit semantics are in
+[CLI.md](CLI.md#doctor).
+
 `orisema diagnose` is a read-only view that keeps five concerns separate:
 
 - **configuration:** comparison of the supported manifest fields;

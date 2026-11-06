@@ -354,8 +354,10 @@ The path must be absolute. Initialization creates a private store when it is
 absent and is idempotent only for an already safe store. It does not repair
 permissions, replace a missing lock, load a manifest or contact Podman.
 
-`orisema doctor <manifest.yaml> --journal <directory>` performs the first
-Alpha 9 pre-operational checks without changing Podman or the journal. It
+`orisema doctor <manifest.yaml> --journal <directory>` performs pre-operational
+checks without changing Podman or the journal. Its human-readable output uses
+contract `orisema-doctor-v2`: every line has a stable check ID, status and
+machine-searchable `code`. It
 validates the manifest, reads the current Podman rootless/rootful boundary,
 validates every operation snapshot, reports incomplete operations scoped to
 the application, resolves metadata-only secret and network identities and
@@ -364,12 +366,27 @@ space for both the journal and Podman graph root.
 
 Checks are reported as `PASS`, `WARN` or `BLOCK`. A missing container is a
 `WARN`, while drift, ownership ambiguity and unavailable bindings are `BLOCK`.
+The final result is `PASS`, `WARN` or `BLOCK`; both `PASS` and `WARN` exit `0`,
+while neither authorizes a mutation. The stable blocking codes are:
+
+| Area | Codes |
+| --- | --- |
+| Manifest | `MANIFEST_INVALID` |
+| Podman/runtime | `RUNTIME_UNAVAILABLE`, `RUNTIME_INVENTORY_UNAVAILABLE`, `RUNTIME_DRIFT_OR_OWNERSHIP` |
+| Journal | `JOURNAL_UNAVAILABLE`, `JOURNAL_UNSAFE`, `JOURNAL_CORRUPT`, `OPERATION_INCOMPLETE` |
+| Storage | `JOURNAL_STORAGE_UNAVAILABLE`, `JOURNAL_SPACE_LOW`, `RUNTIME_STORAGE_UNAVAILABLE`, `RUNTIME_SPACE_LOW` |
+| Bindings | `SECRET_BINDING_UNAVAILABLE`, `NETWORK_BINDING_UNAVAILABLE` |
+
 Exit code `0` means no blocking check was found, `1` means diagnosis completed
 with a block or could not be completed, and `2` means invalid CLI usage. A
 `PASS` is not authorization to mutate. A missing, unsafe or corrupt journal
 fails closed and must be preserved for investigation.
 
-Secret values and locators are not printed. The command does not forecast
+Secret values, locators and raw manifest parsing errors are not printed. The
+next step for a block is inspection or a separately reviewed operator action;
+it never invokes cleanup, permission repair, deploy or recovery. Independent
+checks continue where safe, so an unavailable runtime does not hide an unsafe
+journal. The command does not forecast
 volume growth or enforce a mutation guard on legacy commands without a journal.
 Both storage checks require at least 256 MiB available; this is an operational
 safety margin, not a capacity forecast for images or application data. See

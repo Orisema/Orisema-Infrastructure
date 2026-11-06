@@ -3,7 +3,8 @@
 - Status: implementado na Alpha 9
 - Issues: #124, #125
 - Contratos de manifesto: `orisema.dev/v1alpha1` a `orisema.dev/v1alpha4`
-- Contrato operacional inicial: `orisema-doctor-v1`
+- Contrato operacional inicial: `orisema-doctor-v1`; diagnóstico acionável:
+  `orisema-doctor-v2`
 
 ## Resumo
 
@@ -73,6 +74,13 @@ Cada check possui:
 - `status`: `PASS`, `WARN` ou `BLOCK`;
 - `summary`: conclusão sem dados sensíveis;
 - `next`: comando ou ação do operador, quando aplicável.
+
+`orisema-doctor-v2` acrescenta `code`, um identificador ASCII estável para a
+causa, diferencia indisponibilidade, insegurança e corrupção do journal e
+separa pressão de espaço do journal e do graph root. O resultado agregado pode
+ser `WARN` com exit code `0`. Erros brutos de parsing do manifesto não fazem
+parte da saída porque podem repetir conteúdo fornecido pelo operador. Checks
+independentes continuam quando isso não requer assumir identidade ou autoridade.
 
 O exit code é `0` quando não existe `BLOCK`, `1` quando o diagnóstico foi
 concluído com bloqueio ou ficou incompleto, e `2` para uso inválido da CLI.

@@ -6,6 +6,13 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ## [Unreleased]
 
+### Adicionado
+
+- `orisema-doctor-v2` com códigos estáveis por causa, orientação separada para
+  manifesto, runtime, bindings, journal e armazenamento, resultado agregado
+  `WARN`, continuidade de checks independentes e redação de erros brutos do
+  manifesto.
+
 ## [0.1.0-alpha.9] - 2026-11-05
 
 ### Adicionado

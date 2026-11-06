@@ -241,8 +241,8 @@ os laboratórios Podman e o race detector passaram no CI. O laboratório Fedora
 - [ ] Publicar inventário verificável da CLI, contratos e limitações (#146).
 - [x] Exercitar encerramento abrupto, reboot e disco cheio sem perda silenciosa
   de evidência ([laboratório Alpha 10](ALPHA10-FAILURE-LAB.md), #147).
-- [ ] Tornar os próximos passos de `doctor` acionáveis e ainda somente leitura
-  (#148).
+- [x] Tornar os próximos passos de `doctor` acionáveis e ainda somente leitura
+  ([contrato do CLI](CLI.md#doctor), #148).
 - [ ] Documentar fluxos equivalentes para operadores e agentes, sem atalho de
   segurança (#149).
 - [ ] Repetir a matriz de compatibilidade, instalação, upgrade, downgrade e

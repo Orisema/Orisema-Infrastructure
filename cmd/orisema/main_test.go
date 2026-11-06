@@ -230,7 +230,7 @@ func TestDoctorReportsPassWithoutChangingJournal(t *testing.T) {
 	if code != 0 || stderr.Len() != 0 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
-	for _, expected := range []string{"orisema-doctor-v1", "[PASS] manifest.valid", "mode=rootless", "[PASS] operation.pending", "[PASS] binding.secrets", "[PASS] binding.networks", "[WARN] runtime.application", "Doctor result: PASS", "No runtime or journal changes made"} {
+	for _, expected := range []string{"orisema-doctor-v2", "[PASS] manifest.valid code=OK", "mode=rootless", "[PASS] operation.pending code=OK", "[PASS] binding.secrets code=OK", "[PASS] binding.networks code=OK", "code=CONTAINER_ABSENT", "Doctor result: WARN (exit=0)", "No runtime or journal changes made"} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("stdout %q missing %q", stdout.String(), expected)
 		}
@@ -265,7 +265,7 @@ func TestDoctorBlocksIncompleteApplicationOperation(t *testing.T) {
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"doctor", manifestPath, "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
-	if code != 1 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "[BLOCK] operation.pending: id=update-pending type=UPDATE state=PENDING") || !strings.Contains(stdout.String(), "mode=rootful") {
+	if code != 1 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "[BLOCK] operation.pending code=OPERATION_INCOMPLETE: id=update-pending type=UPDATE state=PENDING") || !strings.Contains(stdout.String(), "mode=rootful") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
@@ -289,7 +289,7 @@ func TestDoctorDoesNotExposeSecretLocator(t *testing.T) {
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"doctor", manifestPath, "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
-	if code != 1 || !strings.Contains(stdout.String(), "[BLOCK] binding.secrets") {
+	if code != 1 || !strings.Contains(stdout.String(), "code=SECRET_BINDING_UNAVAILABLE") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	if strings.Contains(stdout.String(), canary) || strings.Contains(stderr.String(), canary) {
@@ -315,8 +315,76 @@ func TestDoctorFailsClosedForUnsafeJournalAndUsage(t *testing.T) {
 	stdout.Reset()
 	stderr.Reset()
 	code := run([]string{"doctor", manifestPath, "--journal", filepath.Join(dir, "missing")}, strings.NewReader(""), &stdout, &stderr)
-	if code != 1 || !strings.Contains(stdout.String(), "[BLOCK] operation.journal") || !strings.Contains(stdout.String(), "do not recreate or delete evidence") {
+	if code != 1 || !strings.Contains(stdout.String(), "code=JOURNAL_UNAVAILABLE") || !strings.Contains(stdout.String(), "do not recreate or delete evidence") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestDoctorClassifiesJournalFailuresWithoutRepair(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	if err := os.WriteFile(manifestPath, []byte("apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte(doctorPodmanScript(dir, true)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	unsafeJournal := filepath.Join(dir, "unsafe")
+	if _, err := operation.OpenStore(unsafeJournal); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(unsafeJournal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"doctor", manifestPath, "--journal", unsafeJournal}, strings.NewReader(""), &stdout, &stderr); code != 1 || !strings.Contains(stdout.String(), "code=JOURNAL_UNSAFE") {
+		t.Fatalf("unsafe code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if info, err := os.Stat(unsafeJournal); err != nil || info.Mode().Perm() != 0o755 {
+		t.Fatalf("doctor repaired unsafe journal: %v, %v", info, err)
+	}
+
+	corruptJournal := filepath.Join(dir, "corrupt")
+	if _, err := operation.OpenStore(corruptJournal); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(corruptJournal, "broken.json"), []byte("{\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := run([]string{"doctor", manifestPath, "--journal", corruptJournal}, strings.NewReader(""), &stdout, &stderr); code != 1 || !strings.Contains(stdout.String(), "code=JOURNAL_CORRUPT") {
+		t.Fatalf("corrupt code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestDoctorRedactsInvalidManifestDetails(t *testing.T) {
+	dir := t.TempDir()
+	canary := "manifest-secret-canary-value"
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	data := "apiVersion: orisema.dev/v1alpha2\nkind: Application\nname: demo\nunknownSensitiveField: " + canary + "\nservices:\n  - name: web\n    image: nginx:stable\n"
+	if err := os.WriteFile(manifestPath, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	journal := filepath.Join(dir, "operations")
+	if _, err := operation.OpenStore(journal); err != nil {
+		t.Fatal(err)
+	}
+	podman := filepath.Join(dir, "podman")
+	if err := os.WriteFile(podman, []byte(doctorPodmanScript(dir, true)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"doctor", manifestPath, "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || !strings.Contains(stdout.String(), "code=MANIFEST_INVALID") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if strings.Contains(stdout.String(), canary) || strings.Contains(stderr.String(), canary) {
+		t.Fatalf("doctor exposed invalid manifest content: stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
 

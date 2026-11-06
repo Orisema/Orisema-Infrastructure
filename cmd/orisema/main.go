@@ -809,112 +809,133 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		printUsage(stderr)
 		return 2
 	}
-	fmt.Fprintln(stdout, "Orisema doctor (read-only, contract orisema-doctor-v1):")
+	fmt.Fprintln(stdout, "Orisema doctor (read-only, contract orisema-doctor-v2):")
+	blocked, warned := false, false
 	m, err := manifest.Load(args[1])
 	if err != nil {
-		fmt.Fprintf(stdout, "  [BLOCK] manifest.valid: validation failed: %v\n", err)
-		fmt.Fprintln(stdout, "    next: correct the manifest and run doctor again")
-		fmt.Fprintln(stdout, "No runtime or journal changes made.")
-		return 1
+		blocked = true
+		fmt.Fprintln(stdout, "  [BLOCK] manifest.valid code=MANIFEST_INVALID: manifest could not be parsed or validated")
+		fmt.Fprintln(stdout, "    next: inspect the manifest locally, correct its schema or permissions, then run doctor again")
+	} else {
+		fmt.Fprintf(stdout, "  [PASS] manifest.valid code=OK: application=%s services=%d\n", m.Name, len(m.Services))
 	}
-	fmt.Fprintf(stdout, "  [PASS] manifest.valid: application=%s services=%d\n", m.Name, len(m.Services))
 
 	environment, err := (runtime.Client{}).Environment(context.Background())
+	runtimeAvailable := err == nil
 	if err != nil {
-		fmt.Fprintf(stdout, "  [BLOCK] runtime.podman: unavailable: %v\n", err)
-		fmt.Fprintln(stdout, "    next: restore Podman access for the current user and run doctor again")
-		fmt.Fprintln(stdout, "No runtime or journal changes made.")
-		return 1
+		blocked = true
+		fmt.Fprintln(stdout, "  [BLOCK] runtime.podman code=RUNTIME_UNAVAILABLE: Podman is unavailable to the current user")
+		fmt.Fprintln(stdout, "    next: run 'podman info' as the same user, restore read-only access, then run doctor again")
+	} else {
+		mode := "rootful"
+		if environment.Rootless {
+			mode = "rootless"
+		}
+		fmt.Fprintf(stdout, "  [PASS] runtime.podman code=OK: available mode=%s\n", mode)
 	}
-	mode := "rootful"
-	if environment.Rootless {
-		mode = "rootless"
-	}
-	fmt.Fprintf(stdout, "  [PASS] runtime.podman: available mode=%s\n", mode)
 
 	store, err := operation.OpenExistingStore(args[3])
 	if err != nil {
-		fmt.Fprintf(stdout, "  [BLOCK] operation.journal: unsafe or unavailable: %v\n", err)
-		fmt.Fprintln(stdout, "    next: inspect the explicitly configured journal path; do not recreate or delete evidence")
-		fmt.Fprintln(stdout, "No runtime or journal changes made.")
-		return 1
-	}
-	operations, err := store.List()
-	if err != nil {
-		fmt.Fprintf(stdout, "  [BLOCK] operation.journal: validation failed: %v\n", err)
-		fmt.Fprintln(stdout, "    next: preserve the journal and investigate its integrity before any mutation")
-		fmt.Fprintln(stdout, "No runtime or journal changes made.")
-		return 1
-	}
-	blocked := false
-	var incomplete []operation.Operation
-	for _, op := range operations {
-		if op.Application == m.Name && !op.State.Terminal() {
-			incomplete = append(incomplete, op)
+		blocked = true
+		fmt.Fprintf(stdout, "  [BLOCK] operation.journal code=%s: configured journal is unavailable or unsafe\n", doctorJournalCode(args[3], err))
+		fmt.Fprintln(stdout, "    next: preserve the configured path and inspect its existence, ownership and mode; do not recreate or delete evidence")
+	} else {
+		operations, listErr := store.List()
+		if listErr != nil {
+			blocked = true
+			fmt.Fprintf(stdout, "  [BLOCK] operation.journal code=%s: journal snapshots failed integrity validation\n", doctorJournalCode(args[3], listErr))
+			fmt.Fprintln(stdout, "    next: preserve the complete journal and inspect the reported snapshots offline before any mutation")
+		} else {
+			fmt.Fprintf(stdout, "  [PASS] operation.journal code=OK: validated snapshots=%d\n", len(operations))
+			if m != nil {
+				var incomplete []operation.Operation
+				for _, op := range operations {
+					if op.Application == m.Name && !op.State.Terminal() {
+						incomplete = append(incomplete, op)
+					}
+				}
+				if len(incomplete) == 0 {
+					fmt.Fprintf(stdout, "  [PASS] operation.pending code=OK: none for application=%s\n", m.Name)
+				} else {
+					blocked = true
+					for _, op := range incomplete {
+						fmt.Fprintf(stdout, "  [BLOCK] operation.pending code=OPERATION_INCOMPLETE: id=%s type=%s state=%s\n", op.ID, op.Type, op.State)
+					}
+					fmt.Fprintf(stdout, "    next: orisema operation diagnose --journal %s\n", args[3])
+				}
+			}
 		}
 	}
-	if len(incomplete) == 0 {
-		fmt.Fprintf(stdout, "  [PASS] operation.pending: none for application=%s\n", m.Name)
-	} else {
-		blocked = true
-		for _, op := range incomplete {
-			fmt.Fprintf(stdout, "  [BLOCK] operation.pending: id=%s type=%s state=%s\n", op.ID, op.Type, op.State)
-		}
-		fmt.Fprintf(stdout, "    next: orisema operation diagnose --journal %s\n", args[3])
-	}
-	journalAvailable, err := storagecheck.Available(args[3])
-	if err != nil || !storagecheck.Sufficient(journalAvailable) {
-		blocked = true
-		fmt.Fprintln(stdout, "  [BLOCK] storage.journal: capacity is unavailable or below 256 MiB")
-		fmt.Fprintln(stdout, "    next: restore safe free space on the journal filesystem and run doctor again")
-	} else {
-		fmt.Fprintf(stdout, "  [PASS] storage.journal: available=%d MiB\n", journalAvailable>>20)
-	}
-	storagePath, err := (runtime.Client{}).StoragePath(context.Background())
+	journalBytes, err := storagecheck.Available(args[3])
 	if err != nil {
 		blocked = true
-		fmt.Fprintln(stdout, "  [BLOCK] storage.runtime: Podman storage metadata is unavailable")
-		fmt.Fprintln(stdout, "    next: restore Podman storage access and run doctor again")
-	} else if runtimeAvailable, measureErr := storagecheck.Available(storagePath); measureErr != nil || !storagecheck.Sufficient(runtimeAvailable) {
+		fmt.Fprintln(stdout, "  [BLOCK] storage.journal code=JOURNAL_STORAGE_UNAVAILABLE: journal filesystem capacity could not be measured")
+		fmt.Fprintln(stdout, "    next: restore read access to the configured filesystem and run doctor again without changing the journal")
+	} else if !storagecheck.Sufficient(journalBytes) {
 		blocked = true
-		fmt.Fprintln(stdout, "  [BLOCK] storage.runtime: capacity is unavailable or below 256 MiB")
-		fmt.Fprintln(stdout, "    next: restore safe free space on the Podman storage filesystem and run doctor again")
+		fmt.Fprintf(stdout, "  [BLOCK] storage.journal code=JOURNAL_SPACE_LOW: available=%d MiB required=256 MiB\n", journalBytes>>20)
+		fmt.Fprintln(stdout, "    next: free space outside the journal, preserve all journal files, then run doctor again")
 	} else {
-		fmt.Fprintf(stdout, "  [PASS] storage.runtime: available=%d MiB\n", runtimeAvailable>>20)
+		fmt.Fprintf(stdout, "  [PASS] storage.journal code=OK: available=%d MiB\n", journalBytes>>20)
+	}
+	if runtimeAvailable {
+		storagePath, storageErr := (runtime.Client{}).StoragePath(context.Background())
+		if storageErr != nil {
+			blocked = true
+			fmt.Fprintln(stdout, "  [BLOCK] storage.runtime code=RUNTIME_STORAGE_UNAVAILABLE: Podman storage metadata is unavailable")
+			fmt.Fprintln(stdout, "    next: run 'podman info' as the same user, restore storage visibility, then run doctor again")
+		} else if runtimeBytes, measureErr := storagecheck.Available(storagePath); measureErr != nil {
+			blocked = true
+			fmt.Fprintln(stdout, "  [BLOCK] storage.runtime code=RUNTIME_STORAGE_UNAVAILABLE: Podman storage capacity could not be measured")
+			fmt.Fprintln(stdout, "    next: inspect the Podman graph root filesystem as the same user, then run doctor again")
+		} else if !storagecheck.Sufficient(runtimeBytes) {
+			blocked = true
+			fmt.Fprintf(stdout, "  [BLOCK] storage.runtime code=RUNTIME_SPACE_LOW: available=%d MiB required=256 MiB\n", runtimeBytes>>20)
+			fmt.Fprintln(stdout, "    next: free Podman storage using an explicit operator-reviewed procedure, then run doctor again")
+		} else {
+			fmt.Fprintf(stdout, "  [PASS] storage.runtime code=OK: available=%d MiB\n", runtimeBytes>>20)
+		}
 	}
 
-	resolvedSecrets, err := resolveManifestSecrets(context.Background(), m)
-	if err != nil {
-		blocked = true
-		fmt.Fprintln(stdout, "  [BLOCK] binding.secrets: one or more references are unavailable or unsafe")
-		fmt.Fprintln(stdout, "    next: inspect declared secret metadata and permissions; values and locators were not printed")
-	} else {
-		fmt.Fprintf(stdout, "  [PASS] binding.secrets: resolved metadata for %d service(s)\n", len(resolvedSecrets))
+	var resolvedSecrets map[string][]secrets.ResolvedMount
+	var resolvedNetworks map[string][]networks.ResolvedBinding
+	if m != nil {
+		resolvedSecrets, err = resolveManifestSecrets(context.Background(), m)
+		if err != nil {
+			blocked = true
+			fmt.Fprintln(stdout, "  [BLOCK] binding.secrets code=SECRET_BINDING_UNAVAILABLE: one or more secret references are unavailable or unsafe")
+			fmt.Fprintln(stdout, "    next: inspect declared secret metadata and private file permissions; values and locators were not printed")
+		} else {
+			fmt.Fprintf(stdout, "  [PASS] binding.secrets code=OK: resolved metadata for %d service(s)\n", len(resolvedSecrets))
+		}
+		resolvedNetworks, err = resolveManifestNetworks(context.Background(), m)
+		if err != nil {
+			blocked = true
+			fmt.Fprintln(stdout, "  [BLOCK] binding.networks code=NETWORK_BINDING_UNAVAILABLE: one or more network references are unavailable or unsafe")
+			fmt.Fprintln(stdout, "    next: inspect declared network metadata with read-only Podman commands; locators were not printed")
+		} else {
+			fmt.Fprintf(stdout, "  [PASS] binding.networks code=OK: resolved metadata for %d service(s)\n", len(resolvedNetworks))
+		}
 	}
-	resolvedNetworks, err := resolveManifestNetworks(context.Background(), m)
-	if err != nil {
-		blocked = true
-		fmt.Fprintln(stdout, "  [BLOCK] binding.networks: one or more references are unavailable or unsafe")
-		fmt.Fprintln(stdout, "    next: inspect declared network metadata; locators were not printed")
-	} else {
-		fmt.Fprintf(stdout, "  [PASS] binding.networks: resolved metadata for %d service(s)\n", len(resolvedNetworks))
-	}
-	if resolvedSecrets != nil && resolvedNetworks != nil {
+	if m != nil && runtimeAvailable && resolvedSecrets != nil && resolvedNetworks != nil {
 		containers, listErr := (runtime.Client{}).List(context.Background())
 		if listErr != nil {
 			blocked = true
-			fmt.Fprintln(stdout, "  [BLOCK] runtime.application: container inventory is unavailable")
-			fmt.Fprintln(stdout, "    next: restore read-only Podman inspection and run doctor again")
+			fmt.Fprintln(stdout, "  [BLOCK] runtime.application code=RUNTIME_INVENTORY_UNAVAILABLE: container inventory is unavailable")
+			fmt.Fprintln(stdout, "    next: verify 'podman ps --all' as the same user, restore read-only inspection, then run doctor again")
 		} else {
 			for _, step := range planner.BuildInspectedResolvedRuntime(context.Background(), m, containers, runtime.Client{}, resolvedSecrets, resolvedNetworks) {
 				switch step.Action {
 				case planner.Noop:
-					fmt.Fprintf(stdout, "  [PASS] runtime.application: name=%s declared fields match\n", step.Name)
+					fmt.Fprintf(stdout, "  [PASS] runtime.application code=OK: name=%s declared fields match\n", step.Name)
 				case planner.Create:
-					fmt.Fprintf(stdout, "  [WARN] runtime.application: name=%s container not found; deploy review required\n", step.Name)
+					warned = true
+					fmt.Fprintf(stdout, "  [WARN] runtime.application code=CONTAINER_ABSENT: name=%s container not found\n", step.Name)
+					fmt.Fprintln(stdout, "    next: review 'orisema plan <manifest>' output; this warning does not authorize deploy")
 				default:
 					blocked = true
-					fmt.Fprintf(stdout, "  [BLOCK] runtime.application: name=%s action=%s reason=%s\n", step.Name, step.Action, step.Reason)
+					fmt.Fprintf(stdout, "  [BLOCK] runtime.application code=RUNTIME_DRIFT_OR_OWNERSHIP: name=%s action=%s reason=%s\n", step.Name, step.Action, step.Reason)
+					fmt.Fprintln(stdout, "    next: inspect the named container and ownership labels; do not replace, adopt or remove it automatically")
 				}
 			}
 		}
@@ -924,10 +945,26 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	if blocked {
 		result = "BLOCK"
 		code = 1
+	} else if warned {
+		result = "WARN"
 	}
-	fmt.Fprintf(stdout, "Doctor result: %s\n", result)
+	fmt.Fprintf(stdout, "Doctor result: %s (exit=%d)\n", result, code)
 	fmt.Fprintln(stdout, "No runtime or journal changes made.")
 	return code
+}
+
+func doctorJournalCode(path string, err error) string {
+	if _, statErr := os.Lstat(path); errors.Is(statErr, os.ErrNotExist) {
+		return "JOURNAL_UNAVAILABLE"
+	}
+	message := strings.ToLower(err.Error())
+	if strings.Contains(message, "decode") || strings.Contains(message, "invalid operation journal") || strings.Contains(message, "trailing json") {
+		return "JOURNAL_CORRUPT"
+	}
+	if strings.Contains(message, "unsafe") || strings.Contains(message, "permissions") || strings.Contains(message, "symlink") || strings.Contains(message, "real directory") {
+		return "JOURNAL_UNSAFE"
+	}
+	return "JOURNAL_UNAVAILABLE"
 }
 
 func runRemoteCommand(args []string, stdout, stderr io.Writer) int {

@@ -161,8 +161,8 @@ autenticidade, integridade, versão e arquitetura terem sido verificadas.
 - [ ] Consolidar o inventário da CLI e os limites operacionais (#146).
 - [x] Cobrir falhas abruptas, reboot e esgotamento de disco em laboratórios
   reproduzíveis ([laboratório Alpha 10](docs/ALPHA10-FAILURE-LAB.md), #147).
-- [ ] Melhorar o próximo passo apresentado por `doctor` sem conceder autoridade
-  de mutação (#148).
+- [x] Melhorar o próximo passo apresentado por `doctor` sem conceder autoridade
+  de mutação ([contrato do CLI](docs/CLI.md#doctor), #148).
 - [ ] Publicar um caminho manual e um caminho orientado a agentes com o mesmo
   contrato de segurança (#149).
 - [ ] Aplicar o gate de compatibilidade, upgrade e downgrade à release (#150).

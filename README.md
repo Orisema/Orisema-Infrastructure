@@ -51,6 +51,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Auditoria de conclusão da Alpha 7](docs/ALPHA7-AUDIT.md)
 - [Auditoria de conclusão da Alpha 8](docs/ALPHA8-AUDIT.md)
 - [Auditoria de conclusão da Alpha 9](docs/ALPHA9-AUDIT.md)
+- [Auditoria e evidências da Alpha 10](docs/ALPHA10-AUDIT.md)
 - [Laboratórios Fedora 43/45 da Alpha 8](docs/ALPHA8-FEDORA-LAB.md)
 
 ## Versão do binário
@@ -63,7 +64,7 @@ go build -o orisema ./cmd/orisema
 ./orisema version
 ```
 
-O [pré-release v0.1.0-alpha.9](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.9)
+O [pré-release v0.1.0-alpha.10](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.10)
 distribui binários para Linux AMD64 e Linux ARM64. Podman
 em Linux é o único runtime suportado inicialmente; Docker, Windows e macOS não
 têm suporte oficial nesta etapa. Consulte as diferenças entre alvos compilados

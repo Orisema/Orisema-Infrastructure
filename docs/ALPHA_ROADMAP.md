@@ -255,6 +255,11 @@ atômica; concorrência e falhas abruptas permanecem diagnosticáveis; documenta
 e automação usam o mesmo contrato; upgrade ou downgrade incompatível falha sem
 substituir o binário utilizável.
 
+O gate foi concluído em 6 de novembro de 2026 no commit
+`3db74f1b090d31336555e80d0574feb6e484f755`; a publicação, autenticação e
+reinstalação dos artefatos passaram. Consulte a
+[auditoria da Alpha 10](ALPHA10-AUDIT.md).
+
 ## Integração opcional futura — Orisema Data
 
 O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integração será precedida por RFC e laboratório com serviço simulado. Não é requisito para as Alphas 1–6; Gera Base fica fora do escopo.

@@ -4,8 +4,8 @@ Orisema Infrastructure is **experimental software and is not recommended for
 production environments**.
 
 Release archives let Linux users run Orisema without installing Go. The latest
-experimental release, [`v0.1.0-alpha.9`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.9),
-was published on 2026-11-05 and remains unsuitable for production.
+experimental release, [`v0.1.0-alpha.10`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.10),
+was published on 2026-11-06 and remains unsuitable for production.
 
 ## Supported distribution targets
 
@@ -25,7 +25,7 @@ distribution, kernel, Podman version or ARM64 machine has been tested.
 Select the release version and your architecture (`amd64` or `arm64`):
 
 ```sh
-version=v0.1.0-alpha.9
+version=v0.1.0-alpha.10
 arch=amd64
 curl -fLO "https://github.com/Orisema/Orisema-Infrastructure/releases/download/${version}/orisema_linux_${arch}.tar.gz"
 curl -fLO "https://github.com/Orisema/Orisema-Infrastructure/releases/download/${version}/checksums.txt"
@@ -38,7 +38,7 @@ publish `checksums.txt.sigstore.json`, authenticate the checksum metadata with
 Sigstore and create GitHub artifact attestations. The Alpha 9 instructions will
 require those checks rather than silently falling back to an unsigned checksum.
 
-The Alpha 9 manual verification contract is:
+The Alpha 9+ manual verification contract is:
 
 ```sh
 curl -fLO "https://github.com/Orisema/Orisema-Infrastructure/releases/download/${version}/checksums.txt.sigstore.json"
@@ -54,12 +54,12 @@ gh attestation verify "orisema_linux_${arch}.tar.gz" \
 This verification is online and requires current Cosign and GitHub CLI
 versions. It is not a guarantee attached retroactively to Alpha 8.
 
-The Alpha 10 candidate retains this trust path and adds a release gate that
+Alpha 10 retains this trust path and adds a release gate that
 downloads the published assets again, rejects altered signature/checksum/
 attestation inputs and exercises authenticated Alpha 9 -> Alpha 10 upgrade,
 blocked implicit downgrade, explicit downgrade and uninstall. See the
-[reproducible gate](ALPHA10-RELEASE-GATE.md). Do not treat Alpha 10 as published
-until its release workflow and asset verification have succeeded.
+[reproducible gate](ALPHA10-RELEASE-GATE.md). Its successful evidence is in the
+[Alpha 10 audit](ALPHA10-AUDIT.md).
 
 Extract and inspect the binary before installing it:
 
@@ -74,14 +74,14 @@ The version report includes the release tag, source commit, reproducible build
 timestamp, Go toolchain and target OS/architecture. An ordinary local build
 reports `Version: development`, `Commit: unknown` and `Built: unknown`.
 
-## Alpha 9 installer
+## Alpha 10 installer
 
 The versioned installer automates the same fail-closed checks. Download it from
 the release tag so the reviewed script and requested binary version remain
 aligned:
 
 ```sh
-version=v0.1.0-alpha.9
+version=v0.1.0-alpha.10
 curl -fSLO "https://raw.githubusercontent.com/Orisema/Orisema-Infrastructure/${version}/install.sh"
 less install.sh
 sh install.sh --version "$version" --user

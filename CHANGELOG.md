@@ -8,6 +8,8 @@ versionamento usa SemVer com identificadores de pré-lançamento.
 
 ### Adicionado
 
+- Inventário operacional de todos os comandos públicos, `orisema help` com
+  caminhos canônicos e teste de CI que exige uma ficha para cada comando.
 - `orisema-doctor-v2` com códigos estáveis por causa, orientação separada para
   manifesto, runtime, bindings, journal e armazenamento, resultado agregado
   `WARN`, continuidade de checks independentes e redação de erros brutos do

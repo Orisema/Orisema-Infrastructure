@@ -238,7 +238,8 @@ os laboratórios Podman e o race detector passaram no CI. O laboratório Fedora
 
 - [x] Unificar a admissão e o journal das mutações locais `deploy`, `start` e
   `stop` ([RFC-0007](RFC-0007-unified-local-mutation-journal.md), #145).
-- [ ] Publicar inventário verificável da CLI, contratos e limitações (#146).
+- [x] Publicar inventário verificável da CLI, contratos e limitações
+  ([inventário da CLI](CLI-INVENTORY.md), #146).
 - [x] Exercitar encerramento abrupto, reboot e disco cheio sem perda silenciosa
   de evidência ([laboratório Alpha 10](ALPHA10-FAILURE-LAB.md), #147).
 - [x] Tornar os próximos passos de `doctor` acionáveis e ainda somente leitura

@@ -17,8 +17,8 @@ is not recommended for production**.
 | macOS | None | Not tested | Not supported |
 | Windows | None | Not tested | Not supported |
 
-The versions above were observed by the CI quick-start matrix on 2026-10-27.
-The matrix uses fresh, independent GitHub-hosted runners and records
+The Ubuntu rows are continuously exercised by the CI quick-start matrix. The
+matrix uses fresh, independent GitHub-hosted runners and records
 `/etc/os-release`, kernel architecture and the exact Podman version as workflow
 artifacts. Package versions can change when runner images or Ubuntu repositories
 change; the workflow evidence for a commit is authoritative. These observations
@@ -69,26 +69,38 @@ observed environment rather than a minimum-version guarantee.
 
 | Command | Reads Podman | May change Podman | Notes |
 | --- | --- | --- | --- |
+| `help` | No | No | Canonical public command-path list; checked against the operational inventory |
 | `version` | No | No | Uses only embedded build and Go runtime information |
 | `validate` | No | No | Validates the current manifest contract |
+| `doctor` | Yes | No | Reads an explicit journal and runtime; stable PASS/WARN/BLOCK cause codes |
+| `operation init` | No | Journal only | Explicitly initializes or validates a private operation store; never repairs unsafe state |
+| `operation diagnose` | No | No | Reads incomplete operation evidence; never authorizes automatic resume |
 | `plan` | Yes | No | Compares only supported declared fields |
 | `update plan` | Yes | No | Image-only candidate guidance; never authorizes execution |
 | `update prepare` | Yes | Journal only | Persists one plan-bound intent; never changes Podman |
 | `update authorize` | Yes | Journal only | Confirms and revalidates intent; never changes Podman |
 | `update apply` | Yes | Yes | Revalidates, preserves the stopped previous container and creates one unverified candidate |
 | `update verify` | Yes | Journal only | Records one observation and durably decides only terminal health evidence |
+| `update rollback`, `rollback-verify` | Yes | Yes / journal only | Explicitly restores the preserved container, then verifies it; no data rollback |
 | `status`, `diagnose` | Yes | No | Present distinct runtime and health observations |
 | `logs` | Yes | No | Returns the last 100 lines; does not follow |
 | `deploy` | Yes | Yes | Requires explicit journal; records each `CREATE` boundary and verifies created identities |
 | `start`, `stop` | Yes | Yes | Require explicit journal, atomic admission, ownership, exact confirmation and final-state verification |
-| `recover plan`, `history`, `verify` | Some | No | Journal commands can require local journal access |
+| `secret create`, `remove` | Yes | Yes | Owned Podman secret lifecycle; values enter only through bounded stdin and are never returned |
+| `secret list`, `inspect` | Yes | No | Managed metadata and consumers only; never secret values |
+| `recover plan`, `history`, `verify` | Some | No | History commands can require local history access; verify appends an observation only |
 | `recover prepare` | Yes | Journal only | Reserves an eligible START; does not start it |
 | `recover apply` | Yes | Yes | Consumes a prepared token and performs only START |
+| `recover reconcile`, `record` | Some / No | Journal only | Explicit operator-supplied evidence; never infers or performs runtime mutation |
+| `recover operation` | Yes | Yes | Only delegates an intact `RECOVERY_REQUIRED` update to confirmed rollback |
 | `backup create`, `verify` | No | Files only | Private, bounded configuration artifact with SHA-256 integrity |
 | `backup restore` | No | Files only | Exact confirmation; publishes only into an absent destination |
 | `host check` | Remote | No | Fixed SSH `true`; strict keys, host identity and timeouts |
 | `remote status` | Remote | No | Fixed, bounded inspect for manifest-derived container names |
 | `remote logs` | Remote | No | Revalidates ownership; fixed 100-line, 1 MiB-bounded tail |
+
+Exact syntax, exit semantics, failure handling and evidence for every public
+path are maintained in [CLI-INVENTORY.md](CLI-INVENTORY.md).
 
 Backup/restore commands are available experimentally on Linux and cover only
 validated configuration plus optional read-only operation history. Atomic

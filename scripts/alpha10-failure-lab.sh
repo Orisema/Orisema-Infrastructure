@@ -103,6 +103,7 @@ grep -Fq 'automatic resume safe: false' "$evidence/after-storage-recovery.txt"
 phase=corrupt-journal
 cp -a "$journal" "$mountpoint/corrupt"
 printf '{\n' > "$mountpoint/corrupt/broken.json"
+chmod 0600 "$mountpoint/corrupt/broken.json"
 if "$binary" operation diagnose --journal "$mountpoint/corrupt" \
     > "$evidence/corrupt-journal.txt" 2>&1; then
   echo 'corrupt journal unexpectedly passed diagnosis' >&2

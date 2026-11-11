@@ -1467,6 +1467,13 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	fmt.Fprintf(stdout, "Read-only update plan for %q:\n", m.Name)
 	for _, step := range steps {
 		fmt.Fprintf(stdout, "  [%s] %s: %s\n", step.Action, step.Name, step.Reason)
+		if len(step.DifferenceKinds) != 0 {
+			kinds := make([]string, 0, len(step.DifferenceKinds))
+			for _, kind := range step.DifferenceKinds {
+				kinds = append(kinds, string(kind))
+			}
+			fmt.Fprintf(stdout, "    differences: %s fingerprint=%s\n", strings.Join(kinds, ","), step.DifferenceFingerprint)
+		}
 		if step.Action == updateplan.Candidate {
 			fmt.Fprintf(stdout, "    image: %s -> %s\n", step.CurrentImage, step.TargetImage)
 		}

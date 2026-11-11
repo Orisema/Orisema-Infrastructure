@@ -25,6 +25,9 @@ func TestBuildAllowsOnlyImageOnlyDriftWithHealthcheck(t *testing.T) {
 	if len(got) != 1 || got[0].Action != Candidate || got[0].CurrentImage != "nginx:old" {
 		t.Fatalf("plan=%#v", got)
 	}
+	if len(got[0].DifferenceKinds) != 1 || got[0].DifferenceKinds[0] != planner.DifferenceImage || len(got[0].DifferenceFingerprint) != 64 {
+		t.Fatalf("typed evidence=%#v", got[0])
+	}
 	m.Services[0].Healthcheck = nil
 	got = Build(m, evidence)
 	if got[0].Action != Blocked || !strings.Contains(got[0].Reason, "healthcheck") {
@@ -58,6 +61,9 @@ func TestBuildRejectsLegacyOrUnknownDifferenceEvidence(t *testing.T) {
 	for _, evidence := range []planner.Step{
 		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, Differences: []string{"configured image differs"}, Reason: "configured image differs"},
 		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferenceUnknown, Detail: "future field differs"}}, Reason: "future field differs"},
+		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferencePublicConfig, Detail: "public configuration differs"}}, Reason: "public configuration differs"},
+		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferenceSecretBinding, Detail: "secret binding metadata differs"}}, Reason: "secret binding metadata differs"},
+		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferenceNetworkBinding, Detail: "network attachment differs"}}, Reason: "network attachment differs"},
 	} {
 		got := Build(m, []planner.Step{evidence})
 		if got[0].Action != Blocked || !strings.Contains(got[0].Reason, "image-only") {

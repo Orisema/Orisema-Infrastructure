@@ -491,7 +491,7 @@ esac
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"update", "plan", manifestPath}, strings.NewReader(""), &stdout, &stderr)
-	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "[UPDATE_CANDIDATE]") || !strings.Contains(stdout.String(), "nginx:old -> nginx:new") || !strings.Contains(stdout.String(), "No journal created") {
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "[UPDATE_CANDIDATE]") || !strings.Contains(stdout.String(), "nginx:old -> nginx:new") || !strings.Contains(stdout.String(), "differences: IMAGE fingerprint=") || !strings.Contains(stdout.String(), "No journal created") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	calls, err := os.ReadFile(logPath)

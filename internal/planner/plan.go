@@ -17,14 +17,15 @@ const (
 )
 
 type Step struct {
-	Name         string
-	Image        string
-	CurrentImage string
-	CurrentID    string
-	State        string
-	Action       Action
-	Differences  []string
-	Reason       string
+	Name             string
+	Image            string
+	CurrentImage     string
+	CurrentID        string
+	State            string
+	Action           Action
+	Differences      []string
+	TypedDifferences []Difference
+	Reason           string
 }
 
 func Build(m *manifest.Manifest, existing []runtime.Container) []Step {

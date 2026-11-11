@@ -209,7 +209,7 @@ func buildInspected(ctx context.Context, m *manifest.Manifest, existing []runtim
 			reasons = append(reasons, "restart policy differs")
 		}
 		if len(reasons) > 0 {
-			steps = append(steps, Step{Name: name, Image: svc.Image, CurrentImage: inspected.Config.Image, CurrentID: inspected.ID, Action: Drift, Differences: append([]string(nil), reasons...), Reason: strings.Join(reasons, ", ")})
+			steps = append(steps, Step{Name: name, Image: svc.Image, CurrentImage: inspected.Config.Image, CurrentID: inspected.ID, Action: Drift, Differences: append([]string(nil), reasons...), TypedDifferences: classifyDifferences(reasons), Reason: strings.Join(reasons, ", ")})
 		} else {
 			steps = append(steps, Step{Name: name, Image: svc.Image, CurrentImage: inspected.Config.Image, CurrentID: inspected.ID, Action: Noop, Reason: "managed image reference, ports, healthcheck, restart policy, secret metadata, public configuration and network bindings match; live health and other settings not verified"})
 		}

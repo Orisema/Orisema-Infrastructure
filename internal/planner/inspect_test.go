@@ -141,6 +141,9 @@ func TestBuildInspectedResolvedRuntimeComparesPublicConfigurationAndNetworks(t *
 	if got[0].Action != Drift || strings.Contains(got[0].Reason, "laboratory") || strings.Contains(got[0].Reason, "changed") {
 		t.Fatalf("public configuration drift = %#v; want value-free DRIFT", got)
 	}
+	if len(got[0].TypedDifferences) == 0 || got[0].TypedDifferences[0].Kind != DifferencePublicConfig {
+		t.Fatalf("public configuration drift = %#v; want typed difference", got)
+	}
 	item.Config.Env[1] = "APP_MODE=laboratory"
 	item.NetworkSettings.Networks = map[string]runtime.NetworkEndpoint{"wrong-network": {}}
 	got = BuildInspectedResolvedRuntime(context.Background(), m, existing, fakeInspector{item: item}, nil, resolved)

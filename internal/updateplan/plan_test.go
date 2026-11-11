@@ -20,7 +20,7 @@ func updateManifest() *manifest.Manifest {
 
 func TestBuildAllowsOnlyImageOnlyDriftWithHealthcheck(t *testing.T) {
 	m := updateManifest()
-	evidence := []planner.Step{{Name: "orisema-demo-web", Image: "nginx:new", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, Differences: []string{"configured image differs"}, Reason: "configured image differs"}}
+	evidence := []planner.Step{{Name: "orisema-demo-web", Image: "nginx:new", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, Differences: []string{"configured image differs"}, TypedDifferences: []planner.Difference{{Kind: planner.DifferenceImage, Detail: "configured image differs"}}, Reason: "configured image differs"}}
 	got := Build(m, evidence)
 	if len(got) != 1 || got[0].Action != Candidate || got[0].CurrentImage != "nginx:old" {
 		t.Fatalf("plan=%#v", got)
@@ -50,6 +50,19 @@ func TestBuildBlocksMissingReviewAndCompoundDrift(t *testing.T) {
 				t.Fatalf("plan=%#v", got)
 			}
 		})
+	}
+}
+
+func TestBuildRejectsLegacyOrUnknownDifferenceEvidence(t *testing.T) {
+	m := updateManifest()
+	for _, evidence := range []planner.Step{
+		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, Differences: []string{"configured image differs"}, Reason: "configured image differs"},
+		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferenceUnknown, Detail: "future field differs"}}, Reason: "future field differs"},
+	} {
+		got := Build(m, []planner.Step{evidence})
+		if got[0].Action != Blocked || !strings.Contains(got[0].Reason, "image-only") {
+			t.Fatalf("plan=%#v; want fail-closed BLOCKED", got)
+		}
 	}
 }
 

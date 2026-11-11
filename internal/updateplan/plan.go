@@ -50,7 +50,7 @@ func Build(m *manifest.Manifest, inspected []planner.Step) []Step {
 			step.Action = Noop
 			step.Reason = "declared managed fields already match"
 		case planner.Drift:
-			if len(evidence.Differences) != 1 || evidence.Differences[0] != "configured image differs" {
+			if len(evidence.TypedDifferences) != 1 || evidence.TypedDifferences[0].Kind != planner.DifferenceImage {
 				step.Reason = "update requires image-only drift; observed: " + evidence.Reason
 			} else if evidence.CurrentImage == "" || evidence.CurrentImage == service.Image || evidence.CurrentID == "" {
 				step.Reason = "current image evidence is missing or inconsistent"

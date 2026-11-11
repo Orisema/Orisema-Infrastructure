@@ -34,6 +34,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Proposta de segredos seguros da Alpha 6](docs/RFC-0002-secure-secrets.md)
 - [Proposta de configuração pública e redes da Alpha 7](docs/RFC-0003-public-config-and-external-networks.md)
 - [Proposta de update e rollback configurados da Alpha 8](docs/RFC-0004-configured-update-and-rollback.md)
+- [Proposta de substituição controlada de configuração da Beta 1](docs/RFC-0008-controlled-configuration-replacement.md)
 - [Laboratório de update e rollback da Alpha 3](docs/CONTROLLED-UPDATE-LAB.md)
 - [Backup e restauração de configuração](docs/BACKUP-RESTORE-DESIGN.md)
 - [Transporte SSH estrito](docs/SSH.md)

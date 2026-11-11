@@ -266,6 +266,11 @@ O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integra�
 
 ## Beta e futuro (fora do Alpha inicial)
 
+- A Beta 1 começa pela substituição controlada de configuração declarativa,
+  sujeita à revisão da
+  [RFC-0008](RFC-0008-controlled-configuration-replacement.md) e às issues
+  #164/#165. Nenhum comportamento runtime está autorizado apenas por este
+  roadmap.
 - Matriz ampliada de distribuições/Podman; adaptador Docker somente após testes.
 - Backup e restauração efetivamente testados; SSH remoto seguro.
 - Observabilidade opcional, multi-node, painel e identidade central somente com

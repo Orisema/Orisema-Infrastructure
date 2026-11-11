@@ -3,10 +3,9 @@
 Etapas propostas, sem datas prometidas.
 
 O plano verificável para as versões experimentais está em
-[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–9 foram publicadas.
-A Alpha 9 concluiu os gates de recuperação operacional, distribuição assinada
-e instalação verificável e foi publicada como
-[`v0.1.0-alpha.9`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.9).
+[docs/ALPHA_ROADMAP.md](docs/ALPHA_ROADMAP.md). As Alphas 1–10 foram publicadas.
+A Alpha 10 concluiu os gates de prontidão operacional e foi publicada como
+[`v0.1.0-alpha.10`](https://github.com/Orisema/Orisema-Infrastructure/releases/tag/v0.1.0-alpha.10).
 
 ## Fase 0 — Fundação
 - [x] Criar organização e repositório públicos.
@@ -177,6 +176,28 @@ revalidação ou preservação de evidência.
 O gate de release foi concluído em 6 de novembro de 2026 no commit
 `3db74f1b090d31336555e80d0574feb6e484f755`. Consulte a
 [auditoria da Alpha 10](docs/ALPHA10-AUDIT.md).
+
+## Beta 1 — substituição controlada de configuração
+
+- [ ] Revisar o contrato e o modelo de ameaça antes de alterar o runtime
+  ([RFC-0008](docs/RFC-0008-controlled-configuration-replacement.md), #164,
+  #165).
+- [ ] Classificar drift elegível por tipos fechados, sem expor valores de
+  secrets ou locators privados.
+- [ ] Vincular intenção, confirmação e admissão atômica ao mesmo plano.
+- [ ] Criar e verificar um candidato completo para o menor subconjunto
+  aprovado, preservando a unidade anterior.
+- [ ] Exercitar interrupção, concorrência, troca de bindings e rollback manual
+  em laboratório isolado.
+- [ ] Reconciliar documentação, compatibilidade e release somente depois das
+  evidências no commit candidato.
+
+**Fora do primeiro incremento:** dados persistentes, mutação remota, Docker,
+multi-node, lifecycle de recursos externos e transação multi-serviço.
+
+**Princípio:** entrar na Beta não significa prontidão para produção nem concede
+compatibilidade automática a drift anteriormente bloqueado. A implementação
+runtime permanece bloqueada até revisão humana da RFC.
 
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.

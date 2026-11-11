@@ -159,7 +159,10 @@ before mutation.
 
 Syntax: `orisema update plan <manifest.yaml>`. Runtime read. Reports an
 image-only candidate only when ownership, supported configuration and health
-contract are eligible. It creates no intent.
+contract are eligible. For observed drift it reports closed, value-free
+difference categories and a deterministic fingerprint. Categories do not
+authorize configuration replacement, and secret values and private locators
+are excluded. It creates no intent.
 
 <!-- command: update prepare -->
 ### `orisema update prepare`

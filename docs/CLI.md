@@ -100,8 +100,12 @@ The `plan` command inspects Podman and compares selected declared fields only. I
 
 `update plan` is also read-only. It reports `UPDATE_CANDIDATE` only for exact
 managed ownership plus image-only drift and a declared healthcheck. Every other
-difference is blocked. It does not create an operation journal or authorize an
-update; see [ALPHA5-UPDATE-PLAN.md](ALPHA5-UPDATE-PLAN.md).
+difference is blocked. Drift output includes only closed difference categories
+and a deterministic fingerprint of value-free metadata; it never includes
+secret values or private file locators. The new categories are evidence for
+review and do not make configuration drift eligible. The command does not
+create an operation journal or authorize an update; see
+[ALPHA5-UPDATE-PLAN.md](ALPHA5-UPDATE-PLAN.md).
 
 `update prepare` repeats that read-only inspection for one declared service and
 persists an exact `PENDING` intent in the Alpha 4 journal. It records container

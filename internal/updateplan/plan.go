@@ -7,6 +7,7 @@ package updateplan
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/Orisema/Orisema-Infrastructure/internal/manifest"
 	"github.com/Orisema/Orisema-Infrastructure/internal/planner"
@@ -21,13 +22,15 @@ const (
 )
 
 type Step struct {
-	Service      string
-	Name         string
-	CurrentImage string
-	CurrentID    string
-	TargetImage  string
-	Action       Action
-	Reason       string
+	Service               string
+	Name                  string
+	CurrentImage          string
+	CurrentID             string
+	TargetImage           string
+	Action                Action
+	DifferenceKinds       []planner.DifferenceKind
+	DifferenceFingerprint string
+	Reason                string
 }
 
 // Build classifies supplied planner evidence without querying a runtime. Only
@@ -45,12 +48,23 @@ func Build(m *manifest.Manifest, inspected []planner.Step) []Step {
 		evidence := inspected[i]
 		step.CurrentImage = evidence.CurrentImage
 		step.CurrentID = evidence.CurrentID
+		if len(evidence.TypedDifferences) != 0 {
+			step.DifferenceFingerprint = planner.DifferenceFingerprint(evidence.TypedDifferences)
+			kinds := make(map[planner.DifferenceKind]bool, len(evidence.TypedDifferences))
+			for _, difference := range evidence.TypedDifferences {
+				kinds[difference.Kind] = true
+			}
+			for kind := range kinds {
+				step.DifferenceKinds = append(step.DifferenceKinds, kind)
+			}
+			sort.Slice(step.DifferenceKinds, func(i, j int) bool { return step.DifferenceKinds[i] < step.DifferenceKinds[j] })
+		}
 		switch evidence.Action {
 		case planner.Noop:
 			step.Action = Noop
 			step.Reason = "declared managed fields already match"
 		case planner.Drift:
-			if len(evidence.Differences) != 1 || evidence.Differences[0] != "configured image differs" {
+			if len(evidence.TypedDifferences) != 1 || evidence.TypedDifferences[0].Kind != planner.DifferenceImage {
 				step.Reason = "update requires image-only drift; observed: " + evidence.Reason
 			} else if evidence.CurrentImage == "" || evidence.CurrentImage == service.Image || evidence.CurrentID == "" {
 				step.Reason = "current image evidence is missing or inconsistent"

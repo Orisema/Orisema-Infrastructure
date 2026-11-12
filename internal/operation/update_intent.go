@@ -148,6 +148,16 @@ func publicConfigurationPlanFingerprint(application, service, resourceName, reso
 	return sha256String(data)
 }
 
+// PublicConfigurationPlanFingerprint validates value-free public configuration
+// evidence and returns the v3 fingerprint used for fresh authorization.
+func PublicConfigurationPlanFingerprint(application, service, resourceName, resourceID, image, differenceFingerprint string, bindings UpdateBindingEvidence) (string, error) {
+	canonical, configurationFingerprint, err := canonicalBindingEvidence(bindings)
+	if err != nil || len(canonical.PublicEnvironmentNames) == 0 || len(canonical.Secrets) != 0 || len(canonical.Networks) != 0 || !isSHA256(differenceFingerprint) {
+		return "", errors.New("public configuration authorization evidence is invalid")
+	}
+	return publicConfigurationPlanFingerprint(application, service, resourceName, resourceID, image, configurationFingerprint, differenceFingerprint), nil
+}
+
 func canonicalBindingEvidence(input UpdateBindingEvidence) (UpdateBindingEvidence, string, error) {
 	result := UpdateBindingEvidence{
 		PublicEnvironmentNames:  append([]string(nil), input.PublicEnvironmentNames...),
@@ -287,6 +297,16 @@ func (s *Store) CreatePublicConfigurationIntent(request UpdateIntentRequest, dif
 // PREPARING. Confirmation is a CLI concern; this method only accepts exact
 // plan and resource evidence and never accesses or mutates a runtime.
 func (s *Store) AuthorizeUpdateIntent(id, planFingerprint string, observedResources []Resource, at time.Time) (Operation, error) {
+	return s.authorizeUpdateIntent(id, planFingerprint, observedResources, at, false)
+}
+
+// AuthorizePublicConfigurationIntent advances only a v3 prepare-only intent.
+// It records authorization but does not make the intent executable.
+func (s *Store) AuthorizePublicConfigurationIntent(id, planFingerprint string, observedResources []Resource, at time.Time) (Operation, error) {
+	return s.authorizeUpdateIntent(id, planFingerprint, observedResources, at, true)
+}
+
+func (s *Store) authorizeUpdateIntent(id, planFingerprint string, observedResources []Resource, at time.Time, publicConfiguration bool) (Operation, error) {
 	var result Operation
 	err := s.withLock("."+id+".lock", func() error {
 		op, err := s.Load(id)
@@ -296,8 +316,11 @@ func (s *Store) AuthorizeUpdateIntent(id, planFingerprint string, observedResour
 		if op.State != Pending || op.Intent == nil || op.Authorization != nil {
 			return errors.New("update intent is not pending authorization")
 		}
-		if op.Intent.Contract == updateIntentV3PublicConfig {
+		if op.Intent.Contract == updateIntentV3PublicConfig && !publicConfiguration {
 			return errors.New("public configuration intent is review-only and cannot be authorized")
+		}
+		if op.Intent.Contract != updateIntentV3PublicConfig && publicConfiguration {
+			return errors.New("update intent is not a public configuration intent")
 		}
 		if at.IsZero() {
 			at = time.Now().UTC()
@@ -322,7 +345,11 @@ func (s *Store) AuthorizeUpdateIntent(id, planFingerprint string, observedResour
 		}
 		observed := append([]Resource(nil), observedResources...)
 		op.Authorization = &UpdateAuthorization{At: at, PlanFingerprint: planFingerprint, ObservedResources: observed, ResourceEvidence: evidence}
-		op.Events = append(op.Events, Event{At: at, From: Pending, To: Preparing, Step: "update-authorized", Detail: "plan and resource evidence revalidated"})
+		detail := "plan and resource evidence revalidated"
+		if publicConfiguration {
+			detail = "public configuration plan and resource evidence revalidated; runtime execution remains blocked"
+		}
+		op.Events = append(op.Events, Event{At: at, From: Pending, To: Preparing, Step: "update-authorized", Detail: detail})
 		op.State, op.UpdatedAt = Preparing, at
 		if err := validate(op); err != nil {
 			return err
@@ -343,8 +370,8 @@ func validateUpdateIntent(op Operation) error {
 	}
 	intent := op.Intent
 	publicConfigPrepare := intent.Contract == updateIntentV3PublicConfig
-	if publicConfigPrepare && (op.State != Pending || op.Authorization != nil || op.Execution != nil) {
-		return errors.New("persisted public configuration intent advanced beyond review-only state")
+	if publicConfigPrepare && (op.Execution != nil || op.State != Pending && op.State != Preparing || op.State == Pending && op.Authorization != nil || op.State == Preparing && op.Authorization == nil) {
+		return errors.New("persisted public configuration intent advanced beyond authorized review-only state")
 	}
 	if op.Type != "UPDATE" || intent.Service == "" || intent.CurrentImage == "" || intent.TargetImage == "" || (!publicConfigPrepare && intent.CurrentImage == intent.TargetImage) || (publicConfigPrepare && intent.CurrentImage != intent.TargetImage) {
 		return errors.New("persisted update intent fields are invalid")

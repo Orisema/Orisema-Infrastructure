@@ -760,9 +760,16 @@ esac
 	}
 	stdout.Reset()
 	stderr.Reset()
-	code = run([]string{"update", "authorize", manifestPath, "web", "--journal", journal, "--operation", persisted.ID}, strings.NewReader("AUTHORIZE UPDATE demo/web\n"), &stdout, &stderr)
-	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "blocked before confirmation") || !strings.Contains(stderr.String(), "review-only") {
+	confirmation := "AUTHORIZE PUBLIC CONFIG demo/web " + persisted.ID + "\n"
+	code = run([]string{"update", "authorize", manifestPath, "web", "--journal", journal, "--operation", persisted.ID}, strings.NewReader(confirmation), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "Update intent authorized") || !strings.Contains(stdout.String(), "state=PREPARING") {
 		t.Fatalf("authorize code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "apply", manifestPath, "web", "--journal", journal, "--operation", persisted.ID}, strings.NewReader("APPLY UPDATE demo/web\n"), &stdout, &stderr)
+	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "blocked before confirmation") || !strings.Contains(stderr.String(), "not executable") {
+		t.Fatalf("apply code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
 

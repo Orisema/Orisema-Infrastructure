@@ -171,8 +171,7 @@ Syntax: `orisema update prepare <manifest.yaml> <service> --journal
 <directory>`. Runtime read plus journal write. Persists one plan-bound pending
 intent without confirmation or Podman mutation. Beta 1 additionally permits a
 review-only intent for exclusive `PUBLIC_CONFIG` drift on an otherwise
-unconfigured service; it stores names and fingerprints without values and
-cannot be authorized or executed in this increment.
+unconfigured service; it stores names and fingerprints without values.
 
 <!-- command: update authorize -->
 ### `orisema update authorize`
@@ -180,6 +179,9 @@ cannot be authorized or executed in this increment.
 Syntax: `orisema update authorize <manifest.yaml> <service> --journal
 <directory> --operation <id>`. Runtime revalidation plus journal write after
 exact authorization confirmation. It still makes no Podman change.
+Public-configuration intents require application, service and operation ID in
+the confirmation and may advance only to non-executable `PREPARING` after fresh
+evidence matches.
 
 <!-- command: update apply -->
 ### `orisema update apply`

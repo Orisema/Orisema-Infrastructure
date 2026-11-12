@@ -25,8 +25,8 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   declarativas de ambiente, secrets ou redes não são aplicadas in-place. O
   desenvolvimento da Beta 1 permite persistir somente uma intenção de revisão
   para drift exclusivo de configuração pública em serviço sem secrets ou
-  redes; autorização, candidato, verify e rollback dessa intenção permanecem
-  bloqueados.
+  redes. A intenção pode ser autorizada após revalidação e confirmação exata,
+  mas `apply`, candidato, verify e rollback permanecem bloqueados.
 - Rollback de dados, backup/restore e migrações de volume. O rollback público
   existente restaura somente o container da aplicação preservado pelo update.
 - Backup/restore protege somente configuração validada e histórico operacional

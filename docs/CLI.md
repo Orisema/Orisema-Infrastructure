@@ -116,13 +116,19 @@ For Beta 1, `update prepare` also accepts drift exclusively classified as
 `PUBLIC_CONFIG` when the image is unchanged, a healthcheck is declared and the
 service has no secret or network bindings. It persists names and fingerprints,
 never public values. This intent is review-only: `update authorize` rejects it
-before confirmation and `update apply` cannot execute it. Mixed or unknown
-drift remains blocked.
+unless the operator supplies the exact confirmation containing application,
+service and operation ID and fresh evidence matches. Successful authorization
+advances only to `PREPARING`; `update apply` rejects it before confirmation.
+Mixed or unknown drift remains blocked.
 
 `update authorize` requires exact textual confirmation and repeats the complete
 read-only plan within five minutes of preparation. Matching fresh evidence
 atomically advances the journal to `PREPARING`; failure leaves it untouched.
-The command still performs no runtime mutation.
+For a public-configuration intent, the phrase is `AUTHORIZE PUBLIC CONFIG
+application/service operation-id`; image, configuration fingerprint, container
+identity and ownership must still match. The command performs no runtime
+mutation, and the resulting public-configuration intent is not executable in
+this increment.
 
 `update apply` requires a fresh authorized `PREPARING` intent and the exact
 confirmation `APPLY UPDATE application/service`. It revalidates the complete

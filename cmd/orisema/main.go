@@ -1190,6 +1190,7 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		}
 	}
 	configured := !planOnly && manifestServiceHasBindings(m, args[3])
+	publicConfigurationAuthorization := false
 	if verify {
 		return runUpdateVerify(*m, args[3], args[5], args[7], stdout, stderr)
 	}
@@ -1215,11 +1216,11 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintln(stderr, "error: operation intent does not match the requested manifest and service")
 			return 1
 		}
-		if op.PublicConfigurationReviewOnly() {
-			fmt.Fprintln(stderr, "update authorization blocked before confirmation: public configuration intent is review-only")
-			return 1
-		}
+		publicConfigurationAuthorization = op.PublicConfigurationReviewOnly()
 		confirmation := "AUTHORIZE UPDATE " + m.Name + "/" + service
+		if publicConfigurationAuthorization {
+			confirmation = "AUTHORIZE PUBLIC CONFIG " + m.Name + "/" + service + " " + id
+		}
 		fmt.Fprintf(stdout, "Type %s to authorize preparation: ", confirmation)
 		answer, readErr := bufio.NewReader(stdin).ReadString('\n')
 		if readErr != nil || strings.TrimSpace(answer) != confirmation {
@@ -1237,6 +1238,10 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		op, err := readStore.Load(id)
 		if err != nil || op.Intent == nil || op.Authorization == nil || op.State != operation.Preparing || op.Application != m.Name || op.Intent.Service != service {
 			fmt.Fprintln(stderr, "error: operation is not an authorized PREPARING intent for this manifest and service")
+			return 1
+		}
+		if op.PublicConfigurationReviewOnly() {
+			fmt.Fprintln(stderr, "update execution blocked before confirmation: authorized public configuration intent is not executable")
 			return 1
 		}
 		confirmation := "APPLY UPDATE " + m.Name + "/" + service
@@ -1403,11 +1408,7 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 				break
 			}
 		}
-		if candidate != nil && candidate.Action == updateplan.PublicConfigPrepare {
-			fmt.Fprintln(stderr, "update authorization blocked: public configuration intent is review-only and cannot be authorized")
-			return 1
-		}
-		if candidate == nil || candidate.Action != updateplan.Candidate {
+		if candidate == nil || candidate.Action != updateplan.Candidate && (!publicConfigurationAuthorization || candidate.Action != updateplan.PublicConfigPrepare) {
 			reason := "service is not an update candidate"
 			if candidate != nil {
 				reason = candidate.Reason
@@ -1415,7 +1416,17 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "update authorization blocked: %s\n", reason)
 			return 1
 		}
-		fingerprint, err := updateFingerprint(m, candidate, resolvedSecrets, resolvedNetworks)
+		var fingerprint string
+		if publicConfigurationAuthorization {
+			bindings := updateBindingEvidence(m, candidate.Service, resolvedSecrets, resolvedNetworks)
+			if bindings == nil {
+				err = errors.New("public configuration evidence is missing")
+			} else {
+				fingerprint, err = operation.PublicConfigurationPlanFingerprint(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.DifferenceFingerprint, *bindings)
+			}
+		} else {
+			fingerprint, err = updateFingerprint(m, candidate, resolvedSecrets, resolvedNetworks)
+		}
 		if err != nil {
 			fmt.Fprintf(stderr, "update authorization blocked: invalid binding evidence: %v\n", err)
 			return 1
@@ -1426,7 +1437,12 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
-		op, err := store.AuthorizeUpdateIntent(id, fingerprint, observed, time.Time{})
+		var op operation.Operation
+		if publicConfigurationAuthorization {
+			op, err = store.AuthorizePublicConfigurationIntent(id, fingerprint, observed, time.Time{})
+		} else {
+			op, err = store.AuthorizeUpdateIntent(id, fingerprint, observed, time.Time{})
+		}
 		if err != nil {
 			fmt.Fprintf(stderr, "update authorization blocked: %v\n", err)
 			return 1

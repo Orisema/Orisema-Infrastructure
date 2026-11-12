@@ -155,8 +155,85 @@ func TestPublicConfigurationIntentPersistsValueFreeAndCannotAuthorize(t *testing
 	if string(before) != string(after) {
 		t.Fatal("rejected authorization changed public configuration journal")
 	}
-	if _, err := store.BeginUpdateExecution(created.ID, created.Intent.PlanFingerprint, "rollback-slot", observedIntentResource(), now.Add(time.Minute)); err == nil {
+	authorized, err := store.AuthorizePublicConfigurationIntent(created.ID, created.Intent.PlanFingerprint, observedIntentResource(), now.Add(time.Minute))
+	if err != nil || authorized.State != Preparing || authorized.Authorization == nil {
+		t.Fatalf("authorized=%#v err=%v", authorized, err)
+	}
+	if _, err := store.BeginUpdateExecution(created.ID, created.Intent.PlanFingerprint, "rollback-slot", observedIntentResource(), now.Add(2*time.Minute)); err == nil || !strings.Contains(err.Error(), "cannot be executed") {
 		t.Fatal("review-only intent unexpectedly began execution")
+	}
+}
+
+func TestConcurrentPublicConfigurationAuthorizationHasOneWinner(t *testing.T) {
+	store, _, now := fixture(t)
+	request := intentRequest("public-config-concurrent", now)
+	request.TargetImage = request.CurrentImage
+	request.Bindings = &UpdateBindingEvidence{PublicEnvironmentNames: []string{"APP_MODE"}, PublicEnvironmentDigest: strings.Repeat("a", 64)}
+	created, err := store.CreatePublicConfigurationIntent(request, strings.Repeat("b", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := store.AuthorizePublicConfigurationIntent(created.ID, created.Intent.PlanFingerprint, observedIntentResource(), now.Add(time.Minute))
+			errs <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	var success, rejected int
+	for err := range errs {
+		if err == nil {
+			success++
+		} else if strings.Contains(err.Error(), "not pending") {
+			rejected++
+		} else {
+			t.Fatal(err)
+		}
+	}
+	if success != 1 || rejected != 1 {
+		t.Fatalf("success=%d rejected=%d", success, rejected)
+	}
+}
+
+func TestPublicConfigurationAuthorizationFailuresDoNotWrite(t *testing.T) {
+	tests := []struct {
+		name        string
+		fingerprint func(Operation) string
+		offset      time.Duration
+		want        string
+	}{
+		{"changed plan", func(Operation) string { return strings.Repeat("0", 64) }, time.Minute, "fingerprint"},
+		{"expired", func(op Operation) string { return op.Intent.PlanFingerprint }, UpdateAuthorizationTTL + time.Second, "expired"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			store, _, now := fixture(t)
+			request := intentRequest("public-config-failure", now)
+			request.TargetImage = request.CurrentImage
+			request.Bindings = &UpdateBindingEvidence{PublicEnvironmentNames: []string{"APP_MODE"}, PublicEnvironmentDigest: strings.Repeat("a", 64)}
+			created, err := store.CreatePublicConfigurationIntent(request, strings.Repeat("b", 64))
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(store.root, created.ID+".json")
+			before, _ := os.ReadFile(path)
+			_, err = store.AuthorizePublicConfigurationIntent(created.ID, tc.fingerprint(created), observedIntentResource(), now.Add(tc.offset))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error=%v; want %q", err, tc.want)
+			}
+			after, _ := os.ReadFile(path)
+			if string(before) != string(after) {
+				t.Fatal("failed public configuration authorization changed journal")
+			}
+		})
 	}
 }
 

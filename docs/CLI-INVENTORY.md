@@ -169,7 +169,10 @@ are excluded. It creates no intent.
 
 Syntax: `orisema update prepare <manifest.yaml> <service> --journal
 <directory>`. Runtime read plus journal write. Persists one plan-bound pending
-intent without confirmation or Podman mutation.
+intent without confirmation or Podman mutation. Beta 1 additionally permits a
+review-only intent for exclusive `PUBLIC_CONFIG` drift on an otherwise
+unconfigured service; it stores names and fingerprints without values and
+cannot be authorized or executed in this increment.
 
 <!-- command: update authorize -->
 ### `orisema update authorize`

@@ -16,9 +16,10 @@ import (
 type Action string
 
 const (
-	Noop      Action = "NOOP"
-	Candidate Action = "UPDATE_CANDIDATE"
-	Blocked   Action = "BLOCKED"
+	Noop                Action = "NOOP"
+	Candidate           Action = "UPDATE_CANDIDATE"
+	PublicConfigPrepare Action = "PUBLIC_CONFIG_PREPARE"
+	Blocked             Action = "BLOCKED"
 )
 
 type Step struct {
@@ -64,7 +65,18 @@ func Build(m *manifest.Manifest, inspected []planner.Step) []Step {
 			step.Action = Noop
 			step.Reason = "declared managed fields already match"
 		case planner.Drift:
-			if len(evidence.TypedDifferences) != 1 || evidence.TypedDifferences[0].Kind != planner.DifferenceImage {
+			if onlyDifferenceKind(evidence.TypedDifferences, planner.DifferencePublicConfig) {
+				if len(service.Secrets) != 0 || len(service.Networks) != 0 {
+					step.Reason = "public configuration preparation requires a service without secret or network bindings in the first Beta increment"
+				} else if evidence.CurrentImage == "" || evidence.CurrentImage != service.Image || evidence.CurrentID == "" {
+					step.Reason = "public configuration preparation requires stable image and exact container evidence"
+				} else if service.Healthcheck == nil {
+					step.Reason = "a declared healthcheck is required before public configuration replacement can be prepared"
+				} else {
+					step.Action = PublicConfigPrepare
+					step.Reason = "public configuration-only drift may be persisted for review; authorization and runtime mutation remain blocked"
+				}
+			} else if len(evidence.TypedDifferences) != 1 || evidence.TypedDifferences[0].Kind != planner.DifferenceImage {
 				step.Reason = "update requires image-only drift; observed: " + evidence.Reason
 			} else if evidence.CurrentImage == "" || evidence.CurrentImage == service.Image || evidence.CurrentID == "" {
 				step.Reason = "current image evidence is missing or inconsistent"
@@ -84,4 +96,16 @@ func Build(m *manifest.Manifest, inspected []planner.Step) []Step {
 		result = append(result, step)
 	}
 	return result
+}
+
+func onlyDifferenceKind(differences []planner.Difference, kind planner.DifferenceKind) bool {
+	if len(differences) == 0 {
+		return false
+	}
+	for _, difference := range differences {
+		if difference.Kind != kind {
+			return false
+		}
+	}
+	return true
 }

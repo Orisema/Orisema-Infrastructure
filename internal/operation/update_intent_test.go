@@ -125,6 +125,76 @@ func TestCreateUpdateIntentV2RejectsInvalidEvidence(t *testing.T) {
 	}
 }
 
+func TestPublicConfigurationIntentPersistsValueFreeAndCannotAuthorize(t *testing.T) {
+	store, _, now := fixture(t)
+	request := intentRequest("public-config-intent", now)
+	request.TargetImage = request.CurrentImage
+	request.Bindings = &UpdateBindingEvidence{
+		PublicEnvironmentNames:  []string{"APP_MODE"},
+		PublicEnvironmentDigest: strings.Repeat("a", 64),
+	}
+	created, err := store.CreatePublicConfigurationIntent(request, strings.Repeat("b", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.State != Pending || created.Intent.Contract != updateIntentV3PublicConfig || created.Intent.DifferenceFingerprint == "" {
+		t.Fatalf("operation=%#v", created)
+	}
+	path := filepath.Join(store.root, created.ID+".json")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(before), "public-value-canary") {
+		t.Fatalf("journal exposed value: %s", before)
+	}
+	if _, err := store.AuthorizeUpdateIntent(created.ID, created.Intent.PlanFingerprint, observedIntentResource(), now.Add(time.Minute)); err == nil || !strings.Contains(err.Error(), "review-only") {
+		t.Fatalf("authorization error=%v", err)
+	}
+	after, _ := os.ReadFile(path)
+	if string(before) != string(after) {
+		t.Fatal("rejected authorization changed public configuration journal")
+	}
+	if _, err := store.BeginUpdateExecution(created.ID, created.Intent.PlanFingerprint, "rollback-slot", observedIntentResource(), now.Add(time.Minute)); err == nil {
+		t.Fatal("review-only intent unexpectedly began execution")
+	}
+}
+
+func TestPublicConfigurationIntentRejectsOtherBindings(t *testing.T) {
+	store, _, now := fixture(t)
+	request := intentRequest("public-config-invalid", now)
+	request.TargetImage = request.CurrentImage
+	request.Bindings = &UpdateBindingEvidence{PublicEnvironmentNames: []string{"APP_MODE"}, PublicEnvironmentDigest: strings.Repeat("a", 64), Secrets: []UpdateSecretEvidence{{Name: "token", Provider: "podman", Target: "token", Identity: "id"}}}
+	if _, err := store.CreatePublicConfigurationIntent(request, strings.Repeat("b", 64)); err == nil || !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("error=%v", err)
+	}
+}
+
+func TestLoadRejectsAdvancedPublicConfigurationIntent(t *testing.T) {
+	store, _, now := fixture(t)
+	request := intentRequest("public-config-advanced", now)
+	request.TargetImage = request.CurrentImage
+	request.Bindings = &UpdateBindingEvidence{PublicEnvironmentNames: []string{"APP_MODE"}, PublicEnvironmentDigest: strings.Repeat("a", 64)}
+	created, err := store.CreatePublicConfigurationIntent(request, strings.Repeat("b", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(store.root, created.ID+".json")
+	data, _ := os.ReadFile(path)
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	raw["state"] = string(Preparing)
+	data, _ = json.Marshal(raw)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Load(created.ID); err == nil {
+		t.Fatalf("load error=%v", err)
+	}
+}
+
 func TestLoadRejectsTamperedUpdateIntentV2Bindings(t *testing.T) {
 	store, _, now := fixture(t)
 	got, err := store.CreateUpdateIntent(configuredIntentRequest("intent-v2-tamper", now))

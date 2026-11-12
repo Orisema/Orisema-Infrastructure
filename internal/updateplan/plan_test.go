@@ -61,7 +61,6 @@ func TestBuildRejectsLegacyOrUnknownDifferenceEvidence(t *testing.T) {
 	for _, evidence := range []planner.Step{
 		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, Differences: []string{"configured image differs"}, Reason: "configured image differs"},
 		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferenceUnknown, Detail: "future field differs"}}, Reason: "future field differs"},
-		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferencePublicConfig, Detail: "public configuration differs"}}, Reason: "public configuration differs"},
 		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferenceSecretBinding, Detail: "secret binding metadata differs"}}, Reason: "secret binding metadata differs"},
 		{Name: "orisema-demo-web", CurrentImage: "nginx:old", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferenceNetworkBinding, Detail: "network attachment differs"}}, Reason: "network attachment differs"},
 	} {
@@ -69,6 +68,20 @@ func TestBuildRejectsLegacyOrUnknownDifferenceEvidence(t *testing.T) {
 		if got[0].Action != Blocked || !strings.Contains(got[0].Reason, "image-only") {
 			t.Fatalf("plan=%#v; want fail-closed BLOCKED", got)
 		}
+	}
+}
+
+func TestBuildAllowsPublicConfigurationPrepareOnly(t *testing.T) {
+	m := updateManifest()
+	evidence := planner.Step{Name: "orisema-demo-web", CurrentImage: "nginx:new", CurrentID: "container-123", Action: planner.Drift, TypedDifferences: []planner.Difference{{Kind: planner.DifferencePublicConfig, Detail: "public configuration differs"}}, Reason: "public configuration differs"}
+	got := Build(m, []planner.Step{evidence})
+	if got[0].Action != PublicConfigPrepare || got[0].CurrentImage != got[0].TargetImage {
+		t.Fatalf("plan=%#v; want prepare-only public configuration candidate", got)
+	}
+	m.Services[0].Secrets = []manifest.SecretBinding{{Name: "token", Target: "token"}}
+	got = Build(m, []planner.Step{evidence})
+	if got[0].Action != Blocked || !strings.Contains(got[0].Reason, "without secret or network") {
+		t.Fatalf("plan=%#v; want configured binding block", got)
 	}
 }
 

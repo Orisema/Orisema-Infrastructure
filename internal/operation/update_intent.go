@@ -19,6 +19,7 @@ var updateComparedFields = []string{"ownership", "container-id", "ports", "healt
 const UpdateAuthorizationTTL = 5 * time.Minute
 
 const updateIntentV2 = "orisema-update-intent-v2"
+const updateIntentV3PublicConfig = "orisema-update-intent-v3-public-config-prepare"
 
 type UpdateSecretEvidence struct {
 	Name     string `json:"name"`
@@ -53,6 +54,7 @@ type UpdateIntent struct {
 	PlanFingerprint          string                 `json:"planFingerprint"`
 	Bindings                 *UpdateBindingEvidence `json:"bindings,omitempty"`
 	ConfigurationFingerprint string                 `json:"configurationFingerprint,omitempty"`
+	DifferenceFingerprint    string                 `json:"differenceFingerprint,omitempty"`
 	PlannedAt                time.Time              `json:"plannedAt"`
 }
 
@@ -80,6 +82,12 @@ func (op Operation) IntentResourceName() string {
 		return ""
 	}
 	return op.Resources[0].Name
+}
+
+// PublicConfigurationReviewOnly reports the Beta 1 prepare-only contract
+// without exposing its private persisted identifier to CLI callers.
+func (op Operation) PublicConfigurationReviewOnly() bool {
+	return op.Intent != nil && op.Intent.Contract == updateIntentV3PublicConfig
 }
 
 func UpdatePlanFingerprint(application, service, resourceName, resourceID, currentImage, targetImage string) string {
@@ -123,6 +131,21 @@ func UpdatePlanFingerprintWithBindings(application, service, resourceName, resou
 		return "", err
 	}
 	return updatePlanFingerprintV2(application, service, resourceName, resourceID, currentImage, targetImage, configurationFingerprint), nil
+}
+
+func publicConfigurationPlanFingerprint(application, service, resourceName, resourceID, image, configurationFingerprint, differenceFingerprint string) string {
+	payload := struct {
+		Contract                 string `json:"contract"`
+		Application              string `json:"application"`
+		Service                  string `json:"service"`
+		ResourceName             string `json:"resourceName"`
+		ResourceID               string `json:"resourceId"`
+		Image                    string `json:"image"`
+		ConfigurationFingerprint string `json:"configurationFingerprint"`
+		DifferenceFingerprint    string `json:"differenceFingerprint"`
+	}{updateIntentV3PublicConfig, application, service, resourceName, resourceID, image, configurationFingerprint, differenceFingerprint}
+	data, _ := json.Marshal(payload)
+	return sha256String(data)
 }
 
 func canonicalBindingEvidence(input UpdateBindingEvidence) (UpdateBindingEvidence, string, error) {
@@ -226,6 +249,40 @@ func (s *Store) CreateUpdateIntent(request UpdateIntentRequest) (Operation, erro
 	return s.Load(request.ID)
 }
 
+// CreatePublicConfigurationIntent persists reviewable value-free evidence for
+// public-configuration drift. The contract is intentionally not authorizable
+// or executable in this increment.
+func (s *Store) CreatePublicConfigurationIntent(request UpdateIntentRequest, differenceFingerprint string) (Operation, error) {
+	if request.Bindings == nil || !isSHA256(differenceFingerprint) || request.CurrentImage == "" || request.CurrentImage != request.TargetImage {
+		return Operation{}, errors.New("public configuration intent evidence is incomplete")
+	}
+	bindings, configurationFingerprint, err := canonicalBindingEvidence(*request.Bindings)
+	if err != nil || len(bindings.PublicEnvironmentNames) == 0 || len(bindings.Secrets) != 0 || len(bindings.Networks) != 0 {
+		return Operation{}, errors.New("public configuration intent contains unsupported binding evidence")
+	}
+	at := request.At
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	at = at.UTC()
+	intent := &UpdateIntent{
+		Contract: updateIntentV3PublicConfig, Service: request.Service,
+		CurrentImage: request.CurrentImage, TargetImage: request.TargetImage,
+		ComparedFields: append([]string(nil), updateComparedFields...), Bindings: &bindings,
+		ConfigurationFingerprint: configurationFingerprint, DifferenceFingerprint: differenceFingerprint, PlannedAt: at,
+	}
+	intent.PlanFingerprint = publicConfigurationPlanFingerprint(request.Application, request.Service, request.ResourceName, request.ResourceID, request.CurrentImage, configurationFingerprint, differenceFingerprint)
+	op := Operation{
+		ID: request.ID, Application: request.Application, Services: []string{request.Service}, Type: "UPDATE", CreatedAt: at,
+		Resources: []Resource{{Kind: "container", Name: request.ResourceName, ID: request.ResourceID, Ownership: OwnershipManaged, Application: request.Application, Service: request.Service}},
+		Previous:  request.CurrentImage, RecoveryData: request.ResourceID, Intent: intent,
+	}
+	if err := s.Create(op); err != nil {
+		return Operation{}, err
+	}
+	return s.Load(request.ID)
+}
+
 // AuthorizeUpdateIntent atomically advances a freshly revalidated intent to
 // PREPARING. Confirmation is a CLI concern; this method only accepts exact
 // plan and resource evidence and never accesses or mutates a runtime.
@@ -238,6 +295,9 @@ func (s *Store) AuthorizeUpdateIntent(id, planFingerprint string, observedResour
 		}
 		if op.State != Pending || op.Intent == nil || op.Authorization != nil {
 			return errors.New("update intent is not pending authorization")
+		}
+		if op.Intent.Contract == updateIntentV3PublicConfig {
+			return errors.New("public configuration intent is review-only and cannot be authorized")
 		}
 		if at.IsZero() {
 			at = time.Now().UTC()
@@ -282,7 +342,11 @@ func validateUpdateIntent(op Operation) error {
 		return nil
 	}
 	intent := op.Intent
-	if op.Type != "UPDATE" || intent.Service == "" || intent.CurrentImage == "" || intent.TargetImage == "" || intent.CurrentImage == intent.TargetImage {
+	publicConfigPrepare := intent.Contract == updateIntentV3PublicConfig
+	if publicConfigPrepare && (op.State != Pending || op.Authorization != nil || op.Execution != nil) {
+		return errors.New("persisted public configuration intent advanced beyond review-only state")
+	}
+	if op.Type != "UPDATE" || intent.Service == "" || intent.CurrentImage == "" || intent.TargetImage == "" || (!publicConfigPrepare && intent.CurrentImage == intent.TargetImage) || (publicConfigPrepare && intent.CurrentImage != intent.TargetImage) {
 		return errors.New("persisted update intent fields are invalid")
 	}
 	if intent.PlannedAt.IsZero() || intent.PlannedAt != op.CreatedAt || !reflect.DeepEqual(intent.ComparedFields, updateComparedFields) {
@@ -303,14 +367,24 @@ func validateUpdateIntent(op Operation) error {
 	}
 	want := UpdatePlanFingerprint(op.Application, intent.Service, resource.Name, resource.ID, intent.CurrentImage, intent.TargetImage)
 	if intent.Contract != "" {
-		if intent.Contract != updateIntentV2 || intent.Bindings == nil || !isSHA256(intent.ConfigurationFingerprint) {
+		if intent.Contract != updateIntentV2 && intent.Contract != updateIntentV3PublicConfig || intent.Bindings == nil || !isSHA256(intent.ConfigurationFingerprint) {
 			return errors.New("persisted update intent binding contract is invalid")
 		}
 		bindings, configurationFingerprint, err := canonicalBindingEvidence(*intent.Bindings)
 		if err != nil || !reflect.DeepEqual(bindings, *intent.Bindings) || configurationFingerprint != intent.ConfigurationFingerprint {
 			return errors.New("persisted update intent binding evidence is invalid")
 		}
-		want = updatePlanFingerprintV2(op.Application, intent.Service, resource.Name, resource.ID, intent.CurrentImage, intent.TargetImage, configurationFingerprint)
+		if intent.Contract == updateIntentV3PublicConfig {
+			if len(bindings.PublicEnvironmentNames) == 0 || len(bindings.Secrets) != 0 || len(bindings.Networks) != 0 || !isSHA256(intent.DifferenceFingerprint) {
+				return errors.New("persisted public configuration intent evidence is invalid")
+			}
+			want = publicConfigurationPlanFingerprint(op.Application, intent.Service, resource.Name, resource.ID, intent.CurrentImage, configurationFingerprint, intent.DifferenceFingerprint)
+		} else {
+			if intent.DifferenceFingerprint != "" {
+				return errors.New("persisted update intent contains unexpected difference evidence")
+			}
+			want = updatePlanFingerprintV2(op.Application, intent.Service, resource.Name, resource.ID, intent.CurrentImage, intent.TargetImage, configurationFingerprint)
+		}
 	} else if intent.Bindings != nil || intent.ConfigurationFingerprint != "" {
 		return errors.New("persisted legacy update intent contains binding evidence")
 	}

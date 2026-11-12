@@ -270,6 +270,14 @@ jobs:
             ORISEMA_EVIDENCE_DIR="$PWD/work/alpha8-configured-rollback" \
             scripts/alpha8-configured-rollback-lab.sh
           sudo chown -R "$USER":"$(id -gn)" work/alpha8-configured-rollback
+      - name: Exercise Beta 1 public configuration candidate
+        run: |
+          set -euo pipefail
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/beta1-public-config-apply" \
+            scripts/beta1-public-config-apply-lab.sh
+          sudo chown -R "$USER":"$(id -gn)" work/beta1-public-config-apply
       - name: Exercise Phase 2 backup and restore laboratory
         run: |
           set -euo pipefail
@@ -328,6 +336,10 @@ jobs:
             work/alpha6-secret-lifecycle/*.err
             work/alpha7-config-network/*.txt
             work/alpha7-mixidentity/*.txt
+            work/beta1-public-config-apply/*.txt
+            work/beta1-public-config-apply/*.out
+            work/beta1-public-config-apply/*.err
+            work/beta1-public-config-apply/*.json
             work/alpha3-update/*.json
             work/alpha3-update/*.txt
             work/alpha5-update-apply/*.json

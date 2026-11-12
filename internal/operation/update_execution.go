@@ -31,9 +31,6 @@ func (s *Store) BeginUpdateExecution(id, planFingerprint, backupName string, obs
 		if op.State != Preparing || op.Intent == nil || op.Authorization == nil || op.Execution != nil {
 			return errors.New("update intent is not ready for execution")
 		}
-		if op.Intent.Contract == updateIntentV3PublicConfig {
-			return errors.New("public configuration intent is review-only and cannot be executed")
-		}
 		if at.IsZero() {
 			at = time.Now().UTC()
 		}

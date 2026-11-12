@@ -53,6 +53,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Auditoria de conclusão da Alpha 8](docs/ALPHA8-AUDIT.md)
 - [Auditoria de conclusão da Alpha 9](docs/ALPHA9-AUDIT.md)
 - [Auditoria e evidências da Alpha 10](docs/ALPHA10-AUDIT.md)
+- [Laboratório de candidato de configuração pública da Beta 1](docs/BETA1-PUBLIC-CONFIG-LAB.md)
 - [Laboratórios Fedora 43/45 da Alpha 8](docs/ALPHA8-FEDORA-LAB.md)
 
 ## Versão do binário

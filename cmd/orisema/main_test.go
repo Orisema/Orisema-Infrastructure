@@ -731,6 +731,8 @@ func TestPublicConfigurationPreparePersistsReviewOnlyIntentWithoutValue(t *testi
 case "$1" in
   ps) printf '%%s\n' '[{"Names":["orisema-demo-web"],"State":"running","Image":"nginx:stable"}]' ;;
   inspect) printf '%%s\n' '[{"Id":"container-123","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:stable","Env":["APP_MODE=old"],"Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web","%s":"%s","%s":"%s"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}},"NetworkSettings":{"Networks":{}}}]' ;;
+  stop|rename) : ;;
+  run) printf '%%s\n' 'candidate-456' ;;
   *) exit 91 ;;
 esac
 `, publicconfig.NamesLabel, names, publicconfig.HashLabel, digest)
@@ -767,9 +769,27 @@ esac
 	}
 	stdout.Reset()
 	stderr.Reset()
-	code = run([]string{"update", "apply", manifestPath, "web", "--journal", journal, "--operation", persisted.ID}, strings.NewReader("APPLY UPDATE demo/web\n"), &stdout, &stderr)
-	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "blocked before confirmation") || !strings.Contains(stderr.String(), "not executable") {
+	code = run([]string{"update", "apply", manifestPath, "web", "--journal", journal, "--operation", persisted.ID}, strings.NewReader("APPLY PUBLIC CONFIG demo/web "+persisted.ID+"\n"), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "Update candidate created: candidate-456 state=APPLYING") || !strings.Contains(stdout.String(), "Previous container preserved as:") {
 		t.Fatalf("apply code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	loaded, err := operation.OpenExistingStore(journal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executed, err := loaded.Load(persisted.ID)
+	if err != nil || executed.Execution == nil || !executed.Execution.PreviousStopped || !executed.Execution.PreviousRenamed || executed.Execution.CandidateID != "candidate-456" {
+		t.Fatalf("executed=%#v err=%v", executed, err)
+	}
+	journalData, _ := os.ReadFile(filepath.Join(journal, persisted.ID+".json"))
+	if strings.Contains(string(journalData), canary) || strings.Contains(stdout.String(), canary) || strings.Contains(stderr.String(), canary) {
+		t.Fatal("public configuration value leaked after apply")
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "verify", manifestPath, "web", "--journal", journal, "--operation", persisted.ID}, strings.NewReader(""), &stdout, &stderr)
+	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "verify and rollback are not implemented") {
+		t.Fatalf("verify code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
 

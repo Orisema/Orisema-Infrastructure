@@ -370,8 +370,13 @@ func validateUpdateIntent(op Operation) error {
 	}
 	intent := op.Intent
 	publicConfigPrepare := intent.Contract == updateIntentV3PublicConfig
-	if publicConfigPrepare && (op.Execution != nil || op.State != Pending && op.State != Preparing || op.State == Pending && op.Authorization != nil || op.State == Preparing && op.Authorization == nil) {
-		return errors.New("persisted public configuration intent advanced beyond authorized review-only state")
+	if publicConfigPrepare {
+		validState := op.State == Pending && op.Authorization == nil && op.Execution == nil ||
+			op.State == Preparing && op.Authorization != nil && op.Execution == nil ||
+			op.State == Applying && op.Authorization != nil && op.Execution != nil
+		if !validState {
+			return errors.New("persisted public configuration intent has invalid lifecycle evidence")
+		}
 	}
 	if op.Type != "UPDATE" || intent.Service == "" || intent.CurrentImage == "" || intent.TargetImage == "" || (!publicConfigPrepare && intent.CurrentImage == intent.TargetImage) || (publicConfigPrepare && intent.CurrentImage != intent.TargetImage) {
 		return errors.New("persisted update intent fields are invalid")

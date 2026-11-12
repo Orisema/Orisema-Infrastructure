@@ -22,8 +22,11 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
 - O fluxo experimental Alpha 5 atualiza apenas um serviço elegível por vez;
   `deploy` continua bloqueando `DRIFT` e `REVIEW`.
 - Update configurado aceita somente drift exclusivo de imagem. Mudanças
-  declarativas de ambiente, secrets ou redes exigem uma operação futura de
-  substituição controlada e não são aplicadas in-place.
+  declarativas de ambiente, secrets ou redes não são aplicadas in-place. O
+  desenvolvimento da Beta 1 permite persistir somente uma intenção de revisão
+  para drift exclusivo de configuração pública em serviço sem secrets ou
+  redes; autorização, candidato, verify e rollback dessa intenção permanecem
+  bloqueados.
 - Rollback de dados, backup/restore e migrações de volume. O rollback público
   existente restaura somente o container da aplicação preservado pelo update.
 - Backup/restore protege somente configuração validada e histórico operacional

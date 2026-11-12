@@ -1215,6 +1215,10 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintln(stderr, "error: operation intent does not match the requested manifest and service")
 			return 1
 		}
+		if op.PublicConfigurationReviewOnly() {
+			fmt.Fprintln(stderr, "update authorization blocked before confirmation: public configuration intent is review-only")
+			return 1
+		}
 		confirmation := "AUTHORIZE UPDATE " + m.Name + "/" + service
 		fmt.Fprintf(stdout, "Type %s to authorize preparation: ", confirmation)
 		answer, readErr := bufio.NewReader(stdin).ReadString('\n')
@@ -1271,6 +1275,10 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 				declared = &m.Services[i]
 				break
 			}
+		}
+		if candidate != nil && candidate.Action == updateplan.PublicConfigPrepare {
+			fmt.Fprintln(stderr, "update execution blocked: public configuration intent is review-only and cannot be executed")
+			return 1
 		}
 		if candidate == nil || candidate.Action != updateplan.Candidate {
 			fmt.Fprintln(stderr, "update execution blocked: fresh plan is no longer an update candidate")
@@ -1395,6 +1403,10 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 				break
 			}
 		}
+		if candidate != nil && candidate.Action == updateplan.PublicConfigPrepare {
+			fmt.Fprintln(stderr, "update authorization blocked: public configuration intent is review-only and cannot be authorized")
+			return 1
+		}
 		if candidate == nil || candidate.Action != updateplan.Candidate {
 			reason := "service is not an update candidate"
 			if candidate != nil {
@@ -1436,7 +1448,7 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "error: service %q not declared in manifest\n", service)
 			return 1
 		}
-		if candidate.Action != updateplan.Candidate {
+		if candidate.Action != updateplan.Candidate && candidate.Action != updateplan.PublicConfigPrepare {
 			fmt.Fprintf(stderr, "update intent blocked for %s: %s\n", candidate.Name, candidate.Reason)
 			return 1
 		}
@@ -1450,18 +1462,28 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "error: generate operation ID: %v\n", err)
 			return 1
 		}
-		op, err := store.CreateUpdateIntent(operation.UpdateIntentRequest{
+		request := operation.UpdateIntentRequest{
 			ID: id, Application: m.Name, Service: candidate.Service, ResourceName: candidate.Name,
 			ResourceID: candidate.CurrentID, CurrentImage: candidate.CurrentImage, TargetImage: candidate.TargetImage,
 			Bindings: updateBindingEvidence(m, candidate.Service, resolvedSecrets, resolvedNetworks),
-		})
+		}
+		var op operation.Operation
+		if candidate.Action == updateplan.PublicConfigPrepare {
+			op, err = store.CreatePublicConfigurationIntent(request, candidate.DifferenceFingerprint)
+		} else {
+			op, err = store.CreateUpdateIntent(request)
+		}
 		if err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
 		fmt.Fprintf(stdout, "Update intent persisted: %s\n", op.ID)
 		fmt.Fprintf(stdout, "Plan fingerprint: %s\n", op.Intent.PlanFingerprint)
-		fmt.Fprintln(stdout, "No confirmation requested, image pulled, or runtime changes made.")
+		if candidate.Action == updateplan.PublicConfigPrepare {
+			fmt.Fprintln(stdout, "Review-only public configuration intent persisted. Authorization and runtime mutation remain blocked.")
+		} else {
+			fmt.Fprintln(stdout, "No confirmation requested, image pulled, or runtime changes made.")
+		}
 		return 0
 	}
 	fmt.Fprintf(stdout, "Read-only update plan for %q:\n", m.Name)

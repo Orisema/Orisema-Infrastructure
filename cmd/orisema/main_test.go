@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -713,6 +714,55 @@ func TestConfiguredUpdateVerifyRequiresIntactJournalWithoutExposingValues(t *tes
 	}
 	if strings.Contains(stderr.String(), "laboratory") {
 		t.Fatalf("update error exposed public value: %q", stderr.String())
+	}
+}
+
+func TestPublicConfigurationPreparePersistsReviewOnlyIntentWithoutValue(t *testing.T) {
+	dir := t.TempDir()
+	const canary = "public-config-canary-value"
+	manifestPath := filepath.Join(dir, "manifest.yaml")
+	manifestData := "apiVersion: orisema.dev/v1alpha4\nkind: Application\nname: demo\nservices:\n  - name: web\n    image: nginx:stable\n    publicEnvironment:\n      - name: APP_MODE\n        value: " + canary + "\n    healthcheck:\n      command: nginx -t\n      interval: 30s\n      timeout: 5s\n      retries: 3\n"
+	if err := os.WriteFile(manifestPath, []byte(manifestData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	names, digest := publicconfig.Metadata([]manifest.PublicEnvironmentEntry{{Name: "APP_MODE", Value: canary}})
+	podman := filepath.Join(dir, "podman")
+	script := fmt.Sprintf(`#!/bin/sh
+case "$1" in
+  ps) printf '%%s\n' '[{"Names":["orisema-demo-web"],"State":"running","Image":"nginx:stable"}]' ;;
+  inspect) printf '%%s\n' '[{"Id":"container-123","Name":"orisema-demo-web","State":{"Status":"running","Running":true},"Config":{"Image":"nginx:stable","Env":["APP_MODE=old"],"Labels":{"dev.orisema.managed":"true","dev.orisema.app":"demo","dev.orisema.service":"web","%s":"%s","%s":"%s"},"Healthcheck":{"Test":["CMD-SHELL","nginx -t"],"Interval":30000000000,"Timeout":5000000000,"Retries":3}},"HostConfig":{"PortBindings":{},"RestartPolicy":{"Name":"no","MaximumRetryCount":0}},"NetworkSettings":{"Networks":{}}}]' ;;
+  *) exit 91 ;;
+esac
+`, publicconfig.NamesLabel, names, publicconfig.HashLabel, digest)
+	if err := os.WriteFile(podman, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	journal := filepath.Join(dir, "operations")
+	if _, err := operation.OpenStore(journal); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"update", "prepare", manifestPath, "web", "--journal", journal}, strings.NewReader(""), &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "Review-only public configuration intent persisted") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	data, err := os.ReadFile(filepath.Join(journal, strings.TrimSpace(strings.Split(strings.Split(stdout.String(), "Update intent persisted: ")[1], "\n")[0])+".json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), canary) || strings.Contains(stdout.String(), canary) || strings.Contains(stderr.String(), canary) {
+		t.Fatalf("public configuration value leaked: journal=%s stdout=%q stderr=%q", data, stdout.String(), stderr.String())
+	}
+	var persisted operation.Operation
+	if err := json.Unmarshal(data, &persisted); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"update", "authorize", manifestPath, "web", "--journal", journal, "--operation", persisted.ID}, strings.NewReader("AUTHORIZE UPDATE demo/web\n"), &stdout, &stderr)
+	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "blocked before confirmation") || !strings.Contains(stderr.String(), "review-only") {
+		t.Fatalf("authorize code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
 

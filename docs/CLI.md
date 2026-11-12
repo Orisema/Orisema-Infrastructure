@@ -112,6 +112,13 @@ persists an exact `PENDING` intent in the Alpha 4 journal. It records container
 identity, previous/target image and a deterministic plan fingerprint. It does
 not ask for execution confirmation, pull an image or change Podman.
 
+For Beta 1, `update prepare` also accepts drift exclusively classified as
+`PUBLIC_CONFIG` when the image is unchanged, a healthcheck is declared and the
+service has no secret or network bindings. It persists names and fingerprints,
+never public values. This intent is review-only: `update authorize` rejects it
+before confirmation and `update apply` cannot execute it. Mixed or unknown
+drift remains blocked.
+
 `update authorize` requires exact textual confirmation and repeats the complete
 read-only plan within five minutes of preparation. Matching fresh evidence
 atomically advances the journal to `PREPARING`; failure leaves it untouched.

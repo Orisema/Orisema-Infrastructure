@@ -208,6 +208,27 @@ attestations, a reinstalação e os testes de upgrade/downgrade passaram no
 [workflow 43435385528](https://github.com/Orisema/Orisema-Infrastructure/actions/runs/43435385528).
 Consulte a [auditoria da Beta 1](docs/BETA1-AUDIT.md).
 
+## Beta 2 — rotação segura de referências de secrets
+
+- [ ] Revisar o contrato e o modelo de ameaça antes de alterar o runtime
+  ([RFC-0009](docs/RFC-0009-secret-reference-rotation.md), #183, #184).
+- [ ] Classificar drift de secret por tipos fechados sem transportar valor ou
+  locator privado.
+- [ ] Começar pelo menor subconjunto aprovado: uma referência Podman, um
+  binding existente, um serviço e nenhum outro drift.
+- [ ] Vincular intenção v4, confirmação e admissão ao mesmo plano e
+  identidades externas.
+- [ ] Criar candidato completo, verificar saúde e restaurar a unidade anterior
+  por rollback manual.
+- [ ] Exercitar troca de identidade, concorrência, interrupção e redaction em
+  laboratório isolado antes de release.
+
+**Adiado:** provider `file`, inclusão/remoção de mounts, mudança de target,
+drift combinado, lifecycle de secrets, dados e múltiplos serviços.
+
+**Princípio:** rotação significa trocar uma referência externa já criada; o
+Orisema não lê, cria, atualiza, adota ou remove o valor durante a substituição.
+
 ## Fase 3 — Ecossistema
 - [ ] Adaptadores para outros runtimes.
 - [ ] Integração opcional com monitoramento.

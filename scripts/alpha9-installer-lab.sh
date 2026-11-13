@@ -20,7 +20,7 @@ case "$(uname -m)" in
   *) echo "installer lab: unsupported architecture" >&2; exit 1 ;;
 esac
 
-version=${ORISEMA_LAB_VERSION:-v0.1.0-alpha.10}
+version=${ORISEMA_LAB_VERSION:-v0.1.0-beta.1}
 newer_version=v999.0.0-installer-test
 case "$version" in
   v[0-9]*.[0-9]*.[0-9]*-*) ;;

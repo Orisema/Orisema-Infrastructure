@@ -11,7 +11,7 @@ Alpha 2 introduces a new API version instead of changing the meaning of
 | Contract | Status | Port bind behavior |
 | --- | --- | --- |
 | `orisema.dev/v1alpha1` | legacy compatibility | no `kind` or `hostIP`; Podman binds published ports on all interfaces |
-| `orisema.dev/v1alpha2` | current Alpha contract | requires `kind: Application`; every published port requires an explicit loopback `hostIP` |
+| `orisema.dev/v1alpha2` | supported legacy contract | requires `kind: Application`; every published port requires an explicit loopback `hostIP` |
 
 Unknown YAML fields fail validation in both versions. A field added to the Go
 data model is not automatically valid in an older API version: version-specific

@@ -1,6 +1,6 @@
-# Limitações conhecidas — desenvolvimento v0.1.0-alpha.10
+# Limitações conhecidas — v0.1.0-beta.1
 
-A branch `main` é um protótipo operacional para hosts Linux descartáveis. **Não é
+A release atual é um protótipo operacional para hosts Linux descartáveis. **Não é
 indicada para produção** e não possui garantia de estabilidade ou continuidade.
 
 ## Escopo suportado
@@ -23,7 +23,7 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   `deploy` continua bloqueando `DRIFT` e `REVIEW`.
 - Update configurado aceita somente drift exclusivo de imagem. Mudanças
   declarativas de ambiente, secrets ou redes não são aplicadas in-place. O
-  desenvolvimento da Beta 1 permite persistir somente uma intenção de revisão
+  incremento da Beta 1 permite persistir somente uma intenção
   para drift exclusivo de configuração pública em serviço sem secrets ou
   redes. A intenção pode ser autorizada após revalidação e confirmação exata,
   e `apply` pode preservar a unidade anterior e criar um candidato. Verify

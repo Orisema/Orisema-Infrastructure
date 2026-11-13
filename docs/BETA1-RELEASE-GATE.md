@@ -35,9 +35,10 @@ commit, refuses a mismatched existing tag, and then:
    implicit downgrade, accepts an explicit downgrade, upgrades again and
    uninstalls.
 
-Publication results are facts only after the workflow completes. Until then,
-the audit may record the source candidate as ready but must not claim that the
-tag, release, signatures or post-publication installation passed.
+The gate completed in workflow
+[43435385528](https://github.com/Orisema/Orisema-Infrastructure/actions/runs/43435385528)
+for commit `f78cc1d218a3fe3b148263419db1d88d6b2b809c`. Publication results are
+recorded in the [Beta 1 audit](BETA1-AUDIT.md).
 
 ## Deliberate limits
 

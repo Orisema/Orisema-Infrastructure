@@ -21,6 +21,7 @@ case "$(uname -m)" in
 esac
 
 version=${ORISEMA_LAB_VERSION:-v0.1.0-alpha.10}
+newer_version=v999.0.0-installer-test
 case "$version" in
   v[0-9]*.[0-9]*.[0-9]*-*) ;;
   *) echo "installer lab: invalid ORISEMA_LAB_VERSION" >&2; exit 1 ;;
@@ -114,7 +115,7 @@ test "$(sed -n '6p' "$log")" = gh
 test "$(sed -n '7p' "$log")" = tar
 
 printf '%s\n' '#!/bin/sh' 'echo "Orisema Infrastructure"' \
-  'echo "Version: v0.1.0-alpha.11"' "echo \"OS/Arch: linux/$arch\"" \
+  "echo \"Version: $newer_version\"" "echo \"OS/Arch: linux/$arch\"" \
   >"$home_dir/.local/bin/orisema"
 chmod 0755 "$home_dir/.local/bin/orisema"
 if run_installer --user >"$lab_root/downgrade.out" 2>&1; then

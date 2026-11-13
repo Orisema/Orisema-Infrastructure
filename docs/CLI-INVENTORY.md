@@ -192,8 +192,7 @@ preserves the previous container and creates an unverified candidate. Failures
 receive no automatic cleanup, retry or rollback.
 For a Beta 1 public-configuration intent, exact confirmation includes the
 operation ID and the command may only preserve the previous unit and create the
-candidate. It remains `APPLYING` until explicit verify; rollback and cleanup
-are blocked.
+candidate. It remains `APPLYING` until explicit verify; cleanup is blocked.
 
 <!-- command: update verify -->
 ### `orisema update verify`
@@ -211,7 +210,9 @@ Syntax: `orisema update rollback <manifest.yaml> <service> --journal
 <directory> --operation <id>`. Journaled runtime mutation available only to an
 intact `RECOVERY_REQUIRED` update after exact confirmation. It preserves the
 failed candidate and restores the exact previous container; application data
-is not rolled back.
+is not rolled back. Public-configuration rollback restores that preserved
+identity as-is; old public values are absent from the journal and are not
+reconstructed from the current manifest.
 
 <!-- command: update rollback-verify -->
 ### `orisema update rollback-verify`

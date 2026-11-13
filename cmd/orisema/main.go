@@ -1188,17 +1188,6 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "update continuation blocked before confirmation: %v\n", err)
 			return 1
 		}
-		if rollback || rollbackVerify {
-			op, err := store.Load(args[7])
-			if err != nil {
-				fmt.Fprintf(stderr, "update continuation blocked: %v\n", err)
-				return 1
-			}
-			if op.PublicConfigurationReviewOnly() {
-				fmt.Fprintln(stderr, "update continuation blocked: public configuration rollback is not implemented")
-				return 1
-			}
-		}
 	}
 	configured := !planOnly && manifestServiceHasBindings(m, args[3])
 	publicConfigurationAuthorization := false
@@ -1228,7 +1217,7 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintln(stderr, "error: operation intent does not match the requested manifest and service")
 			return 1
 		}
-		publicConfigurationAuthorization = op.PublicConfigurationReviewOnly()
+		publicConfigurationAuthorization = op.PublicConfigurationIntent()
 		confirmation := "AUTHORIZE UPDATE " + m.Name + "/" + service
 		if publicConfigurationAuthorization {
 			confirmation = "AUTHORIZE PUBLIC CONFIG " + m.Name + "/" + service + " " + id
@@ -1252,7 +1241,7 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintln(stderr, "error: operation is not an authorized PREPARING intent for this manifest and service")
 			return 1
 		}
-		publicConfigurationExecution = op.PublicConfigurationReviewOnly()
+		publicConfigurationExecution = op.PublicConfigurationIntent()
 		confirmation := "APPLY UPDATE " + m.Name + "/" + service
 		if publicConfigurationExecution {
 			confirmation = "APPLY PUBLIC CONFIG " + m.Name + "/" + service + " " + id
@@ -1621,7 +1610,7 @@ func revalidateUpdateBindings(ctx context.Context, m *manifest.Manifest, op oper
 		return nil, nil, errors.New("authorized configured bindings are missing from the manifest")
 	}
 	var fingerprint string
-	if op.PublicConfigurationReviewOnly() {
+	if op.PublicConfigurationIntent() {
 		fingerprint, err = operation.PublicConfigurationPlanFingerprint(op.Application, op.Intent.Service, op.IntentResourceName(), op.Resources[0].ID, op.Intent.CurrentImage, op.Intent.DifferenceFingerprint, *bindings)
 	} else {
 		fingerprint, err = operation.UpdatePlanFingerprintWithBindings(op.Application, op.Intent.Service, op.IntentResourceName(), op.Resources[0].ID, op.Intent.CurrentImage, op.Intent.TargetImage, *bindings)
@@ -1898,23 +1887,25 @@ func runUpdateRollbackVerify(m manifest.Manifest, service, journal, id string, s
 		fmt.Fprintf(stderr, "rollback verification blocked: list runtime containers: %v\n", err)
 		return 1
 	}
-	oldManifest := m
-	oldManifest.Services = append([]manifest.Service(nil), m.Services...)
-	matchedOldConfiguration := false
-	for i := range oldManifest.Services {
-		if oldManifest.Services[i].Name == service {
-			oldManifest.Services[i].Image = op.Intent.CurrentImage
+	if !op.PublicConfigurationIntent() {
+		oldManifest := m
+		oldManifest.Services = append([]manifest.Service(nil), m.Services...)
+		matchedOldConfiguration := false
+		for i := range oldManifest.Services {
+			if oldManifest.Services[i].Name == service {
+				oldManifest.Services[i].Image = op.Intent.CurrentImage
+			}
 		}
-	}
-	for _, step := range planner.BuildInspectedResolvedRuntime(context.Background(), &oldManifest, containers, client, resolvedSecrets, resolvedNetworks) {
-		if step.Name == op.IntentResourceName() && step.Action == planner.Noop {
-			matchedOldConfiguration = true
-			break
+		for _, step := range planner.BuildInspectedResolvedRuntime(context.Background(), &oldManifest, containers, client, resolvedSecrets, resolvedNetworks) {
+			if step.Name == op.IntentResourceName() && step.Action == planner.Noop {
+				matchedOldConfiguration = true
+				break
+			}
 		}
-	}
-	if !matchedOldConfiguration {
-		fmt.Fprintln(stderr, "rollback verification blocked: restored container no longer matches its supported previous configuration")
-		return 1
+		if !matchedOldConfiguration {
+			fmt.Fprintln(stderr, "rollback verification blocked: restored container no longer matches its supported previous configuration")
+			return 1
+		}
 	}
 	observed, restored, err := inspectRollbackResources(context.Background(), client, op, true)
 	if err != nil {

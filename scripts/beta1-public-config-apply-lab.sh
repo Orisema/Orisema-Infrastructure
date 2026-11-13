@@ -126,14 +126,41 @@ else
   candidate_before=$(podman inspect --format '{{.Id}}' "$target")
   previous_before=$(podman inspect --format '{{.Id}}' "$backup")
   status=0
-  printf 'ROLLBACK UPDATE %s/web %s\n' "$app" "$operation_id" | \
+  printf 'ROLLBACK UPDATE wrong/value wrong-id\n' | \
     "$binary" update rollback "$manifest" web --journal "$journal" \
-      --operation "$operation_id" >"$evidence/rollback-blocked.out" 2>"$evidence/rollback-blocked.err" || status=$?
+      --operation "$operation_id" >"$evidence/rollback-wrong.out" 2>"$evidence/rollback-wrong.err" || status=$?
   test "$status" -ne 0
-  grep -Fq 'public configuration rollback is not implemented' "$evidence/rollback-blocked.err"
+  grep -Fq 'cancelled; journal and runtime unchanged' "$evidence/rollback-wrong.err"
   test "$(sha256sum "$journal/$operation_id.json" | awk '{print $1}')" = "$journal_before"
   test "$(podman inspect --format '{{.Id}}' "$target")" = "$candidate_before"
   test "$(podman inspect --format '{{.Id}}' "$backup")" = "$previous_before"
+
+  write_manifest "beta1-tampered-${RANDOM}-${RANDOM}" "$manifest"
+  status=0
+  printf 'ROLLBACK UPDATE %s/web %s\n' "$app" "$operation_id" | \
+    "$binary" update rollback "$manifest" web --journal "$journal" \
+      --operation "$operation_id" >"$evidence/rollback-drift.out" 2>"$evidence/rollback-drift.err" || status=$?
+  test "$status" -ne 0
+  grep -Fq 'rollback blocked:' "$evidence/rollback-drift.err"
+  test "$(sha256sum "$journal/$operation_id.json" | awk '{print $1}')" = "$journal_before"
+  test "$(podman inspect --format '{{.Id}}' "$target")" = "$candidate_before"
+  test "$(podman inspect --format '{{.Id}}' "$backup")" = "$previous_before"
+  write_manifest "$new_value" "$manifest"
+
+  printf 'ROLLBACK UPDATE %s/web %s\n' "$app" "$operation_id" | \
+    "$binary" update rollback "$manifest" web --journal "$journal" \
+      --operation "$operation_id" >"$evidence/rollback.out"
+  failed="orisema-failed-${operation_id#update-}"
+  test "$(podman inspect --format '{{.Id}}' "$target")" = "$old_id"
+  test "$(podman inspect --format '{{.State.Running}}' "$target")" = true
+  test "$(podman inspect --format '{{.Id}}' "$failed")" = "$new_id"
+  test "$(podman inspect --format '{{.State.Running}}' "$failed")" = false
+  test "$(podman inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$target" | grep -c "^APP_MODE=${old_value}$")" = 1
+  podman healthcheck run "$target" >"$evidence/rollback-health.txt"
+  "$binary" update rollback-verify "$manifest" web --journal "$journal" \
+    --operation "$operation_id" >"$evidence/rollback-verify.out"
+  grep -Fq 'state=ROLLED_BACK decision=ROLLED_BACK' "$evidence/rollback-verify.out"
+  backup=$failed
 fi
 
 if grep -FRq --exclude='old.yaml' --exclude='manifest.yaml' -- "$old_value" "$evidence" || \

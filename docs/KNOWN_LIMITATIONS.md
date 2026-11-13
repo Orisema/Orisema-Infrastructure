@@ -26,9 +26,10 @@ indicada para produção** e não possui garantia de estabilidade ou continuidad
   desenvolvimento da Beta 1 permite persistir somente uma intenção de revisão
   para drift exclusivo de configuração pública em serviço sem secrets ou
   redes. A intenção pode ser autorizada após revalidação e confirmação exata,
-  e `apply` pode preservar a unidade anterior e criar um candidato. Verify,
-  verify pode decidir `COMPLETED` ou `RECOVERY_REQUIRED`; rollback e cleanup
-  permanecem bloqueados.
+  e `apply` pode preservar a unidade anterior e criar um candidato. Verify
+  pode decidir `COMPLETED` ou `RECOVERY_REQUIRED`; neste último estado o
+  rollback manual restaura a unidade exata preservada. Cleanup permanece
+  bloqueado.
 - Rollback de dados, backup/restore e migrações de volume. O rollback público
   existente restaura somente o container da aplicação preservado pelo update.
 - Backup/restore protege somente configuração validada e histórico operacional

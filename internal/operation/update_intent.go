@@ -84,9 +84,9 @@ func (op Operation) IntentResourceName() string {
 	return op.Resources[0].Name
 }
 
-// PublicConfigurationReviewOnly reports the Beta 1 prepare-only contract
+// PublicConfigurationIntent reports the Beta 1 public-configuration contract
 // without exposing its private persisted identifier to CLI callers.
-func (op Operation) PublicConfigurationReviewOnly() bool {
+func (op Operation) PublicConfigurationIntent() bool {
 	return op.Intent != nil && op.Intent.Contract == updateIntentV3PublicConfig
 }
 
@@ -375,7 +375,8 @@ func validateUpdateIntent(op Operation) error {
 			op.State == Preparing && op.Authorization != nil && op.Execution == nil ||
 			op.State == Applying && op.Authorization != nil && op.Execution != nil && op.Health == nil && op.Decision == nil ||
 			op.State == Verifying && op.Authorization != nil && op.Execution != nil && op.Health != nil && op.Decision == nil ||
-			(op.State == Completed || op.State == RecoveryRequired) && op.Authorization != nil && op.Execution != nil && op.Health != nil && op.Decision != nil
+			(op.State == Completed || op.State == RecoveryRequired) && op.Authorization != nil && op.Execution != nil && op.Health != nil && op.Decision != nil && op.Rollback == nil ||
+			(op.State == RollingBack || op.State == RolledBack) && op.Authorization != nil && op.Execution != nil && op.Health != nil && op.Decision != nil && op.Rollback != nil
 		if !validState {
 			return errors.New("persisted public configuration intent has invalid lifecycle evidence")
 		}

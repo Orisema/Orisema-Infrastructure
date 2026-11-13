@@ -143,8 +143,9 @@ For an authorized Beta 1 public-configuration intent, the confirmation is
 the value-free plan, persists every next effect, stops and preserves the exact
 previous container, then creates a candidate with the new public configuration
 and unchanged image. It ends in `APPLYING`; the separate verify command records
-the durable decision. Rollback and cleanup remain unavailable for this
-contract, so the preserved unit must not be removed manually.
+the durable decision. A `RECOVERY_REQUIRED` decision enables the same explicit
+manual rollback described below. Cleanup remains unavailable, so neither the
+preserved unit nor the diagnostic candidate may be removed blindly.
 
 `update verify` is read-only with respect to Podman and records one explicit
 post-update observation per invocation. It freshly revalidates the candidate
@@ -162,7 +163,10 @@ diagnostic name and restores and starts the stopped previous container. Each
 mutation boundary is persisted first. Configured bindings are freshly
 revalidated, but the preserved previous container is restored as-is rather
 than reconstructed. It does not restore data, mutate external resources or
-remove any container.
+remove any container. For a public-configuration replacement, verification of
+the restored unit relies on its exact preserved ID, image, ownership and
+health; old public values are neither reconstructed from the new manifest nor
+persisted in the journal.
 
 `update rollback-verify` reinspects both exact containers and records the
 restored container's configured health. Only `healthy` commits `ROLLED_BACK`;

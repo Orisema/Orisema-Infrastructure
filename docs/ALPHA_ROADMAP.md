@@ -276,6 +276,9 @@ O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integra�
   autorização, apply, verify e rollback manual foram entregues nas issues
   #165–#177. O gate de fonte e publicação é #179; os demais tipos de drift
   continuam bloqueados.
+- O gate foi concluído e `v0.1.0-beta.1` foi publicada em 13/11/2026 a partir
+  do commit `f78cc1d218a3fe3b148263419db1d88d6b2b809c`; assinatura, attestations,
+  reinstalação e upgrade/downgrade passaram no workflow 43435385528.
 - Matriz ampliada de distribuições/Podman; adaptador Docker somente após testes.
 - Backup e restauração efetivamente testados; SSH remoto seguro.
 - Observabilidade opcional, multi-node, painel e identidade central somente com

@@ -1,15 +1,24 @@
-# Beta 1 source audit
+# Beta 1 release audit
 
-Date: 2026-11-13  
-Target: `v0.1.0-beta.1`  
+Date: 2026-11-13
+
+Target: `v0.1.0-beta.1`
+
+Source commit: `f78cc1d218a3fe3b148263419db1d88d6b2b809c`
+
 Gate issue: #179
 
-## Current result
+Release run: [43435385528](https://github.com/Orisema/Orisema-Infrastructure/actions/runs/43435385528)
 
-The Beta 1 implementation gate is ready for human review. This is a source
-audit, not a publication result: the tag, signed artifacts and release do not
-exist until #179 is explicitly approved and closed and the release workflow
-passes.
+## Result
+
+The Beta 1 source and publication gates passed. The tag resolves to the exact
+source commit above. The release workflow repeated vet, tests and race checks,
+recorded the Beta source gate, built both Linux archives, signed and attested
+the distribution, published it, downloaded it again and completed the
+post-publication installation checks.
+
+The release remains experimental and is not recommended for production.
 
 ## Controlled public-configuration replacement
 
@@ -41,8 +50,20 @@ passes.
 - Wrong confirmation and changed public-configuration evidence left journal
   hashes and both runtime IDs unchanged.
 
-The authoritative release evidence will be the workflow run for the exact tag
-commit. No CI result above is represented as a future publication result.
+## Published asset evidence
+
+| Asset | Published size | Verification |
+| --- | ---: | --- |
+| `orisema_linux_amd64.tar.gz` | 1,541,790 bytes | checksum, attestation, archive shape and native version/commit |
+| `orisema_linux_arm64.tar.gz` | 1,410,963 bytes | checksum, attestation, archive shape and cross-build metadata |
+| `checksums.txt` | 186 bytes | Sigstore and GitHub attestation |
+| `checksums.txt.sigstore.json` | 10,727 bytes | Cosign bundle verified against the published checksum file |
+
+The workflow deliberately changed an archive and checksum metadata and
+confirmed their rejection before installation. It installed authenticated
+Alpha 10, upgraded to Beta 1, rejected implicit downgrade, accepted explicit
+downgrade, upgraded again and uninstalled. ARM64 remains cross-build only; no
+native ARM64 execution is claimed.
 
 ## Residual limits
 

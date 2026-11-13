@@ -1188,9 +1188,21 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "update continuation blocked before confirmation: %v\n", err)
 			return 1
 		}
+		if verify || rollback || rollbackVerify {
+			op, err := store.Load(args[7])
+			if err != nil {
+				fmt.Fprintf(stderr, "update continuation blocked: %v\n", err)
+				return 1
+			}
+			if op.PublicConfigurationReviewOnly() {
+				fmt.Fprintln(stderr, "update continuation blocked: public configuration verify and rollback are not implemented")
+				return 1
+			}
+		}
 	}
 	configured := !planOnly && manifestServiceHasBindings(m, args[3])
 	publicConfigurationAuthorization := false
+	publicConfigurationExecution := false
 	if verify {
 		return runUpdateVerify(*m, args[3], args[5], args[7], stdout, stderr)
 	}
@@ -1240,11 +1252,11 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintln(stderr, "error: operation is not an authorized PREPARING intent for this manifest and service")
 			return 1
 		}
-		if op.PublicConfigurationReviewOnly() {
-			fmt.Fprintln(stderr, "update execution blocked before confirmation: authorized public configuration intent is not executable")
-			return 1
-		}
+		publicConfigurationExecution = op.PublicConfigurationReviewOnly()
 		confirmation := "APPLY UPDATE " + m.Name + "/" + service
+		if publicConfigurationExecution {
+			confirmation = "APPLY PUBLIC CONFIG " + m.Name + "/" + service + " " + id
+		}
 		fmt.Fprintf(stdout, "Type %s to start runtime mutation: ", confirmation)
 		answer, readErr := bufio.NewReader(stdin).ReadString('\n')
 		if readErr != nil || strings.TrimSpace(answer) != confirmation {
@@ -1281,11 +1293,7 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 				break
 			}
 		}
-		if candidate != nil && candidate.Action == updateplan.PublicConfigPrepare {
-			fmt.Fprintln(stderr, "update execution blocked: public configuration intent is review-only and cannot be executed")
-			return 1
-		}
-		if candidate == nil || candidate.Action != updateplan.Candidate {
+		if candidate == nil || candidate.Action != updateplan.Candidate && (!publicConfigurationExecution || candidate.Action != updateplan.PublicConfigPrepare) {
 			fmt.Fprintln(stderr, "update execution blocked: fresh plan is no longer an update candidate")
 			return 1
 		}
@@ -1294,7 +1302,17 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintln(stderr, "update execution blocked: rollback slot already exists")
 			return 1
 		}
-		fingerprint, err := updateFingerprint(m, candidate, resolvedSecrets, resolvedNetworks)
+		var fingerprint string
+		if publicConfigurationExecution {
+			bindings := updateBindingEvidence(m, candidate.Service, resolvedSecrets, resolvedNetworks)
+			if bindings == nil {
+				err = errors.New("public configuration evidence is missing")
+			} else {
+				fingerprint, err = operation.PublicConfigurationPlanFingerprint(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.DifferenceFingerprint, *bindings)
+			}
+		} else {
+			fingerprint, err = updateFingerprint(m, candidate, resolvedSecrets, resolvedNetworks)
+		}
 		if err != nil {
 			fmt.Fprintf(stderr, "update authorization blocked: invalid binding evidence: %v\n", err)
 			return 1
@@ -1317,7 +1335,7 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 				_ = cleanupSecrets(context.Background())
 			}
 		}()
-		if configured {
+		if configured && !publicConfigurationExecution {
 			freshSecrets, err := resolveManifestSecrets(context.Background(), m)
 			if err != nil || !secrets.SameMounts(resolvedSecrets[service], freshSecrets[service]) {
 				fmt.Fprintln(stderr, "update execution blocked: secret identity changed before binding preparation; previous container remains running")
@@ -1363,7 +1381,7 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "journal failed after renaming previous container: %v\n", err)
 			return 1
 		}
-		if configured {
+		if configured && !publicConfigurationExecution {
 			freshSecrets, err := resolveManifestSecrets(context.Background(), m)
 			if err != nil || !secrets.SameMounts(resolvedSecrets[service], freshSecrets[service]) {
 				fmt.Fprintf(stderr, "candidate creation blocked: secret identity changed; previous container remains preserved as %s\n", backupName)
@@ -1371,6 +1389,18 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			}
 			if err := networks.RevalidateManifest(context.Background(), m, networkInspectors(), resolvedNetworks); err != nil {
 				fmt.Fprintf(stderr, "candidate creation blocked: network identity changed; previous container remains preserved as %s: %v\n", backupName, err)
+				return 1
+			}
+		}
+		if publicConfigurationExecution {
+			bindings := updateBindingEvidence(m, candidate.Service, resolvedSecrets, resolvedNetworks)
+			if bindings == nil {
+				fmt.Fprintf(stderr, "candidate creation blocked: public configuration evidence is missing; previous container remains preserved as %s\n", backupName)
+				return 1
+			}
+			freshFingerprint, fingerprintErr := operation.PublicConfigurationPlanFingerprint(m.Name, candidate.Service, candidate.Name, candidate.CurrentID, candidate.CurrentImage, candidate.DifferenceFingerprint, *bindings)
+			if fingerprintErr != nil || freshFingerprint != fingerprint {
+				fmt.Fprintf(stderr, "candidate creation blocked: public configuration evidence changed; previous container remains preserved as %s\n", backupName)
 				return 1
 			}
 		}

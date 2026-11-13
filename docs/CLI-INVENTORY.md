@@ -190,6 +190,9 @@ Syntax: `orisema update apply <manifest.yaml> <service> --journal <directory>
 --operation <id>`. Journaled runtime mutation after exact confirmation. It
 preserves the previous container and creates an unverified candidate. Failures
 receive no automatic cleanup, retry or rollback.
+For a Beta 1 public-configuration intent, exact confirmation includes the
+operation ID and the command may only preserve the previous unit and create the
+candidate. It remains `APPLYING`; verify, rollback and cleanup are blocked.
 
 <!-- command: update verify -->
 ### `orisema update verify`

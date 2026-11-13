@@ -159,8 +159,9 @@ func TestPublicConfigurationIntentPersistsValueFreeAndCannotAuthorize(t *testing
 	if err != nil || authorized.State != Preparing || authorized.Authorization == nil {
 		t.Fatalf("authorized=%#v err=%v", authorized, err)
 	}
-	if _, err := store.BeginUpdateExecution(created.ID, created.Intent.PlanFingerprint, "rollback-slot", observedIntentResource(), now.Add(2*time.Minute)); err == nil || !strings.Contains(err.Error(), "cannot be executed") {
-		t.Fatal("review-only intent unexpectedly began execution")
+	executing, err := store.BeginUpdateExecution(created.ID, created.Intent.PlanFingerprint, "rollback-slot", observedIntentResource(), now.Add(2*time.Minute))
+	if err != nil || executing.State != Applying || executing.Execution == nil || executing.Execution.PendingStep != "stop-previous" {
+		t.Fatalf("executing=%#v err=%v", executing, err)
 	}
 }
 

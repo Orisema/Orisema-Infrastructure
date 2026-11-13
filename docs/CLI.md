@@ -138,6 +138,14 @@ old container is preserved and failures receive no automatic cleanup, retry or
 rollback. A created candidate remains unverified; this command does not claim
 health or completion.
 
+For an authorized Beta 1 public-configuration intent, the confirmation is
+`APPLY PUBLIC CONFIG application/service operation-id`. The command revalidates
+the value-free plan, persists every next effect, stops and preserves the exact
+previous container, then creates a candidate with the new public configuration
+and unchanged image. It ends in `APPLYING`: verify, completion, rollback and
+cleanup remain unavailable for this contract, so the preserved unit must not be
+removed manually.
+
 `update verify` is read-only with respect to Podman and records one explicit
 post-update observation per invocation. It freshly revalidates the candidate
 and preserved previous container, then persists `VERIFYING`. Healthy evidence

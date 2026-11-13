@@ -373,7 +373,9 @@ func validateUpdateIntent(op Operation) error {
 	if publicConfigPrepare {
 		validState := op.State == Pending && op.Authorization == nil && op.Execution == nil ||
 			op.State == Preparing && op.Authorization != nil && op.Execution == nil ||
-			op.State == Applying && op.Authorization != nil && op.Execution != nil
+			op.State == Applying && op.Authorization != nil && op.Execution != nil && op.Health == nil && op.Decision == nil ||
+			op.State == Verifying && op.Authorization != nil && op.Execution != nil && op.Health != nil && op.Decision == nil ||
+			(op.State == Completed || op.State == RecoveryRequired) && op.Authorization != nil && op.Execution != nil && op.Health != nil && op.Decision != nil
 		if !validState {
 			return errors.New("persisted public configuration intent has invalid lifecycle evidence")
 		}

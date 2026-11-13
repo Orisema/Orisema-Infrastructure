@@ -1188,14 +1188,14 @@ func runUpdateCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 			fmt.Fprintf(stderr, "update continuation blocked before confirmation: %v\n", err)
 			return 1
 		}
-		if verify || rollback || rollbackVerify {
+		if rollback || rollbackVerify {
 			op, err := store.Load(args[7])
 			if err != nil {
 				fmt.Fprintf(stderr, "update continuation blocked: %v\n", err)
 				return 1
 			}
 			if op.PublicConfigurationReviewOnly() {
-				fmt.Fprintln(stderr, "update continuation blocked: public configuration verify and rollback are not implemented")
+				fmt.Fprintln(stderr, "update continuation blocked: public configuration rollback is not implemented")
 				return 1
 			}
 		}
@@ -1620,7 +1620,12 @@ func revalidateUpdateBindings(ctx context.Context, m *manifest.Manifest, op oper
 	if bindings == nil {
 		return nil, nil, errors.New("authorized configured bindings are missing from the manifest")
 	}
-	fingerprint, err := operation.UpdatePlanFingerprintWithBindings(op.Application, op.Intent.Service, op.IntentResourceName(), op.Resources[0].ID, op.Intent.CurrentImage, op.Intent.TargetImage, *bindings)
+	var fingerprint string
+	if op.PublicConfigurationReviewOnly() {
+		fingerprint, err = operation.PublicConfigurationPlanFingerprint(op.Application, op.Intent.Service, op.IntentResourceName(), op.Resources[0].ID, op.Intent.CurrentImage, op.Intent.DifferenceFingerprint, *bindings)
+	} else {
+		fingerprint, err = operation.UpdatePlanFingerprintWithBindings(op.Application, op.Intent.Service, op.IntentResourceName(), op.Resources[0].ID, op.Intent.CurrentImage, op.Intent.TargetImage, *bindings)
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid binding evidence: %w", err)
 	}

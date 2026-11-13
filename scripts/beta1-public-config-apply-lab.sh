@@ -9,6 +9,8 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 binary=${ORISEMA_BINARY:-"$repo_root/work/orisema"}
 evidence=${ORISEMA_EVIDENCE_DIR:-"$repo_root/work/beta1-public-config-apply"}
 image=${ORISEMA_IMAGE:-docker.io/library/nginx:1.27-alpine}
+health_command=${ORISEMA_HEALTH_COMMAND:-nginx -t}
+expected_decision=${ORISEMA_EXPECT_DECISION:-COMPLETE}
 app=beta1-public-config
 target=orisema-beta1-public-config-web
 old_value="beta1-old-${RANDOM}-${RANDOM}"
@@ -32,7 +34,7 @@ cleanup
 
 write_manifest() {
   local value=$1 output=$2
-  sed -e "s|LAB_IMAGE|$image|" -e "s|LAB_VALUE|$value|" >"$output" <<'YAML'
+  sed -e "s|LAB_IMAGE|$image|" -e "s|LAB_VALUE|$value|" -e "s|HEALTH_COMMAND|$health_command|" >"$output" <<'YAML'
 apiVersion: orisema.dev/v1alpha4
 kind: Application
 name: beta1-public-config
@@ -43,7 +45,7 @@ services:
       - name: APP_MODE
         value: LAB_VALUE
     healthcheck:
-      command: nginx -t
+      command: "HEALTH_COMMAND"
       interval: 5s
       timeout: 2s
       retries: 2
@@ -99,13 +101,40 @@ test "$(podman inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$ba
 podman inspect --format '{{json .State}}' "$target" >"$evidence/candidate.json"
 podman inspect --format '{{json .State}}' "$backup" >"$evidence/preserved-previous.json"
 
-status=0
-"$binary" update verify "$manifest" web --journal "$journal" \
-  --operation "$operation_id" >"$evidence/verify.out" 2>"$evidence/verify.err" || status=$?
-test "$status" -ne 0
-grep -Fq 'verify and rollback are not implemented' "$evidence/verify.err"
+if [ "$expected_decision" = COMPLETE ]; then
+  podman healthcheck run "$target" >"$evidence/candidate-health.txt"
+  "$binary" update verify "$manifest" web --journal "$journal" \
+    --operation "$operation_id" >"$evidence/verify.out"
+  grep -Fq 'decision: COMPLETE' "$evidence/verify.out"
+  grep -Fq 'state=COMPLETED' "$evidence/verify.out"
+  expected_state=COMPLETED
+else
+  test "$expected_decision" = RECOVERY_REQUIRED
+  podman stop --time 0 "$target" >"$evidence/candidate-stop.txt"
+  "$binary" update verify "$manifest" web --journal "$journal" \
+    --operation "$operation_id" >"$evidence/verify.out"
+  grep -Fq 'decision: RECOVERY_REQUIRED' "$evidence/verify.out"
+  grep -Fq 'state=RECOVERY_REQUIRED' "$evidence/verify.out"
+  expected_state=RECOVERY_REQUIRED
+fi
 "$binary" operation diagnose --journal "$journal" >"$evidence/diagnosis.txt"
-grep -Fq 'state=APPLYING' "$evidence/diagnosis.txt"
+if [ "$expected_state" = COMPLETED ]; then
+  grep -Fq '  none' "$evidence/diagnosis.txt"
+else
+  grep -Fq 'state=RECOVERY_REQUIRED' "$evidence/diagnosis.txt"
+  journal_before=$(sha256sum "$journal/$operation_id.json" | awk '{print $1}')
+  candidate_before=$(podman inspect --format '{{.Id}}' "$target")
+  previous_before=$(podman inspect --format '{{.Id}}' "$backup")
+  status=0
+  printf 'ROLLBACK UPDATE %s/web %s\n' "$app" "$operation_id" | \
+    "$binary" update rollback "$manifest" web --journal "$journal" \
+      --operation "$operation_id" >"$evidence/rollback-blocked.out" 2>"$evidence/rollback-blocked.err" || status=$?
+  test "$status" -ne 0
+  grep -Fq 'public configuration rollback is not implemented' "$evidence/rollback-blocked.err"
+  test "$(sha256sum "$journal/$operation_id.json" | awk '{print $1}')" = "$journal_before"
+  test "$(podman inspect --format '{{.Id}}' "$target")" = "$candidate_before"
+  test "$(podman inspect --format '{{.Id}}' "$backup")" = "$previous_before"
+fi
 
 if grep -FRq --exclude='old.yaml' --exclude='manifest.yaml' -- "$old_value" "$evidence" || \
    grep -FRq --exclude='old.yaml' --exclude='manifest.yaml' -- "$new_value" "$evidence"; then
@@ -117,4 +146,4 @@ if grep -Fq -- "$old_value" "$journal/$operation_id.json" || grep -Fq -- "$new_v
   exit 1
 fi
 
-printf 'Beta 1 public configuration candidate laboratory passed.\n' | tee "$evidence/result.txt"
+printf 'Beta 1 public configuration %s laboratory passed.\n' "$expected_decision" | tee "$evidence/result.txt"

@@ -277,7 +277,13 @@ jobs:
             ORISEMA_BINARY="$PWD/work/orisema" \
             ORISEMA_EVIDENCE_DIR="$PWD/work/beta1-public-config-apply" \
             scripts/beta1-public-config-apply-lab.sh
+          sudo env \
+            ORISEMA_BINARY="$PWD/work/orisema" \
+            ORISEMA_EVIDENCE_DIR="$PWD/work/beta1-public-config-failure" \
+            ORISEMA_EXPECT_DECISION=RECOVERY_REQUIRED \
+            scripts/beta1-public-config-apply-lab.sh
           sudo chown -R "$USER":"$(id -gn)" work/beta1-public-config-apply
+          sudo chown -R "$USER":"$(id -gn)" work/beta1-public-config-failure
       - name: Exercise Phase 2 backup and restore laboratory
         run: |
           set -euo pipefail
@@ -340,6 +346,10 @@ jobs:
             work/beta1-public-config-apply/*.out
             work/beta1-public-config-apply/*.err
             work/beta1-public-config-apply/*.json
+            work/beta1-public-config-failure/*.txt
+            work/beta1-public-config-failure/*.out
+            work/beta1-public-config-failure/*.err
+            work/beta1-public-config-failure/*.json
             work/alpha3-update/*.json
             work/alpha3-update/*.txt
             work/alpha5-update-apply/*.json

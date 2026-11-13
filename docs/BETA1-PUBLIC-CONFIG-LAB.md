@@ -10,9 +10,10 @@ Podman service. The image, ports, healthcheck and restart policy remain
 unchanged; the service has no secrets, networks or volumes. The previous
 container must be preserved stopped under the operation-specific rollback name.
 
-The operation intentionally ends in `APPLYING`. `update verify`, rollback and
-cleanup reject this v3 contract. Operators must not remove either container or
-edit the journal manually.
+The operation enters `APPLYING`, then verify records a durable `COMPLETED` or
+`RECOVERY_REQUIRED` decision. Rollback and cleanup still reject this v3
+contract. Operators must not remove either container or edit the journal
+manually.
 
 ## Run
 
@@ -40,7 +41,8 @@ at an existing directory containing operator data.
 - the candidate uses the new value and unchanged image;
 - public values appear only in the supplied manifests and live Podman
   configuration, not journal, command output or retained diagnostic evidence;
-- verify is rejected and `operation diagnose` reports `APPLYING`.
+- a healthy candidate commits `COMPLETED`;
+- a stopped candidate commits `RECOVERY_REQUIRED` without automatic rollback.
 
 ## Interruption and recovery
 
@@ -54,5 +56,6 @@ orisema operation diagnose --journal /absolute/journal
 ```
 
 There is no automatic resume, cleanup or rollback for a Beta 1 public
-configuration intent yet. Preserve the journal, candidate and previous
-container for the following reviewed recovery increment.
+configuration intent. A `RECOVERY_REQUIRED` decision preserves the journal,
+candidate and previous container for the following reviewed recovery
+increment.

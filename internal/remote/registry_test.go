@@ -13,6 +13,9 @@ import (
 func registryFixture(t *testing.T, hosts string) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()
+	if err := os.Chmod(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	key := filepath.Join(root, "id_ed25519")
 	known := filepath.Join(root, "known_hosts")
 	if err := os.WriteFile(key, []byte("test-key-reference"), 0o600); err != nil {

@@ -14,12 +14,13 @@ permissions:
 
 jobs:
   release:
-    if: github.event_name == 'push' || contains(fromJSON('[14, 27, 28, 46, 73, 89, 102, 121, 124, 150]'), github.event.issue.number)
+    if: github.event_name == 'push' || contains(fromJSON('[14, 27, 28, 46, 73, 89, 102, 121, 124, 150, 179]'), github.event.issue.number)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.issue.number == 27 && 'v0.1.0-alpha.2' || github.event.issue.number == 28 && 'v0.1.0-alpha.3' || github.event.issue.number == 46 && 'v0.1.0-alpha.4' || github.event.issue.number == 73 && 'v0.1.0-alpha.5' || github.event.issue.number == 89 && 'v0.1.0-alpha.6' || github.event.issue.number == 102 && 'v0.1.0-alpha.7' || github.event.issue.number == 121 && 'v0.1.0-alpha.8' || github.event.issue.number == 124 && 'v0.1.0-alpha.9' || github.event.issue.number == 150 && 'v0.1.0-alpha.10' || 'v0.1.0-alpha.1' }}
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || github.event.issue.number == 27 && 'v0.1.0-alpha.2' || github.event.issue.number == 28 && 'v0.1.0-alpha.3' || github.event.issue.number == 46 && 'v0.1.0-alpha.4' || github.event.issue.number == 73 && 'v0.1.0-alpha.5' || github.event.issue.number == 89 && 'v0.1.0-alpha.6' || github.event.issue.number == 102 && 'v0.1.0-alpha.7' || github.event.issue.number == 121 && 'v0.1.0-alpha.8' || github.event.issue.number == 124 && 'v0.1.0-alpha.9' || github.event.issue.number == 150 && 'v0.1.0-alpha.10' || github.event.issue.number == 179 && 'v0.1.0-beta.1' || 'v0.1.0-alpha.1' }}
       COMMIT: ${{ github.event_name == 'push' && github.sha || github.event.issue.number == 27 && 'a33e930025247e801c2b57799a8c77aa821e8e3e' || github.sha }}
+      PREVIOUS_VERSION: ${{ (github.event.issue.number == 179 || github.ref_name == 'v0.1.0-beta.1') && 'v0.1.0-alpha.10' || 'v0.1.0-alpha.9' }}
       CERTIFICATE_IDENTITY: https://github.com/${{ github.workflow_ref }}
     steps:
       - name: Check out immutable release source
@@ -32,7 +33,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Create the Alpha tag after its gate issue closes
+      - name: Create the release tag after its gate issue closes
         if: github.event_name == 'issues'
         run: |
           set -euo pipefail
@@ -47,6 +48,7 @@ jobs:
             121) test "$VERSION" = v0.1.0-alpha.8 ;;
             124) test "$VERSION" = v0.1.0-alpha.9 ;;
             150) test "$VERSION" = v0.1.0-alpha.10 ;;
+            179) test "$VERSION" = v0.1.0-beta.1 ;;
             *) exit 1 ;;
           esac
           existing="$(git ls-remote --refs origin "refs/tags/$VERSION" \
@@ -82,6 +84,19 @@ jobs:
         with:
           name: alpha10-release-gate-${{ github.sha }}
           path: ${{ runner.temp }}/alpha10-release-gate
+          if-no-files-found: error
+          retention-days: 30
+      - name: Record Beta 1 source gate
+        if: env.VERSION == 'v0.1.0-beta.1'
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/beta1-release-gate
+        run: scripts/beta1-release-gate.sh
+      - name: Upload Beta 1 source-gate evidence
+        if: env.VERSION == 'v0.1.0-beta.1'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: beta1-release-gate-${{ github.sha }}
+          path: ${{ runner.temp }}/beta1-release-gate
           if-no-files-found: error
           retention-days: 30
       - name: Build and verify release archives
@@ -177,22 +192,22 @@ jobs:
           ./orisema version | tee installed-version.txt
           grep -Fq "Version: $VERSION" installed-version.txt
           grep -Fq "Commit: $COMMIT" installed-version.txt
-          sh "$GITHUB_WORKSPACE/install.sh" --version v0.1.0-alpha.9 \
+          sh "$GITHUB_WORKSPACE/install.sh" --version "$PREVIOUS_VERSION" \
             --bin-dir "$install_dir/bin"
           sh "$GITHUB_WORKSPACE/install.sh" --version "$VERSION" \
             --bin-dir "$install_dir/bin"
           "$install_dir/bin/orisema" version | tee installer-version.txt
           grep -Fq "Version: $VERSION" installer-version.txt
           grep -Fq "Commit: $COMMIT" installer-version.txt
-          if sh "$GITHUB_WORKSPACE/install.sh" --version v0.1.0-alpha.9 \
+          if sh "$GITHUB_WORKSPACE/install.sh" --version "$PREVIOUS_VERSION" \
             --bin-dir "$install_dir/bin"; then
             echo 'implicit downgrade unexpectedly succeeded' >&2
             exit 1
           fi
           "$install_dir/bin/orisema" version | grep -Fq "Version: $VERSION"
-          sh "$GITHUB_WORKSPACE/install.sh" --version v0.1.0-alpha.9 \
+          sh "$GITHUB_WORKSPACE/install.sh" --version "$PREVIOUS_VERSION" \
             --bin-dir "$install_dir/bin" --allow-downgrade
-          "$install_dir/bin/orisema" version | grep -Fq 'Version: v0.1.0-alpha.9'
+          "$install_dir/bin/orisema" version | grep -Fq "Version: $PREVIOUS_VERSION"
           sh "$GITHUB_WORKSPACE/install.sh" --version "$VERSION" \
             --bin-dir "$install_dir/bin"
           HOME="$install_dir/home" XDG_BIN_HOME="$install_dir/bin" \

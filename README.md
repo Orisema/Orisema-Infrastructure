@@ -45,6 +45,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Compatibilidade e comandos suportados](docs/COMPATIBILITY.md)
 - [Inventário operacional verificável da CLI](docs/CLI-INVENTORY.md)
 - [Gate de compatibilidade e release da Alpha 10](docs/ALPHA10-RELEASE-GATE.md)
+- [Gate de compatibilidade e release da Beta 1](docs/BETA1-RELEASE-GATE.md)
 - [Manual do mantenedor](docs/MAINTAINER-MANUAL.md)
 - [Laboratórios equivalentes para operador e agente](docs/OPERATOR-AGENT-LABS.md)
 - [Auditoria de conclusão da Fase 2](docs/PHASE2-AUDIT.md)
@@ -53,6 +54,7 @@ Projeto comunitário para simplificar a implantação, atualização, diagnósti
 - [Auditoria de conclusão da Alpha 8](docs/ALPHA8-AUDIT.md)
 - [Auditoria de conclusão da Alpha 9](docs/ALPHA9-AUDIT.md)
 - [Auditoria e evidências da Alpha 10](docs/ALPHA10-AUDIT.md)
+- [Auditoria de fonte da Beta 1](docs/BETA1-AUDIT.md)
 - [Laboratório de candidato de configuração pública da Beta 1](docs/BETA1-PUBLIC-CONFIG-LAB.md)
 - [Laboratórios Fedora 43/45 da Alpha 8](docs/ALPHA8-FEDORA-LAB.md)
 

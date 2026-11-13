@@ -271,6 +271,11 @@ O planejamento detalhado está no [roadmap principal](../ROADMAP.md). A integra�
   [RFC-0008](RFC-0008-controlled-configuration-replacement.md) e às issues
   #164/#165. Nenhum comportamento runtime está autorizado apenas por este
   roadmap.
+- O primeiro incremento implementa somente drift exclusivo de configuração
+  pública em um serviço sem secrets ou redes. Plano tipado, intenção v3,
+  autorização, apply, verify e rollback manual foram entregues nas issues
+  #165–#177. O gate de fonte e publicação é #179; os demais tipos de drift
+  continuam bloqueados.
 - Matriz ampliada de distribuições/Podman; adaptador Docker somente após testes.
 - Backup e restauração efetivamente testados; SSH remoto seguro.
 - Observabilidade opcional, multi-node, painel e identidade central somente com

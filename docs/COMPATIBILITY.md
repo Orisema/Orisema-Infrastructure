@@ -26,7 +26,8 @@ change; the workflow evidence for a commit is authoritative. These observations
 are not minimum-version guarantees.
 
 The evidence classes, reproducible commands and post-publication checks are
-defined by the [Alpha 10 release gate](ALPHA10-RELEASE-GATE.md). A compiled
+defined by the [Alpha 10 release gate](ALPHA10-RELEASE-GATE.md) and the
+[Beta 1 release gate](BETA1-RELEASE-GATE.md). A compiled
 artifact, a container lab and a native runtime test are deliberately not
 treated as interchangeable evidence.
 
@@ -82,7 +83,7 @@ observed environment rather than a minimum-version guarantee.
 | `operation init` | No | Journal only | Explicitly initializes or validates a private operation store; never repairs unsafe state |
 | `operation diagnose` | No | No | Reads incomplete operation evidence; never authorizes automatic resume |
 | `plan` | Yes | No | Compares only supported declared fields |
-| `update plan` | Yes | No | Image-only candidate guidance; never authorizes execution |
+| `update plan` | Yes | No | Image-only or bounded public-configuration candidate guidance; never authorizes execution |
 | `update prepare` | Yes | Journal only | Persists one plan-bound intent; never changes Podman |
 | `update authorize` | Yes | Journal only | Confirms and revalidates intent; never changes Podman |
 | `update apply` | Yes | Yes | Revalidates, preserves the stopped previous container and creates one unverified candidate |

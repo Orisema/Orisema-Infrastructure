@@ -1,7 +1,7 @@
 # Beta 1 public configuration candidate laboratory
 
-Status: implementation evidence for issue #173. This laboratory does not
-claim verify, completion, rollback or production readiness.
+Status: implementation evidence for issues #173, #175 and #177. This
+laboratory does not claim cleanup, data rollback or production readiness.
 
 ## Boundary
 
@@ -11,9 +11,9 @@ unchanged; the service has no secrets, networks or volumes. The previous
 container must be preserved stopped under the operation-specific rollback name.
 
 The operation enters `APPLYING`, then verify records a durable `COMPLETED` or
-`RECOVERY_REQUIRED` decision. Rollback and cleanup still reject this v3
-contract. Operators must not remove either container or edit the journal
-manually.
+`RECOVERY_REQUIRED` decision. The latter permits only an explicit, confirmed
+rollback of the exact preserved unit. Cleanup still rejects this v3 contract.
+Operators must not remove either container or edit the journal manually.
 
 ## Run
 
@@ -42,20 +42,27 @@ at an existing directory containing operator data.
 - public values appear only in the supplied manifests and live Podman
   configuration, not journal, command output or retained diagnostic evidence;
 - a healthy candidate commits `COMPLETED`;
-- a stopped candidate commits `RECOVERY_REQUIRED` without automatic rollback.
+- a stopped candidate commits `RECOVERY_REQUIRED` without automatic rollback;
+- a wrong rollback confirmation changes neither journal nor runtime;
+- changed public-configuration evidence blocks rollback before runtime mutation;
+- manual rollback restores and starts the same previous container ID, keeps
+  the failed candidate stopped under its diagnostic name and commits
+  `ROLLED_BACK` only after healthy evidence.
 
 ## Interruption and recovery
 
 Every runtime effect uses the existing update execution journal boundaries:
 `stop-previous`, `rename-previous` and `create-candidate`. An interruption
-preserves the pending step and all observed IDs. The supported next action in
-this increment is inspection only:
+preserves the pending step and all observed IDs. Inspection remains the safe
+first action:
 
 ```sh
 orisema operation diagnose --journal /absolute/journal
 ```
 
-There is no automatic resume, cleanup or rollback for a Beta 1 public
-configuration intent. A `RECOVERY_REQUIRED` decision preserves the journal,
-candidate and previous container for the following reviewed recovery
-increment.
+There is no automatic resume, cleanup or rollback. A `RECOVERY_REQUIRED`
+decision preserves the journal, candidate and previous container until the
+operator explicitly invokes `update rollback`; every rollback effect is
+journaled and `update rollback-verify` separately records health. The old
+public value is never reconstructed or persisted: restoration uses the exact
+preserved container.
